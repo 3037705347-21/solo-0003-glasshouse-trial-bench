@@ -1,0 +1,29 @@
+{
+  "language": "TypeScript",
+  "project_shape": "frontend",
+  "source_extensions": [
+    ".ts",
+    ".tsx",
+    ".css"
+  ],
+  "build_command": "npm run build",
+  "testing": "deferred",
+  "workflow_checks": [
+    {
+      "workflow_id": "curate-accession-roster",
+      "command": "node scripts/smoke.mjs curate-accession-roster"
+    },
+    {
+      "workflow_id": "assign-accession-bench",
+      "command": "node scripts/smoke.mjs assign-accession-bench"
+    },
+    {
+      "workflow_id": "record-observation-pass",
+      "command": "node scripts/smoke.mjs record-observation-pass"
+    },
+    {
+      "workflow_id": "advance-trial-clearance",
+      "command": "node scripts/smoke.mjs advance-trial-clearance"
+    }
+  ]
+}

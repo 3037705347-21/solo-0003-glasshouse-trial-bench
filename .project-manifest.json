@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "name": "glasshouse-trial-bench",
+  "project_shape": "frontend",
+  "modules": [
+    {
+      "id": "app",
+      "path": "src/app",
+      "responsibility": "路由组合、导航和公开页面入口"
+    },
+    {
+      "id": "domain",
+      "path": "src/domain",
+      "responsibility": "实体、校验、转换、台架规则、标记派生和放行计算"
+    },
+    {
+      "id": "state",
+      "path": "src/state",
+      "responsibility": "reducer、动作、选择器、示例工作区和浏览器持久化"
+    },
+    {
+      "id": "roster",
+      "path": "src/features/roster",
+      "responsibility": "材料发现、筛选、创建和编辑"
+    },
+    {
+      "id": "layout",
+      "path": "src/features/layout",
+      "responsibility": "台架选择、兼容性反馈、分配和移出"
+    },
+    {
+      "id": "observations",
+      "path": "src/features/observations",
+      "responsibility": "观测编辑、观测历史和标记生命周期"
+    },
+    {
+      "id": "clearance",
+      "path": "src/features/clearance",
+      "responsibility": "放行预览、快照生成和阻止项展示"
+    },
+    {
+      "id": "components",
+      "path": "src/components",
+      "responsibility": "共享表单、表格、弹窗、标签、指标、toast 和空状态原语"
+    }
+  ],
+  "complexity": {
+    "mechanisms": [
+      "state_transition",
+      "validation_boundary",
+      "error_propagation",
+      "resource_lifecycle"
+    ]
+  },
+  "workflows": [
+    {
+      "id": "curate-accession-roster",
+      "name": "维护材料登记",
+      "entry": "GET /#/roster",
+      "steps": [
+        "筛选和搜索材料",
+        "校验材料草稿",
+        "持久化创建或更新的材料"
+      ],
+      "success": "材料出现在清单中，并可用于台架分配",
+      "failure": "表单显示稳定的字段级校验错误",
+      "verification": "无头浏览器创建 ACC-0009 并确认它出现",
+      "module_ids": ["app", "domain", "state", "roster"]
+    },
+    {
+      "id": "assign-accession-bench",
+      "name": "分配材料台架",
+      "entry": "GET /#/layout",
+      "steps": [
+        "选择未分配材料",
+        "检查台架光照、容量和运行状态",
+        "提交台架分配"
+      ],
+      "success": "材料出现在所选台架上",
+      "failure": "分配被拒绝并给出具体约束信息",
+      "verification": "无头浏览器将 Yellow Pear 分配到 E-2 台架",
+      "module_ids": ["app", "domain", "state", "layout"]
+    },
+    {
+      "id": "record-observation-pass",
+      "name": "记录生长观测",
+      "entry": "GET /#/observations",
+      "steps": [
+        "校验观测日期、观测人和测量记录",
+        "创建观测记录",
+        "从测量数据派生生长标记"
+      ],
+      "success": "观测记录被保存，派生标记可见",
+      "failure": "无效或重复测量被拒绝",
+      "verification": "无头浏览器记录观测并确认观测历史增加",
+      "module_ids": ["app", "domain", "state", "observations"]
+    },
+    {
+      "id": "advance-trial-clearance",
+      "name": "推进试验放行",
+      "entry": "GET /#/clearance",
+      "steps": [
+        "计算跨模块放行指标",
+        "收集材料、台架、标记和试验阻止项",
+        "生成放行快照"
+      ],
+      "success": "就绪快照可以把试验移动到已放行状态",
+      "failure": "被阻止的快照列出每个具体阻止项",
+      "verification": "无头浏览器为示例试验生成被阻止的快照",
+      "module_ids": ["app", "domain", "state", "clearance"]
+    }
+  ]
+}
