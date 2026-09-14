@@ -77,6 +77,22 @@ export function RosterPage() {
       render: (accession) => accession.source,
     },
     {
+      key: "labels",
+      header: "标签",
+      render: (accession) =>
+        accession.labels.length > 0 ? (
+          <span className="label-chip-row">
+            {accession.labels.map((label) => (
+              <span className="label-chip" key={label}>
+                {label}
+              </span>
+            ))}
+          </span>
+        ) : (
+          <span className="muted-copy">无</span>
+        ),
+    },
+    {
       key: "trial",
       header: "试验",
       render: (accession) =>

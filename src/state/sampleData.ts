@@ -53,7 +53,7 @@ const accessions: Accession[] = [
     trayCells: 104,
     preferredLight: "full-sun",
     genotypeNote: "有限生长型矮化品系，节间紧凑。",
-    labels: ["矮化", "早熟"],
+    labels: ["矮化", "早熟", "Early"],
   },
   {
     id: "acc-tom-02",
@@ -66,7 +66,7 @@ const accessions: Accession[] = [
     trayCells: 104,
     preferredLight: "full-sun",
     genotypeNote: "矮化品种，单盆果实密度较高。",
-    labels: ["矮化", "果实"],
+    labels: ["矮化 ", "果实", "EARLY"],
   },
   {
     id: "acc-tom-03",
@@ -105,7 +105,7 @@ const accessions: Accession[] = [
     trayCells: 128,
     preferredLight: "partial-shade",
     genotypeNote: "金色甜菜品系，用于低草酸筛选。",
-    labels: ["金色", "低草酸"],
+    labels: ["金色", "低草酸", "  "],
   },
   {
     id: "acc-bee-03",

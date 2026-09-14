@@ -15,6 +15,7 @@ const scenarios = {
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
+  "govern-accession-labels": governAccessionLabels,
 };
 
 const scenarioPaths = {
@@ -22,6 +23,7 @@ const scenarioPaths = {
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
+  "govern-accession-labels": "/labels",
 };
 
 async function waitForServer() {
@@ -91,6 +93,54 @@ async function advanceTrialClearance(page) {
     .getByText("阻止", { exact: true })
     .first()
     .waitFor();
+}
+
+async function governAccessionLabels(page) {
+  // 示例数据中 SOL-01 存在大小写混用（Early / EARLY）、首尾空格（矮化␠）。
+  await page.getByTestId("dirty-banner").waitFor();
+  await page
+    .getByTestId("label-variants-early")
+    .getByText("EARLY×1")
+    .waitFor();
+
+  // 重命名：早熟 -> early-maturity，执行前预览影响 1 个材料。
+  await page.getByTestId("rename-label-早熟").click();
+  await page.getByTestId("rename-label-input").fill("early-maturity");
+  await page.getByTestId("impact-count").getByText("1 个材料").waitFor();
+  await page.getByTestId("impact-row-acc-tom-01").waitFor();
+  await page.getByTestId("apply-label-operation").click();
+  await page.getByText("标签已重命名", { exact: true }).waitFor();
+
+  // 合并：矮化 + early（含大小写混用）统一为 compact，影响 2 个材料。
+  await page.getByTestId("label-check-矮化").check();
+  await page.getByTestId("label-check-early").check();
+  await page.getByTestId("open-bulk-merge").click();
+  await page.getByTestId("merge-target-input").fill("compact");
+  await page.getByTestId("impact-count").getByText("2 个材料").waitFor();
+  await page.getByTestId("apply-label-operation").click();
+  await page.getByText("标签已合并", { exact: true }).waitFor();
+  await page.waitForFunction(
+    () => document.querySelectorAll('[data-testid="dirty-banner"]').length === 0,
+  );
+
+  // 批量添加：为试验内全部 3 个材料追加“抗病”。
+  await page.getByTestId("open-add-labels").click();
+  await page.getByTestId("add-labels-input").fill("抗病");
+  await page.getByTestId("impact-count").getByText("3 个材料").waitFor();
+  await page.getByTestId("apply-label-operation").click();
+  await page.getByText("标签已批量添加", { exact: true }).waitFor();
+
+  // 回到材料列表核对落库结果，治理结果必须与材料记录一致。
+  await page.goto(`${baseUrl}/#/roster`, { waitUntil: "networkidle" });
+  await page.getByTestId("accession-search").fill("抗病");
+  await page.waitForFunction(
+    () => document.querySelectorAll("table.data-table tbody tr").length === 3,
+  );
+  await page.getByTestId("accession-search").fill("early-maturity");
+  await page.waitForFunction(
+    () => document.querySelectorAll("table.data-table tbody tr").length === 1,
+  );
+  await page.getByText("compact", { exact: true }).first().waitFor();
 }
 
 async function runScenario(scenarioName) {

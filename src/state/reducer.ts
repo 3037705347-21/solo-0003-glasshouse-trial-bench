@@ -32,6 +32,17 @@ export function workspaceReducer(
           accession.id === action.accession.id ? action.accession : accession,
         ),
       };
+    case "accession/labels-applied": {
+      const updates = new Map(
+        action.accessions.map((accession) => [accession.id, accession]),
+      );
+      return {
+        ...state,
+        accessions: state.accessions.map((accession) =>
+          updates.get(accession.id) ?? accession,
+        ),
+      };
+    }
     case "bench/assigned":
     case "bench/released":
       return {

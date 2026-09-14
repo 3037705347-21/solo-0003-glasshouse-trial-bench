@@ -16,6 +16,7 @@ export type WorkspaceAction =
   | { type: "trial/transitioned"; trialId: string; state: TrialState }
   | { type: "accession/created"; accession: Accession }
   | { type: "accession/updated"; accession: Accession }
+  | { type: "accession/labels-applied"; accessions: Accession[] }
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
