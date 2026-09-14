@@ -15,6 +15,7 @@ const scenarios = {
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
+  "maintain-accession-lineage": maintainAccessionLineage,
 };
 
 const scenarioPaths = {
@@ -22,6 +23,7 @@ const scenarioPaths = {
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
+  "maintain-accession-lineage": "/lineage",
 };
 
 async function waitForServer() {
@@ -56,7 +58,7 @@ async function curateAccessionRoster(page) {
   await page.locator("textarea").first().fill("Compact heirloom line with uniform early habit.");
   await page.getByTestId("save-accession-button").click();
   await page.getByText("Stupice", { exact: true }).first().waitFor();
-  await page.getByText("ACC-0009", { exact: true }).first().waitFor();
+  await page.getByText("ACC-0013", { exact: true }).first().waitFor();
 }
 
 async function assignAccessionBench(page) {
@@ -91,6 +93,32 @@ async function advanceTrialClearance(page) {
     .getByText("阻止", { exact: true })
     .first()
     .waitFor();
+}
+
+async function maintainAccessionLineage(page) {
+  // The sample SOL-01 data contains a three-generation parent chain.
+  await page.getByText("完整谱系链", { exact: true }).waitFor();
+  await page.getByTestId("lineage-node-acc-tom-04").waitFor();
+  await page.getByTestId("lineage-node-acc-tom-06").waitFor();
+  await page.getByText("追溯终止", { exact: true }).first().waitFor();
+
+  // Open the relation editor seeded on the current focus node.
+  await page.getByTestId("open-create-relation").click();
+  await page.getByTestId("lineage-type-select").selectOption("parent");
+  await page.getByTestId("lineage-endpoint-b").selectOption("acc-tom-03");
+  await page.getByTestId("save-lineage-button").click();
+  await page.getByText("谱系关系已添加", { exact: true }).waitFor();
+
+  // The list fallback shows the new relation and offers removal.
+  await page.getByRole("tab", { name: "关系列表" }).click();
+  await page.getByText("ACC-0001 · Tiny Tim", { exact: true }).waitFor();
+  await page.getByText("ACC-0003 · Yellow Pear", { exact: true }).waitFor();
+
+  // The relationship must survive a full page reload (local persistence).
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByRole("tab", { name: "关系列表" }).click();
+  await page.getByText("ACC-0003 · Yellow Pear", { exact: true }).waitFor();
+  await page.getByTestId("delete-relation-lin-tom-cohort-01").waitFor();
 }
 
 async function runScenario(scenarioName) {

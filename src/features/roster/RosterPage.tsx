@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Leaf, Plus, Sprout } from "lucide-react";
+import { Link } from "react-router-dom";
+import { GitBranch, Plus, Sprout, Wrench } from "lucide-react";
 import { Button } from "../../components/Button";
 import { DataTable, type DataColumn } from "../../components/DataTable";
 import { Dialog } from "../../components/Dialog";
@@ -12,15 +13,17 @@ import {
   accessionMatchesQuery,
   nextAccessionNumber,
 } from "../../domain/accession";
+import { accessionDisplayName } from "../../domain/lineage";
 import type { Accession } from "../../domain/types";
 import {
   accessionById,
-  accessionsForTrial,
+  accessionMergeTarget,
   accessionStatus,
   benchForAccession,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { RosterForm } from "./RosterForm";
+import { AccessionManageDialog } from "../lineage/AccessionManageDialog";
 
 type RosterSegment = "all" | "assigned" | "unassigned";
 
@@ -31,6 +34,7 @@ export function RosterPage() {
   const [segment, setSegment] = useState<RosterSegment>("all");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingAccession, setEditingAccession] = useState<Accession | undefined>();
+  const [manageId, setManageId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
@@ -47,6 +51,9 @@ export function RosterPage() {
         accessionMatchesQuery(accession, query, trialFilter),
       )
       .filter((accession) => {
+        if (accession.mergedIntoId) {
+          return segment === "all";
+        }
         const status = accessionStatus(state, accession);
         if (segment === "assigned") {
           return status === "assigned";
@@ -63,7 +70,12 @@ export function RosterPage() {
       key: "accessionNo",
       header: "材料编号",
       render: (accession) => (
-        <span className="table-primary">{accession.accessionNo}</span>
+        <span className="table-primary">
+          {accession.accessionNo}
+          {accession.mergedIntoId ? (
+            <StatusBadge tone="warning">已归档</StatusBadge>
+          ) : null}
+        </span>
       ),
     },
     {
@@ -97,6 +109,10 @@ export function RosterPage() {
       key: "bench",
       header: "台架",
       render: (accession) => {
+        if (accession.mergedIntoId) {
+          const target = accessionMergeTarget(state, accession.id);
+          return target ? `已并入 ${target.accessionNo}` : "已归档";
+        }
         const bench = benchForAccession(state, accession.id);
         return bench ? bench.code : "未分配";
       },
@@ -105,6 +121,9 @@ export function RosterPage() {
       key: "status",
       header: "状态",
       render: (accession) => {
+        if (accession.mergedIntoId) {
+          return <StatusBadge tone="warning">已合并</StatusBadge>;
+        }
         const status = accessionStatus(state, accession);
         const label =
           status === "assigned"
@@ -119,17 +138,38 @@ export function RosterPage() {
       key: "actions",
       header: "",
       render: (accession) => (
-        <Button
-          tone="ghost"
-          size="sm"
-          onClick={() => {
-            setEditingAccession(accession);
-            setEditorOpen(true);
-          }}
-          data-testid={`edit-accession-${accession.id}`}
-        >
-          编辑
-        </Button>
+        <span className="row-actions">
+          <Link
+            className="button button-ghost button-sm"
+            to={`/lineage?trial=${accession.trialId}&focus=${accession.id}`}
+            data-testid={`lineage-link-${accession.id}`}
+          >
+            <GitBranch size={14} />
+            谱系
+          </Link>
+          {accession.mergedIntoId ? null : (
+            <Button
+              tone="ghost"
+              size="sm"
+              onClick={() => {
+                setEditingAccession(accession);
+                setEditorOpen(true);
+              }}
+              data-testid={`edit-accession-${accession.id}`}
+            >
+              编辑
+            </Button>
+          )}
+          <Button
+            tone="ghost"
+            size="sm"
+            onClick={() => setManageId(accession.id)}
+            data-testid={`manage-accession-${accession.id}`}
+          >
+            <Wrench size={14} />
+            管理
+          </Button>
+        </span>
       ),
     },
   ];
@@ -139,12 +179,16 @@ export function RosterPage() {
     setEditorOpen(true);
   };
 
+  const manageAccession = manageId
+    ? accessionById(state, manageId)
+    : undefined;
+
   return (
     <div className="page">
       <PageHeader
         eyebrow="试验材料"
         title="材料登记"
-        description="维护将进入观测和台架分配流程的植物品系。"
+        description="维护将进入观测和台架分配流程的植物品系，并在材料谱系中追溯来源。"
         actions={
           <Button onClick={openCreate} data-testid="open-create-accession">
             <Plus size={16} />
@@ -228,6 +272,41 @@ export function RosterPage() {
         ) : (
           <p>请先创建试验，再添加材料。</p>
         )}
+      </Dialog>
+      <Dialog
+        open={Boolean(manageId)}
+        title={
+          manageAccession
+            ? `管理材料 · ${accessionDisplayName(manageAccession)}`
+            : "管理材料"
+        }
+        onClose={() => setManageId(null)}
+      >
+        {manageId ? (
+          <AccessionManageDialog
+            sourceId={manageId}
+            onClose={() => setManageId(null)}
+            onMerged={(targetName) => {
+              setManageId(null);
+              pushToast({
+                tone: "success",
+                title: "材料已合并归档",
+                message: `历史观测与标记保留原材料身份，谱系已改接到 ${targetName}。`,
+              });
+            }}
+            onDeleted={() => {
+              setManageId(null);
+              pushToast({
+                tone: "success",
+                title: "材料已删除",
+                message: "相关谱系关系和台架分配已一并清理，没有遗留悬空引用。",
+              });
+            }}
+            onError={(message) =>
+              pushToast({ tone: "error", title: "操作被拒绝", message })
+            }
+          />
+        ) : null}
       </Dialog>
       <ToastRegion
         messages={toasts}

@@ -1,5 +1,6 @@
 import {
   ClipboardCheck,
+  GitBranch,
   LayoutGrid,
   ListTree,
   NotebookPen,
@@ -8,6 +9,7 @@ import { NavLink } from "react-router-dom";
 
 const navItems = [
   { to: "/roster", label: "材料登记", icon: ListTree },
+  { to: "/lineage", label: "材料谱系", icon: GitBranch },
   { to: "/layout", label: "台架布局", icon: LayoutGrid },
   { to: "/observations", label: "生长观测", icon: NotebookPen },
   { to: "/clearance", label: "试验放行", icon: ClipboardCheck },

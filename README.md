@@ -25,6 +25,7 @@ npm run build
 
 ```bash
 node scripts/smoke.mjs curate-accession-roster
+node scripts/smoke.mjs maintain-accession-lineage
 node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
 node scripts/smoke.mjs advance-trial-clearance
@@ -41,6 +42,7 @@ src/
   state/                  reducer、选择器、示例状态和持久化
   features/
     roster/               材料登记和编辑
+    lineage/              材料谱系、合并与删除
     layout/               台架分配工作区
     observations/         观测记录和标记处理
     clearance/            放行快照工作区

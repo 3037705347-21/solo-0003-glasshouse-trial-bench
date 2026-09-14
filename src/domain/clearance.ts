@@ -13,7 +13,8 @@ export function buildClearanceSnapshot(
 ): ClearanceSnapshot {
   const trial = state.trials.find((item) => item.id === trialId);
   const accessions = state.accessions.filter(
-    (accession) => accession.trialId === trialId,
+    (accession) =>
+      accession.trialId === trialId && !accession.mergedIntoId,
   );
   const assignedIds = new Set(
     state.benches.flatMap((bench) => bench.assignedIds),

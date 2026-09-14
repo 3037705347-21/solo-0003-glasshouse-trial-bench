@@ -1,5 +1,46 @@
-import type { WorkspaceState } from "../domain/types";
+import type { Bench, WorkspaceState } from "../domain/types";
 import type { WorkspaceAction } from "./types";
+
+function releaseIdsFromBench(bench: Bench, ids: ReadonlySet<string>): Bench {
+  if (!bench.assignedIds.some((id) => ids.has(id))) {
+    return bench;
+  }
+  const assignedIds = bench.assignedIds.filter((id) => !ids.has(id));
+  // Only an occupied bench falls back to available; blocked/quarantine
+  // benches keep the operational state recorded for them.
+  const status =
+    bench.status === "assigned"
+      ? assignedIds.length === 0
+        ? "available"
+        : "assigned"
+      : bench.status;
+  return { ...bench, assignedIds, status };
+}
+
+function applyAccessionRemoval(
+  state: WorkspaceState,
+  accessionIds: string[],
+  relationIds: string[],
+  benchReleaseIds: string[],
+): WorkspaceState {
+  const relationIdSet = new Set(relationIds);
+  const benchIdSet = new Set(benchReleaseIds);
+  const accessionIdSet = new Set(accessionIds);
+  return {
+    ...state,
+    accessions: state.accessions.filter(
+      (accession) => !accessionIdSet.has(accession.id),
+    ),
+    lineageRelations: state.lineageRelations.filter(
+      (relation) => !relationIdSet.has(relation.id),
+    ),
+    benches: state.benches.map((bench) =>
+      benchIdSet.has(bench.id)
+        ? releaseIdsFromBench(bench, accessionIdSet)
+        : bench,
+    ),
+  };
+}
 
 export function workspaceReducer(
   state: WorkspaceState,
@@ -30,6 +71,47 @@ export function workspaceReducer(
         ...state,
         accessions: state.accessions.map((accession) =>
           accession.id === action.accession.id ? action.accession : accession,
+        ),
+      };
+    case "accession/merge-requested": {
+      const removedIds = new Set([action.sourceId]);
+      const next: WorkspaceState = {
+        ...state,
+        accessions: state.accessions.map((accession) =>
+          accession.id === action.sourceId
+            ? {
+                ...accession,
+                mergedIntoId: action.targetId,
+                mergedOn: action.mergedOn,
+              }
+            : accession,
+        ),
+        lineageRelations: action.relations,
+        benches: state.benches.map((bench) =>
+          action.benchReleaseIds.includes(bench.id)
+            ? releaseIdsFromBench(bench, removedIds)
+            : bench,
+        ),
+      };
+      return next;
+    }
+    case "accession/delete-requested":
+      return applyAccessionRemoval(
+        state,
+        [action.accessionId],
+        action.relationIds,
+        action.benchReleaseIds,
+      );
+    case "lineage/created":
+      return {
+        ...state,
+        lineageRelations: [...state.lineageRelations, action.relation],
+      };
+    case "lineage/deleted":
+      return {
+        ...state,
+        lineageRelations: state.lineageRelations.filter(
+          (relation) => relation.id !== action.relationId,
         ),
       };
     case "bench/assigned":

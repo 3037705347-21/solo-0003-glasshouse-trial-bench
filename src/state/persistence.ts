@@ -10,6 +10,41 @@ export interface StoredWorkspace {
   state: WorkspaceState;
 }
 
+/**
+ * Workspaces saved before the lineage module shipped have no
+ * `lineageRelations` collection. Backfill it and prune any links that point
+ * at accessions missing from the roster so a corrupted record cannot leave
+ * dangling references in the graph.
+ */
+export function migrateWorkspaceState(value: unknown): WorkspaceState | undefined {
+  if (!isWorkspaceState(value)) {
+    return undefined;
+  }
+  const accessionIds = new Set(value.accessions.map((accession) => accession.id));
+  const lineageRelations = (value.lineageRelations ?? []).filter(
+    (relation) =>
+      accessionIds.has(relation.endpointAId) &&
+      accessionIds.has(relation.endpointBId),
+  );
+  const benches = value.benches.map((bench) => {
+    const assignedIds = bench.assignedIds.filter((id) => accessionIds.has(id));
+    if (assignedIds.length === bench.assignedIds.length) {
+      return bench;
+    }
+    return {
+      ...bench,
+      assignedIds,
+      status:
+        bench.status === "assigned"
+          ? assignedIds.length === 0
+            ? ("available" as const)
+            : ("assigned" as const)
+          : bench.status,
+    };
+  });
+  return { ...value, lineageRelations, benches };
+}
+
 export function loadWorkspaceState(): WorkspaceState {
   try {
     const raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
@@ -17,10 +52,10 @@ export function loadWorkspaceState(): WorkspaceState {
       return createSampleWorkspaceState();
     }
     const parsed = JSON.parse(raw) as Partial<StoredWorkspace>;
-    if (!parsed || !isWorkspaceState(parsed.state)) {
+    if (!parsed || !parsed.state) {
       return createSampleWorkspaceState();
     }
-    return parsed.state;
+    return migrateWorkspaceState(parsed.state) ?? createSampleWorkspaceState();
   } catch {
     return createSampleWorkspaceState();
   }

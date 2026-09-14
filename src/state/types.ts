@@ -3,6 +3,7 @@ import type {
   Bench,
   ClearanceSnapshot,
   Flag,
+  LineageRelation,
   ObservationPass,
   Trial,
   TrialState,
@@ -16,6 +17,22 @@ export type WorkspaceAction =
   | { type: "trial/transitioned"; trialId: string; state: TrialState }
   | { type: "accession/created"; accession: Accession }
   | { type: "accession/updated"; accession: Accession }
+  | {
+      type: "accession/merge-requested";
+      sourceId: string;
+      targetId: string;
+      mergedOn: string;
+      relations: LineageRelation[];
+      benchReleaseIds: string[];
+    }
+  | {
+      type: "accession/delete-requested";
+      accessionId: string;
+      relationIds: string[];
+      benchReleaseIds: string[];
+    }
+  | { type: "lineage/created"; relation: LineageRelation }
+  | { type: "lineage/deleted"; relationId: string }
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
@@ -37,6 +54,8 @@ export function isWorkspaceState(value: unknown): value is WorkspaceState {
     Array.isArray(candidate.benches) &&
     Array.isArray(candidate.observationPasses) &&
     Array.isArray(candidate.flags) &&
-    Array.isArray(candidate.clearanceSnapshots)
+    Array.isArray(candidate.clearanceSnapshots) &&
+    (candidate.lineageRelations === undefined ||
+      Array.isArray(candidate.lineageRelations))
   );
 }

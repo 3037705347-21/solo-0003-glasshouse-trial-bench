@@ -3,6 +3,7 @@ import type {
   Bench,
   ClearanceSnapshot,
   Flag,
+  LineageRelation,
   ObservationPass,
   Trial,
   WorkspaceState,
@@ -92,4 +93,33 @@ export function accessionStatus(
   return bench.status === "blocked" || bench.status === "quarantine"
     ? "blocked"
     : "assigned";
+}
+
+export function activeAccessionsForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): Accession[] {
+  return state.accessions.filter(
+    (accession) => accession.trialId === trialId && !accession.mergedIntoId,
+  );
+}
+
+export function lineageRelationsForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): LineageRelation[] {
+  return state.lineageRelations
+    .filter((relation) => relation.trialId === trialId)
+    .sort((left, right) => right.createdOn.localeCompare(left.createdOn));
+}
+
+export function accessionMergeTarget(
+  state: WorkspaceState,
+  accessionId: string,
+): Accession | undefined {
+  const accession = accessionById(state, accessionId);
+  if (!accession?.mergedIntoId) {
+    return undefined;
+  }
+  return accessionById(state, accession.mergedIntoId);
 }

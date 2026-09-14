@@ -137,11 +137,36 @@ export function updateAccession(
   draft: AccessionDraft,
   state: WorkspaceState,
 ): Result<Accession> {
+  if (current.mergedIntoId) {
+    return fail([
+      fieldError(
+        "trialId",
+        "merged",
+        "材料已合并归档，不能再编辑；如需调整请编辑合并目标材料",
+      ),
+    ]);
+  }
   const validated = validateAccessionDraft(draft, state, current.id);
   if (!validated.ok) {
     return validated;
   }
   const value = validated.value;
+  if (value.trialId !== current.trialId) {
+    const hasLineage = state.lineageRelations.some(
+      (relation) =>
+        relation.endpointAId === current.id ||
+        relation.endpointBId === current.id,
+    );
+    if (hasLineage) {
+      return fail([
+        fieldError(
+          "trialId",
+          "lineage_scoped",
+          "该材料已存在谱系关系，不能移动到其他试验；如需归并请使用合并功能",
+        ),
+      ]);
+    }
+  }
   return ok({
     ...current,
     trialId: value.trialId,

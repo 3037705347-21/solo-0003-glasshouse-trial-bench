@@ -54,7 +54,11 @@ export function validateObservationDraft(
       fieldError("entries", "empty", "请至少添加一条测量记录"),
     );
   }
-  const accessionIds = new Set(state.accessions.map((item) => item.id));
+  const accessionIds = new Set(
+    state.accessions
+      .filter((accession) => !accession.mergedIntoId)
+      .map((item) => item.id),
+  );
   const seen = new Set<string>();
   draft.entries.forEach((entry, index) => {
     if (!accessionIds.has(entry.accessionId)) {

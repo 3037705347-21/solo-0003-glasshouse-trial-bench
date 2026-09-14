@@ -25,6 +25,31 @@ export interface Accession {
   preferredLight: PreferredLight;
   genotypeNote: string;
   labels: string[];
+  /**
+   * When an accession has been merged into another one, the record is kept as
+   * a tombstone so historical observations and flags retain the material
+   * identity they were recorded against.
+   */
+  mergedIntoId?: string;
+  mergedOn?: string;
+}
+
+export type LineageRelationType = "parent" | "cohort";
+
+/**
+ * A provenance link between two accessions of the same trial.
+ * - `parent`: directed, `endpointAId` is the parent (earlier generation),
+ *   `endpointBId` the child propagated from it.
+ * - `cohort`: undirected, the two endpoints were derived from the same batch.
+ */
+export interface LineageRelation {
+  id: string;
+  trialId: string;
+  type: LineageRelationType;
+  endpointAId: string;
+  endpointBId: string;
+  note?: string;
+  createdOn: string;
 }
 
 export type BenchStatus = "available" | "assigned" | "blocked" | "quarantine";
@@ -105,4 +130,5 @@ export interface WorkspaceState {
   observationPasses: ObservationPass[];
   flags: Flag[];
   clearanceSnapshots: ClearanceSnapshot[];
+  lineageRelations: LineageRelation[];
 }

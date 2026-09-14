@@ -28,7 +28,9 @@ function emptyEntry(accessionId = ""): ObservationEntry {
 
 export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
   const { state, dispatch } = useWorkspace();
-  const accessions = accessionsForTrial(state, trialId);
+  const accessions = accessionsForTrial(state, trialId).filter(
+    (accession) => !accession.mergedIntoId,
+  );
   const [draft, setDraft] = useState<ObservationDraft>({
     trialId,
     observedOn: todayDateOnly(),

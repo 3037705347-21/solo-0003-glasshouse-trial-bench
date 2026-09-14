@@ -20,7 +20,8 @@ export function AssignmentPanel({
   onSelectAccession,
 }: AssignmentPanelProps) {
   const accessions = state.accessions.filter(
-    (accession) => accession.trialId === trialId,
+    (accession) =>
+      accession.trialId === trialId && !accession.mergedIntoId,
   );
   const selected = accessions.find(
     (accession) => accession.id === selectedAccessionId,
