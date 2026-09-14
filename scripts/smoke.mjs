@@ -11,6 +11,7 @@ const viteBin =
     : `${root}node_modules/.bin/vite`;
 
 const scenarios = {
+  "manage-trial-lifecycle": manageTrialLifecycle,
   "curate-accession-roster": curateAccessionRoster,
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
@@ -18,6 +19,7 @@ const scenarios = {
 };
 
 const scenarioPaths = {
+  "manage-trial-lifecycle": "/trials",
   "curate-accession-roster": "/roster",
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
@@ -45,6 +47,73 @@ async function freshPage(browser, path) {
   await page.evaluate(() => window.localStorage.clear());
   await page.reload({ waitUntil: "networkidle" });
   return page;
+}
+
+async function manageTrialLifecycle(page) {
+  // 重复编号和颠倒的日期顺序都会被拒绝并显示字段级提示
+  await page.getByTestId("open-create-trial").click();
+  await page.getByTestId("trial-code-input").fill("SOL-01");
+  await page.getByTestId("trial-crop-input").fill("葫芦科");
+  await page.getByLabel("季节").selectOption("秋季");
+  await page.getByLabel("开始日期").fill("2026-09-01");
+  await page.getByLabel("结束日期").fill("2026-12-20");
+  await page.getByLabel("试验目标").fill("比较黄瓜品系在秋冬茬口的坐果与抗病表现。");
+  await page.getByTestId("save-trial-button").click();
+  await page.getByText("该试验编号已被使用", { exact: true }).waitFor();
+  await page.getByTestId("trial-code-input").fill("CUC-07");
+  await page.getByLabel("结束日期").fill("2026-08-01");
+  await page.getByTestId("save-trial-button").click();
+  await page.getByText("结束日期不能早于开始日期", { exact: true }).waitFor();
+  await page.getByLabel("结束日期").fill("2026-12-20");
+  await page.getByTestId("save-trial-button").click();
+  await page.getByText("试验已创建", { exact: true }).waitFor();
+  await page.locator("tr", { hasText: "CUC-07" }).waitFor();
+
+  // 新试验立即出现在其它工作流的试验选择器中
+  await page.getByRole("link", { name: "材料登记" }).click();
+  await page.getByTestId("trial-filter").selectOption({ label: "CUC-07 - 葫芦科" });
+  await page.getByTestId("open-create-accession").click();
+  await page.getByTestId("cultivar-input").fill("Greensleeves");
+  await page.getByLabel("来源").fill("Glasshouse Exchange");
+  await page.getByLabel("繁殖日期").fill("2026-08-14");
+  await page.getByLabel("数量").fill("72");
+  await page.locator("textarea").first().fill("Crisp slicing line with even node spacing.");
+  await page.getByTestId("save-accession-button").click();
+  await page.getByText("ACC-0009", { exact: true }).first().waitFor();
+
+  // 编辑试验资料后，已有材料引用保持不变
+  await page.getByRole("link", { name: "试验管理" }).click();
+  await page
+    .locator("tr", { hasText: "CUC-07" })
+    .getByRole("button", { name: "编辑" })
+    .click();
+  await page.getByTestId("trial-code-input").fill("CUC-08");
+  await page.getByTestId("save-trial-button").click();
+  await page.getByText("试验已更新", { exact: true }).waitFor();
+  await page.getByRole("link", { name: "材料登记" }).click();
+  await page.getByTestId("trial-filter").selectOption({ label: "CUC-08 - 葫芦科" });
+  await page.getByText("Greensleeves", { exact: true }).first().waitFor();
+
+  // 生命周期转换：草稿启动、进行中暂停、暂停恢复
+  await page.getByRole("link", { name: "试验管理" }).click();
+  const trialRow = page.locator("tr", { hasText: "CUC-08" });
+  await trialRow.getByRole("button", { name: "启动" }).click();
+  await trialRow.getByText("进行中", { exact: true }).waitFor();
+  await trialRow.getByRole("button", { name: "暂停" }).click();
+  await trialRow.getByText("已暂停", { exact: true }).waitFor();
+  await trialRow.getByRole("button", { name: "恢复" }).click();
+  await trialRow.getByText("进行中", { exact: true }).waitFor();
+
+  // 刷新后试验仍然存在，其它选择器也能看到
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator("tr", { hasText: "CUC-08" }).waitFor();
+  await page.getByRole("link", { name: "生长观测" }).click();
+  await page.waitForFunction(() => {
+    const select = document.querySelector('[data-testid="observation-trial-select"]');
+    return (
+      select && [...select.options].some((option) => option.textContent.includes("CUC-08"))
+    );
+  });
 }
 
 async function curateAccessionRoster(page) {

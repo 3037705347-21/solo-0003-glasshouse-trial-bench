@@ -11,6 +11,13 @@ export function workspaceReducer(
       return action.state;
     case "trial/created":
       return { ...state, trials: [...state.trials, action.trial] };
+    case "trial/updated":
+      return {
+        ...state,
+        trials: state.trials.map((trial) =>
+          trial.id === action.trial.id ? action.trial : trial,
+        ),
+      };
     case "trial/transitioned":
       return {
         ...state,

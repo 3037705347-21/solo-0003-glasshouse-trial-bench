@@ -408,6 +408,28 @@ button {
   font-weight: 700;
 }
 
+.cell-clamp {
+  display: inline-block;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+.table-subtext {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: normal;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;

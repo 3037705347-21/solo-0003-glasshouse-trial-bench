@@ -1,5 +1,6 @@
 import {
   ClipboardCheck,
+  FlaskConical,
   LayoutGrid,
   ListTree,
   NotebookPen,
@@ -7,6 +8,7 @@ import {
 import { NavLink } from "react-router-dom";
 
 const navItems = [
+  { to: "/trials", label: "试验管理", icon: FlaskConical },
   { to: "/roster", label: "材料登记", icon: ListTree },
   { to: "/layout", label: "台架布局", icon: LayoutGrid },
   { to: "/observations", label: "生长观测", icon: NotebookPen },

@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-打开 Vite 输出的地址。应用默认进入材料登记页，数据保存在浏览器的本地存储中，命名空间为 `glasshouse-trial-bench:workspace:v1`。
+打开 Vite 输出的地址。应用默认进入试验管理页，数据保存在浏览器的本地存储中，命名空间为 `glasshouse-trial-bench:workspace:v1`。
 
 ## 构建
 
@@ -24,6 +24,7 @@ npm run build
 当前项目处于延迟测试模式，本阶段不生成单元测试或 Playwright 测试文件，后续任务阶段再补充正式测试。以下生产级冒烟命令会启动无头浏览器，逐条验证公开工作流：
 
 ```bash
+node scripts/smoke.mjs manage-trial-lifecycle
 node scripts/smoke.mjs curate-accession-roster
 node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
@@ -40,6 +41,7 @@ src/
   domain/                 实体、校验、状态转换和规则
   state/                  reducer、选择器、示例状态和持久化
   features/
+    trials/               试验资料维护和生命周期转换
     roster/               材料登记和编辑
     layout/               台架分配工作区
     observations/         观测记录和标记处理

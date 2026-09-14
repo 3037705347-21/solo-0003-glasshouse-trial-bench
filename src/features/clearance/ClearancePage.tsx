@@ -7,7 +7,7 @@ import {
   applyClearance,
   buildClearanceSnapshot,
 } from "../../domain/clearance";
-import { transitionTrial } from "../../domain/trial";
+import { transitionTrial, trialStateLabel } from "../../domain/trial";
 import { latestSnapshotForTrial } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { SnapshotCard } from "./SnapshotCard";
@@ -101,15 +101,7 @@ export function ClearancePage() {
         >
           {state.trials.map((item) => (
             <option value={item.id} key={item.id}>
-              {item.code} - {item.cropFamily}（
-              {item.state === "draft"
-                ? "草稿"
-                : item.state === "active"
-                  ? "进行中"
-                  : item.state === "paused"
-                    ? "已暂停"
-                    : "已放行"}
-              ）
+              {item.code} - {item.cropFamily}（{trialStateLabel(item.state)}）
             </option>
           ))}
         </select>

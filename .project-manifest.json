@@ -19,6 +19,11 @@
       "responsibility": "reducer、动作、选择器、示例工作区和浏览器持久化"
     },
     {
+      "id": "trials",
+      "path": "src/features/trials",
+      "responsibility": "试验资料维护、搜索筛选和生命周期转换"
+    },
+    {
       "id": "roster",
       "path": "src/features/roster",
       "responsibility": "材料发现、筛选、创建和编辑"
@@ -54,6 +59,25 @@
   },
   "workflows": [
     {
+      "id": "manage-trial-lifecycle",
+      "name": "维护试验信息",
+      "entry": "GET /#/trials",
+      "steps": [
+        "查看、搜索并按状态筛选试验",
+        "校验并创建或编辑试验资料",
+        "办理启动、暂停和恢复等合法状态转换"
+      ],
+      "success": "试验出现在清单和各工作流选择器中，刷新后仍然持久",
+      "failure": "重复编号、颠倒日期和非法状态转换被拒绝并给出提示",
+      "verification": "无头浏览器创建试验、编辑编号、转换状态并确认跨页面可见",
+      "module_ids": [
+        "app",
+        "domain",
+        "state",
+        "trials"
+      ]
+    },
+    {
       "id": "curate-accession-roster",
       "name": "维护材料登记",
       "entry": "GET /#/roster",
@@ -65,7 +89,12 @@
       "success": "材料出现在清单中，并可用于台架分配",
       "failure": "表单显示稳定的字段级校验错误",
       "verification": "无头浏览器创建 ACC-0009 并确认它出现",
-      "module_ids": ["app", "domain", "state", "roster"]
+      "module_ids": [
+        "app",
+        "domain",
+        "state",
+        "roster"
+      ]
     },
     {
       "id": "assign-accession-bench",
@@ -79,7 +108,12 @@
       "success": "材料出现在所选台架上",
       "failure": "分配被拒绝并给出具体约束信息",
       "verification": "无头浏览器将 Yellow Pear 分配到 E-2 台架",
-      "module_ids": ["app", "domain", "state", "layout"]
+      "module_ids": [
+        "app",
+        "domain",
+        "state",
+        "layout"
+      ]
     },
     {
       "id": "record-observation-pass",
@@ -93,7 +127,12 @@
       "success": "观测记录被保存，派生标记可见",
       "failure": "无效或重复测量被拒绝",
       "verification": "无头浏览器记录观测并确认观测历史增加",
-      "module_ids": ["app", "domain", "state", "observations"]
+      "module_ids": [
+        "app",
+        "domain",
+        "state",
+        "observations"
+      ]
     },
     {
       "id": "advance-trial-clearance",
@@ -107,7 +146,12 @@
       "success": "就绪快照可以把试验移动到已放行状态",
       "failure": "被阻止的快照列出每个具体阻止项",
       "verification": "无头浏览器为示例试验生成被阻止的快照",
-      "module_ids": ["app", "domain", "state", "clearance"]
+      "module_ids": [
+        "app",
+        "domain",
+        "state",
+        "clearance"
+      ]
     }
   ]
 }

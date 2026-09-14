@@ -10,6 +10,10 @@
   "testing": "deferred",
   "workflow_checks": [
     {
+      "workflow_id": "manage-trial-lifecycle",
+      "command": "node scripts/smoke.mjs manage-trial-lifecycle"
+    },
+    {
       "workflow_id": "curate-accession-roster",
       "command": "node scripts/smoke.mjs curate-accession-roster"
     },
