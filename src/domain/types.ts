@@ -76,6 +76,33 @@ export interface Flag {
 
 export type ClearanceStatus = "ready" | "blocked";
 
+export type LineageRelation = "selfed" | "cross" | "selected-from";
+
+export interface AccessionLineage {
+  id: string;
+  childAccessionId: string;
+  parentAccessionId: string;
+  relation: LineageRelation;
+  note: string;
+  createdOn: string;
+}
+
+export interface TrialCopyRecord {
+  id: string;
+  /** 客户端幂等键：同一次复制请求重试只会返回该记录。 */
+  idempotencyKey: string;
+  sourceTrialId: string;
+  sourceTrialCode: string;
+  newTrialId: string;
+  newTrialCode: string;
+  copiedAccessionCount: number;
+  skippedAccessionCount: number;
+  fieldSelection: string[];
+  /** 提交时使用的模板修订号，用于解释来源版本。 */
+  templateRevision: string;
+  createdOn: string;
+}
+
 export interface ClearanceMetric {
   label: string;
   value: number;
@@ -105,4 +132,6 @@ export interface WorkspaceState {
   observationPasses: ObservationPass[];
   flags: Flag[];
   clearanceSnapshots: ClearanceSnapshot[];
+  accessionLineage: AccessionLineage[];
+  trialCopyRecords: TrialCopyRecord[];
 }

@@ -1,5 +1,7 @@
 import {
   ClipboardCheck,
+  Copy,
+  GitBranch,
   LayoutGrid,
   ListTree,
   NotebookPen,
@@ -11,6 +13,8 @@ const navItems = [
   { to: "/layout", label: "台架布局", icon: LayoutGrid },
   { to: "/observations", label: "生长观测", icon: NotebookPen },
   { to: "/clearance", label: "试验放行", icon: ClipboardCheck },
+  { to: "/templates", label: "试验复制", icon: Copy },
+  { to: "/lineage", label: "材料谱系", icon: GitBranch },
 ];
 
 export function Nav() {

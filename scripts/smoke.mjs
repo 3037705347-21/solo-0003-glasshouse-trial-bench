@@ -15,6 +15,8 @@ const scenarios = {
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
+  "duplicate-trial-from-template": duplicateTrialFromTemplate,
+  "register-accession-lineage": registerAccessionLineage,
 };
 
 const scenarioPaths = {
@@ -22,6 +24,8 @@ const scenarioPaths = {
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
+  "duplicate-trial-from-template": "/templates",
+  "register-accession-lineage": "/lineage",
 };
 
 async function waitForServer() {
@@ -91,6 +95,66 @@ async function advanceTrialClearance(page) {
     .getByText("阻止", { exact: true })
     .first()
     .waitFor();
+}
+
+async function duplicateTrialFromTemplate(page) {
+  await page.getByTestId("copy-from-trial-sol-01").click();
+  await page.getByTestId("copy-trial-dialog").waitFor();
+
+  // 跳过第三个材料，验证预览中的跳过项与编号重排。
+  await page.getByTestId("copy-accession-acc-tom-03").uncheck();
+  // 重置两个材料字段，验证默认值提示。
+  await page.getByTestId("copy-field-source").uncheck();
+  await page.getByTestId("copy-field-labels").uncheck();
+  await page.getByTestId("copy-new-code").fill("SOL-04");
+  await page.getByTestId("copy-start-date").fill("2026-08-17");
+  await page.getByTestId("copy-end-date").fill("2026-11-20");
+
+  await page.getByTestId("copy-preview-button").click();
+  await page.getByTestId("copy-preview").waitFor();
+  await page.getByTestId("copy-copied-count").getByText("2").waitFor();
+  await page.getByTestId("copy-skipped-count").getByText("1").waitFor();
+  await page.getByTestId("copy-skipped-list").getByText("ACC-0003").waitFor();
+  await page.getByTestId("copy-new-no-acc-tom-01").getByText("ACC-0009").waitFor();
+  await page.getByTestId("copy-new-no-acc-tom-02").getByText("ACC-0010").waitFor();
+
+  // 已分配源材料必须提示重新分配。
+  await page.getByText("新材料需要重新分配", { exact: false }).first().waitFor();
+
+  await page.getByTestId("copy-commit-button").click();
+  await page.getByText("新试验 SOL-04 已创建", { exact: true }).waitFor();
+
+  // 新试验与新材料是独立身份：观测和标记没有混入。
+  await page.goto(`${baseUrl}/#/observations`, { waitUntil: "networkidle" });
+  const trialOptions = await page
+    .locator("select")
+    .first()
+    .locator("option")
+    .allInnerTexts();
+  if (!trialOptions.some((label) => label.includes("SOL-04"))) {
+    throw new Error("新试验 SOL-04 未出现在试验选择中");
+  }
+
+  // 同一复制请求不能产生第二套试验：复制记录只有一条。
+  await page.goto(`${baseUrl}/#/templates`, { waitUntil: "networkidle" });
+  const recordCount = await page
+    .getByText("SOL-01 → SOL-04", { exact: true })
+    .count();
+  if (recordCount !== 1) {
+    throw new Error(`期望恰好一条复制记录，实际 ${recordCount}`);
+  }
+}
+
+async function registerAccessionLineage(page) {
+  await page.getByTestId("open-create-lineage").click();
+  await page.getByTestId("lineage-parent-input").selectOption("acc-tom-01");
+  await page.getByTestId("lineage-child-input").selectOption("acc-tom-02");
+  await page.getByTestId("lineage-note-input").fill("S1 代自交留种批次，母本编号一致。");
+  await page.getByTestId("save-lineage-button").click();
+  await page.getByText("亲缘关系已登记", { exact: true }).waitFor();
+  await page.getByText("自交后代").first().waitFor();
+  await page.getByText("ACC-0002 · Micro Tom").first().waitFor();
+  await page.getByText("ACC-0001 · Tiny Tim").first().waitFor();
 }
 
 async function runScenario(scenarioName) {

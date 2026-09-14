@@ -1,10 +1,12 @@
 import type {
   Accession,
+  AccessionLineage,
   Bench,
   ClearanceSnapshot,
   Flag,
   ObservationPass,
   Trial,
+  TrialCopyRecord,
   WorkspaceState,
 } from "../domain/types";
 
@@ -300,6 +302,10 @@ const flags: Flag[] = [
 
 const clearanceSnapshots: ClearanceSnapshot[] = [];
 
+const accessionLineage: AccessionLineage[] = [];
+
+const trialCopyRecords: TrialCopyRecord[] = [];
+
 export function createSampleWorkspaceState(): WorkspaceState {
   return {
     trials,
@@ -308,5 +314,7 @@ export function createSampleWorkspaceState(): WorkspaceState {
     observationPasses,
     flags,
     clearanceSnapshots,
+    accessionLineage,
+    trialCopyRecords,
   };
 }

@@ -59,6 +59,36 @@ export function workspaceReducer(
         clearanceSnapshots: [...state.clearanceSnapshots, action.snapshot],
         trials: action.trials,
       };
+    case "trial/copied":
+      // 同键重复派发直接忽略，保证重复提交不会产生多套试验。
+      if (
+        state.trialCopyRecords.some(
+          (record) => record.idempotencyKey === action.record.idempotencyKey,
+        )
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        trials: [...state.trials, action.trial],
+        accessions: [...state.accessions, ...action.accessions],
+        trialCopyRecords: [...state.trialCopyRecords, action.record],
+      };
+    case "lineage/created":
+      if (
+        state.accessionLineage.some(
+          (link) =>
+            link.childAccessionId === action.link.childAccessionId &&
+            link.parentAccessionId === action.link.parentAccessionId &&
+            link.relation === action.link.relation,
+        )
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        accessionLineage: [...state.accessionLineage, action.link],
+      };
     default:
       return state;
   }

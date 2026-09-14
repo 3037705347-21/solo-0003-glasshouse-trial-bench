@@ -1,5 +1,5 @@
 import type { WorkspaceState } from "../domain/types";
-import { isWorkspaceState } from "./types";
+import { isWorkspaceState, normalizeWorkspaceState } from "./types";
 import { createSampleWorkspaceState } from "./sampleData";
 
 export const WORKSPACE_STORAGE_KEY = "glasshouse-trial-bench:workspace:v1";
@@ -20,7 +20,7 @@ export function loadWorkspaceState(): WorkspaceState {
     if (!parsed || !isWorkspaceState(parsed.state)) {
       return createSampleWorkspaceState();
     }
-    return parsed.state;
+    return normalizeWorkspaceState(parsed.state);
   } catch {
     return createSampleWorkspaceState();
   }

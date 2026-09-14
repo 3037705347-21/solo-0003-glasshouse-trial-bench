@@ -1232,3 +1232,318 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* 试验复制与模板滚动 */
+.copy-row-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.copy-wizard {
+  display: grid;
+  gap: 18px;
+}
+
+.copy-notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--green-600);
+  border-radius: var(--radius);
+  background: var(--green-100);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.copy-notice-soft {
+  border-left-color: var(--blue-700);
+  background: var(--blue-100);
+}
+
+.copy-section {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.copy-section-heading h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+}
+
+.copy-section-heading p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.copy-field-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.copy-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--canvas);
+  font-size: 13px;
+}
+
+.copy-toggle-on {
+  border-color: var(--green-600);
+  background: var(--green-100);
+}
+
+.copy-check-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.copy-accession-list {
+  display: grid;
+  gap: 6px;
+  max-height: 240px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.copy-accession-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.copy-accession-skip {
+  opacity: 0.55;
+  background: var(--surface-soft);
+}
+
+.copy-accession-main {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.copy-accession-main span:last-child {
+  color: var(--text-muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copy-accession-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.copy-error-banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.copy-error-banner ul {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 4px;
+}
+
+.copy-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+/* 复制预览 */
+.copy-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.copy-summary-card {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--canvas);
+}
+
+.copy-summary-card strong {
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.copy-summary-trial strong {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 18px;
+}
+
+.copy-summary-label {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.copy-conflict-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.copy-conflict {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.copy-conflict-warning {
+  background: var(--amber-100);
+  border-color: var(--amber-700);
+  color: var(--amber-700);
+}
+
+.copy-conflict-blocking {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.copy-number-list {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.copy-number-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(160px, 0.8fr) minmax(0, 1.5fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.copy-number-pair {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.copy-number-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.copy-number-copy strong {
+  font-size: 13px;
+}
+
+.copy-number-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.copy-chip {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.copy-chip-reset {
+  background: var(--surface-soft);
+  color: var(--text-muted);
+  border: 1px solid var(--line-strong);
+}
+
+.copy-chip-warning {
+  background: var(--amber-100);
+  color: var(--amber-700);
+}
+
+.copy-skipped-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.copy-skipped-list li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .copy-field-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .copy-number-row,
+  .copy-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .copy-accession-row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .copy-accession-meta {
+    grid-column: 2;
+    text-align: left;
+  }
+}
