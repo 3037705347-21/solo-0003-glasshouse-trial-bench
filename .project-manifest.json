@@ -39,6 +39,11 @@
       "responsibility": "放行预览、快照生成和阻止项展示"
     },
     {
+      "id": "backup",
+      "path": "src/features/backup",
+      "responsibility": "备份导出、导入预览、版本与完整性校验和整批恢复"
+    },
+    {
       "id": "components",
       "path": "src/components",
       "responsibility": "共享表单、表格、弹窗、标签、指标、toast 和空状态原语"
@@ -108,6 +113,20 @@
       "failure": "被阻止的快照列出每个具体阻止项",
       "verification": "无头浏览器为示例试验生成被阻止的快照",
       "module_ids": ["app", "domain", "state", "clearance"]
+    },
+    {
+      "id": "backup-restore-workspace",
+      "name": "备份与恢复工作区",
+      "entry": "GET /#/backup",
+      "steps": [
+        "导出版本化备份文件",
+        "校验导入文件的版本、结构和引用",
+        "预览确认后整批替换工作区"
+      ],
+      "success": "备份文件可下载，有效备份整批恢复并刷新所有页面",
+      "failure": "损坏、过旧、引用断裂或冲突的文件被整批拒绝，当前数据保持不动",
+      "verification": "无头浏览器导出备份、导入修改后的备份并验证拒绝路径",
+      "module_ids": ["app", "domain", "state", "backup"]
     }
   ]
 }

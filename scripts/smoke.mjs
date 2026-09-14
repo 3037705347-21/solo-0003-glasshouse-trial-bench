@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
+import assert from "node:assert/strict";
 import { chromium } from "playwright";
 
 const port = 4177;
@@ -15,6 +17,7 @@ const scenarios = {
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
+  "backup-restore-workspace": backupRestoreWorkspace,
 };
 
 const scenarioPaths = {
@@ -22,6 +25,7 @@ const scenarioPaths = {
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
+  "backup-restore-workspace": "/backup",
 };
 
 async function waitForServer() {
@@ -91,6 +95,148 @@ async function advanceTrialClearance(page) {
     .getByText("阻止", { exact: true })
     .first()
     .waitFor();
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+async function uploadBackup(page, payload, name = "workspace-backup.json") {
+  const buffer = Buffer.from(
+    typeof payload === "string" ? payload : JSON.stringify(payload),
+  );
+  await page
+    .getByTestId("backup-file-input")
+    .setInputFiles({ name, mimeType: "application/json", buffer });
+}
+
+async function confirmImport(page) {
+  const preview = page.getByRole("dialog", { name: "导入预览" });
+  await preview.waitFor();
+  await preview.getByText("格式版本", { exact: true }).waitFor();
+  await preview.getByText("v1", { exact: true }).waitFor();
+  await preview.getByTestId("confirm-import-button").click();
+  await page.getByText("工作区已恢复", { exact: true }).waitFor();
+}
+
+async function goTo(page, label) {
+  await page.getByRole("link", { name: label }).click();
+}
+
+async function backupRestoreWorkspace(page) {
+  // 导出：文件带版本、导出时间和内容摘要
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByTestId("export-backup-button").click();
+  const download = await downloadPromise;
+  const exported = JSON.parse(await readFile(await download.path(), "utf8"));
+  assert.equal(exported.kind, "glasshouse-trial-bench/workspace-backup");
+  assert.equal(exported.version, 1);
+  assert.ok(!Number.isNaN(Date.parse(exported.exportedAt)));
+  assert.equal(exported.summary.trials, 3);
+  assert.equal(exported.summary.accessions, 8);
+  assert.deepEqual(exported.summary.trialCodes, ["SOL-01", "AMA-02", "BRA-03"]);
+
+  // 有效导入：预览后整批替换，所有页面切换到新数据
+  const restoredCultivar = "Restored Tim";
+  const modified = clone(exported);
+  modified.state.accessions.find((item) => item.id === "acc-tom-01").cultivar =
+    restoredCultivar;
+  await uploadBackup(page, modified);
+  await confirmImport(page);
+  await goTo(page, "材料登记");
+  await page.getByText(restoredCultivar, { exact: true }).first().waitFor();
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByText(restoredCultivar, { exact: true }).first().waitFor();
+
+  // 损坏文件：整批拒绝，当前数据保持不动
+  await goTo(page, "备份恢复");
+  await uploadBackup(page, "{ 这不是有效的 JSON");
+  await page.getByTestId("import-error-list").getByText(/已损坏/).waitFor();
+  await page.getByText("导入已拒绝", { exact: true }).waitFor();
+
+  // 版本过旧：拒绝并说明所需版本
+  await uploadBackup(page, { ...modified, version: 0 });
+  await page.getByTestId("import-error-list").getByText(/过旧/).waitFor();
+
+  // 引用断裂：材料指向不存在的试验
+  const broken = clone(modified);
+  broken.state.accessions[0].trialId = "trial-missing";
+  await uploadBackup(page, broken);
+  await page
+    .getByTestId("import-error-list")
+    .getByText(/不存在的试验/)
+    .waitFor();
+
+  // 冲突记录：材料编号重复
+  const conflicting = clone(modified);
+  conflicting.state.accessions.push({
+    ...clone(conflicting.state.accessions[0]),
+    id: "acc-duplicate",
+  });
+  conflicting.summary.accessions = conflicting.state.accessions.length;
+  await uploadBackup(page, conflicting);
+  await page.getByTestId("import-error-list").getByText(/冲突/).waitFor();
+
+  // 不完整文件：缺少标记集合
+  const incomplete = clone(modified);
+  delete incomplete.state.flags;
+  incomplete.summary.flags = 0;
+  await uploadBackup(page, incomplete);
+  await page
+    .getByTestId("import-error-list")
+    .getByText(/缺少生长标记集合/)
+    .waitFor();
+
+  // 多次拒绝后当前数据仍然可用
+  await goTo(page, "材料登记");
+  await page.getByText(restoredCultivar, { exact: true }).first().waitFor();
+
+  // 空工作区：合法备份，可以整批导入
+  const empty = {
+    kind: exported.kind,
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    summary: {
+      trials: 0,
+      accessions: 0,
+      benches: 0,
+      observationPasses: 0,
+      flags: 0,
+      clearanceSnapshots: 0,
+      trialCodes: [],
+    },
+    state: {
+      trials: [],
+      accessions: [],
+      benches: [],
+      observationPasses: [],
+      flags: [],
+      clearanceSnapshots: [],
+    },
+  };
+  await goTo(page, "备份恢复");
+  await uploadBackup(page, empty);
+  await confirmImport(page);
+  await goTo(page, "材料登记");
+  await page.getByText("当前视图下没有匹配材料。").waitFor();
+
+  // 恢复点：回滚到导入前的状态
+  await goTo(page, "备份恢复");
+  await page.getByTestId("restore-preimport-button").click();
+  await page.getByTestId("confirm-restore-button").click();
+  await page.getByText("已恢复导入前状态", { exact: true }).waitFor();
+  await goTo(page, "材料登记");
+  await page.getByText(restoredCultivar, { exact: true }).first().waitFor();
+
+  // 重复导入：同一文件再次导入仍然成功且不产生重复记录
+  await goTo(page, "备份恢复");
+  await uploadBackup(page, modified);
+  await confirmImport(page);
+  await uploadBackup(page, modified);
+  await confirmImport(page);
+  await goTo(page, "材料登记");
+  await page.getByText(restoredCultivar, { exact: true }).first().waitFor();
+  await page.getByText(/8 个材料中显示/).waitFor();
 }
 
 async function runScenario(scenarioName) {

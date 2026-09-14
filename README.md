@@ -28,6 +28,7 @@ node scripts/smoke.mjs curate-accession-roster
 node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
 node scripts/smoke.mjs advance-trial-clearance
+node scripts/smoke.mjs backup-restore-workspace
 ```
 
 每条命令都会启动并关闭一个本地 Vite 预览服务，端口为 `4177`。检查过程不调用外部服务，也不依赖在线数据库。
@@ -44,6 +45,7 @@ src/
     layout/               台架分配工作区
     observations/         观测记录和标记处理
     clearance/            放行快照工作区
+    backup/               工作区备份导出、导入预览和整批恢复
   components/             共享 UI 原语
   styles/                 应用样式
 scripts/
@@ -52,7 +54,7 @@ scripts/
 
 ## 输入与输出
 
-- 输入：试验信息、材料信息、台架约束、观测测量、标记处理和放行请求。
-- 输出：本地持久化工作区、更新的台架布局、派生生长标记和放行快照。
+- 输入：试验信息、材料信息、台架约束、观测测量、标记处理、放行请求和备份文件。
+- 输出：本地持久化工作区、更新的台架布局、派生生长标记、放行快照和带版本摘要的备份文件。
 
 本地使用不需要环境变量。
