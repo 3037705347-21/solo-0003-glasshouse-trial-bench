@@ -3,7 +3,8 @@ import { Button } from "../../components/Button";
 import { ProgressBar } from "../../components/ProgressBar";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { Accession, Bench } from "../../domain/types";
-import { canAssignAccession } from "../../domain/bench";
+import { benchOccupancy } from "./benchOccupancy";
+import { isBenchAssignable } from "./compatibility";
 
 interface BenchCardProps {
   bench: Bench;
@@ -20,13 +21,8 @@ export function BenchCard({
   onAssign,
   onRelease,
 }: BenchCardProps) {
-  const assigned = accessions.filter((accession) =>
-    bench.assignedIds.includes(accession.id),
-  );
-  const freeSlots = Math.max(0, bench.capacity - assigned.length);
-  const compatible = Boolean(
-    selectedAccession && canAssignAccession(selectedAccession, bench),
-  );
+  const occupancy = benchOccupancy(bench, accessions);
+  const compatible = isBenchAssignable(bench, selectedAccession);
 
   return (
     <article
@@ -65,19 +61,19 @@ export function BenchCard({
         </div>
         <div>
           <dt>空位</dt>
-          <dd>{freeSlots}</dd>
+          <dd>{occupancy.freeSlots}</dd>
         </div>
       </dl>
       <ProgressBar
-        value={assigned.length}
+        value={occupancy.assigned.length}
         max={bench.capacity}
-        tone={freeSlots === 0 ? "critical" : freeSlots === 1 ? "warning" : "positive"}
+        tone={occupancy.tone}
       />
       <div className="bench-assignments">
-        {assigned.length === 0 ? (
+        {occupancy.assigned.length === 0 ? (
           <p className="muted-copy">暂无分配材料。</p>
         ) : (
-          assigned.map((accession) => (
+          occupancy.assigned.map((accession) => (
             <div className="bench-accession-row" key={accession.id}>
               <div>
                 <strong>{accession.cultivar}</strong>

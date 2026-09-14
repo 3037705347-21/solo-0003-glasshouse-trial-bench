@@ -1,33 +1,29 @@
 import { ArrowRight, ListPlus } from "lucide-react";
 import { SelectField } from "../../components/fields";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
-import type { Accession, Bench } from "../../domain/types";
+import type { Accession, WorkspaceState } from "../../domain/types";
 import { accessionStatus } from "../../state/selectors";
-import type { WorkspaceState } from "../../domain/types";
-import { canAssignAccession } from "../../domain/bench";
+import { compatibleBenchesFor } from "./compatibility";
 
 interface AssignmentPanelProps {
   state: WorkspaceState;
-  trialId: string;
+  accessions: Accession[];
+  selectedAccession?: Accession;
   selectedAccessionId: string;
   onSelectAccession: (accessionId: string) => void;
 }
 
 export function AssignmentPanel({
   state,
-  trialId,
+  accessions,
+  selectedAccession,
   selectedAccessionId,
   onSelectAccession,
 }: AssignmentPanelProps) {
-  const accessions = state.accessions.filter(
-    (accession) => accession.trialId === trialId,
+  const compatibleBenches = compatibleBenchesFor(
+    state.benches,
+    selectedAccession,
   );
-  const selected = accessions.find(
-    (accession) => accession.id === selectedAccessionId,
-  );
-  const compatibleBenches = selected
-    ? state.benches.filter((bench) => canAssignAccession(selected, bench))
-    : [];
 
   return (
     <aside className="assignment-panel">
@@ -48,20 +44,20 @@ export function AssignmentPanel({
           </option>
         ))}
       </SelectField>
-      {selected ? (
+      {selectedAccession ? (
         <div className="assignment-selected">
-          <span className="assignment-cultivar">{selected.cultivar}</span>
+          <span className="assignment-cultivar">{selectedAccession.cultivar}</span>
           <div className="assignment-details">
-            <span>{selected.accessionNo}</span>
-            <StatusBadge tone={statusTone(accessionStatus(state, selected))}>
-              {accessionStatus(state, selected) === "assigned"
+            <span>{selectedAccession.accessionNo}</span>
+            <StatusBadge tone={statusTone(accessionStatus(state, selectedAccession))}>
+              {accessionStatus(state, selectedAccession) === "assigned"
                 ? "已分配"
-                : accessionStatus(state, selected) === "blocked"
+                : accessionStatus(state, selectedAccession) === "blocked"
                   ? "受限"
                   : "未分配"}
             </StatusBadge>
           </div>
-          <p>{selected.genotypeNote}</p>
+          <p>{selectedAccession.genotypeNote}</p>
           <div className="assignment-compatible">
             <ArrowRight size={16} aria-hidden="true" />
             <span>

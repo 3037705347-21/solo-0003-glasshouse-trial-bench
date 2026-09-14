@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { CheckCircle2, CircleAlert, Info, X, XCircle } from "lucide-react";
 import { Button } from "./Button";
 
@@ -8,6 +9,24 @@ export interface ToastMessage {
   tone: ToastTone;
   title: string;
   message?: string;
+}
+
+export function useToastQueue() {
+  const [messages, setMessages] = useState<ToastMessage[]>([]);
+
+  const pushToast = (toast: Omit<ToastMessage, "id">) => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setMessages((current) => [...current, { ...toast, id }]);
+    window.setTimeout(() => {
+      setMessages((current) => current.filter((item) => item.id !== id));
+    }, 4200);
+  };
+
+  const dismissToast = (id: string) => {
+    setMessages((current) => current.filter((item) => item.id !== id));
+  };
+
+  return { messages, pushToast, dismissToast };
 }
 
 const toneIcon = {
