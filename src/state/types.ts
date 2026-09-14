@@ -2,6 +2,7 @@ import type {
   Accession,
   Bench,
   ClearanceSnapshot,
+  CompliancePackage,
   Flag,
   ObservationPass,
   Trial,
@@ -24,7 +25,8 @@ export type WorkspaceAction =
       type: "clearance/generated";
       snapshot: ClearanceSnapshot;
       trials: Trial[];
-    };
+    }
+  | { type: "package/generated"; package: CompliancePackage };
 
 export function isWorkspaceState(value: unknown): value is WorkspaceState {
   if (!value || typeof value !== "object") {
@@ -37,6 +39,8 @@ export function isWorkspaceState(value: unknown): value is WorkspaceState {
     Array.isArray(candidate.benches) &&
     Array.isArray(candidate.observationPasses) &&
     Array.isArray(candidate.flags) &&
-    Array.isArray(candidate.clearanceSnapshots)
+    Array.isArray(candidate.clearanceSnapshots) &&
+    (candidate.compliancePackages === undefined ||
+      Array.isArray(candidate.compliancePackages))
   );
 }

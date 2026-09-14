@@ -2,6 +2,7 @@ import type {
   Accession,
   Bench,
   ClearanceSnapshot,
+  CompliancePackage,
   Flag,
   ObservationPass,
   Trial,
@@ -65,6 +66,15 @@ export function latestSnapshotForTrial(
   return [...state.clearanceSnapshots]
     .filter((snapshot) => snapshot.trialId === trialId)
     .sort((left, right) => right.generatedOn.localeCompare(left.generatedOn))[0];
+}
+
+export function packagesForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): CompliancePackage[] {
+  return [...state.compliancePackages]
+    .filter((item) => item.trialId === trialId)
+    .sort((left, right) => right.version - left.version);
 }
 
 export function benchUtilization(

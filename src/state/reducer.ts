@@ -59,6 +59,11 @@ export function workspaceReducer(
         clearanceSnapshots: [...state.clearanceSnapshots, action.snapshot],
         trials: action.trials,
       };
+    case "package/generated":
+      return {
+        ...state,
+        compliancePackages: [...state.compliancePackages, action.package],
+      };
     default:
       return state;
   }

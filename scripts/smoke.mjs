@@ -15,6 +15,7 @@ const scenarios = {
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
+  "assemble-compliance-package": assembleCompliancePackage,
 };
 
 const scenarioPaths = {
@@ -22,6 +23,7 @@ const scenarioPaths = {
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
+  "assemble-compliance-package": "/packages",
 };
 
 async function waitForServer() {
@@ -91,6 +93,60 @@ async function advanceTrialClearance(page) {
     .getByText("阻止", { exact: true })
     .first()
     .waitFor();
+}
+
+async function assembleCompliancePackage(page) {
+  await page.getByRole("link", { name: "试验放行" }).click();
+  await page.getByTestId("generate-clearance").click();
+  await page.getByText("放行被阻止", { exact: true }).waitFor();
+
+  await page.getByRole("link", { name: "合规包" }).click();
+  await page.getByTestId("generate-package").click();
+  await page.getByText("第 1 版", { exact: true }).first().waitFor();
+  await page.getByText("含排除项", { exact: true }).first().waitFor();
+  await page.getByRole("heading", { name: /未处理阻止项（/ }).waitFor();
+  const digestV1 = await page.getByTestId("package-digest").textContent();
+
+  await page.getByRole("link", { name: "材料登记" }).click();
+  await page.getByTestId("edit-accession-acc-tom-01").click();
+  await page.getByTestId("cultivar-input").fill("Tiny Tim X");
+  await page.getByTestId("save-accession-button").click();
+  await page.getByText("材料已更新", { exact: true }).waitFor();
+
+  await page.getByRole("link", { name: "合规包" }).click();
+  await page.getByTestId("package-detail").getByText("Tiny Tim", { exact: true }).waitFor();
+  const frozenCount = await page
+    .getByTestId("package-detail")
+    .getByText("Tiny Tim X", { exact: true })
+    .count();
+  if (frozenCount !== 0) {
+    throw new Error("v1 package content changed after accession edit");
+  }
+
+  await page.getByTestId("generate-package").click();
+  await page.getByText("第 2 版", { exact: true }).first().waitFor();
+  await page.getByTestId("package-detail").getByText("Tiny Tim X", { exact: true }).waitFor();
+  const digestV2 = await page.getByTestId("package-digest").textContent();
+  if (digestV1 === digestV2) {
+    throw new Error("package digest did not change across versions");
+  }
+
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByText("第 2 版", { exact: true }).first().waitFor();
+  await page.getByTestId("package-detail").getByText(/SOL-01 · 第 2 版/).waitFor();
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByTestId("export-package").click(),
+  ]);
+  if (!download.suggestedFilename().endsWith("compliance-package-SOL-01-v2.json")) {
+    throw new Error(`Unexpected export file name: ${download.suggestedFilename()}`);
+  }
+
+  await page.getByTestId("package-trial-select").selectOption("trial-bra-03");
+  await page.getByTestId("generate-package").click();
+  await page.getByText("第 1 版", { exact: true }).first().waitFor();
+  await page.getByRole("heading", { name: /缺页（/ }).waitFor();
 }
 
 async function runScenario(scenarioName) {

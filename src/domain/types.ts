@@ -98,6 +98,89 @@ export interface ClearanceSnapshot {
   blockers: ClearanceBlocker[];
 }
 
+export type PackageCheckCategory =
+  | "missing-page"
+  | "broken-ref"
+  | "duplicate"
+  | "open-blocker";
+
+export interface PackageCheckFinding {
+  category: PackageCheckCategory;
+  code: string;
+  message: string;
+}
+
+export interface PackageAccessionRecord {
+  id: string;
+  accessionNo: string;
+  cultivar: string;
+  source: string;
+  quantity: number;
+  trayCells: number;
+  preferredLight: PreferredLight;
+  labels: string[];
+  benchCode: string | null;
+  benchSector: string | null;
+}
+
+export interface PackageObservationRecord {
+  id: string;
+  observedOn: string;
+  observer: string;
+  entries: ObservationEntry[];
+}
+
+export interface PackageFlagRecord {
+  id: string;
+  accessionNo: string;
+  code: string;
+  message: string;
+  severity: FlagSeverity;
+  state: FlagState;
+  resolutionNote: string | null;
+}
+
+export interface PackageClearanceRecord {
+  snapshotId: string;
+  generatedOn: string;
+  status: ClearanceStatus;
+  blockers: ClearanceBlocker[];
+}
+
+export interface PackageInventoryEntry {
+  key: string;
+  label: string;
+  count: number;
+  detail: string;
+}
+
+export interface PackageScopeNote {
+  label: string;
+  detail: string;
+}
+
+export type CompliancePackageStatus = "complete" | "with-exclusions";
+
+export interface CompliancePackage {
+  id: string;
+  trialId: string;
+  trialCode: string;
+  trialCropFamily: string;
+  version: number;
+  generatedOn: string;
+  status: CompliancePackageStatus;
+  inventory: PackageInventoryEntry[];
+  accessions: PackageAccessionRecord[];
+  observations: PackageObservationRecord[];
+  flags: PackageFlagRecord[];
+  clearance: PackageClearanceRecord | null;
+  checks: PackageCheckFinding[];
+  included: PackageScopeNote[];
+  excluded: PackageScopeNote[];
+  digest: string;
+  exportFileName: string;
+}
+
 export interface WorkspaceState {
   trials: Trial[];
   accessions: Accession[];
@@ -105,4 +188,5 @@ export interface WorkspaceState {
   observationPasses: ObservationPass[];
   flags: Flag[];
   clearanceSnapshots: ClearanceSnapshot[];
+  compliancePackages: CompliancePackage[];
 }

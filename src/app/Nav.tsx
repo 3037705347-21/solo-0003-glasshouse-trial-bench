@@ -3,6 +3,7 @@ import {
   LayoutGrid,
   ListTree,
   NotebookPen,
+  PackageCheck,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -11,6 +12,7 @@ const navItems = [
   { to: "/layout", label: "台架布局", icon: LayoutGrid },
   { to: "/observations", label: "生长观测", icon: NotebookPen },
   { to: "/clearance", label: "试验放行", icon: ClipboardCheck },
+  { to: "/packages", label: "合规包", icon: PackageCheck },
 ];
 
 export function Nav() {

@@ -1130,6 +1130,218 @@ button {
   font-size: 14px;
 }
 
+.package-workspace {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.package-list {
+  position: sticky;
+  top: 24px;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.package-list-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--green-700);
+}
+
+.package-list-heading h2 {
+  flex: 1;
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.package-list-heading span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.package-versions {
+  display: grid;
+  gap: 10px;
+}
+
+.package-version-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fdfefc;
+  color: var(--text);
+  text-align: left;
+}
+
+.package-version-card:hover {
+  border-color: var(--green-600);
+}
+
+.package-version-card-active {
+  border-color: var(--green-600);
+  box-shadow: 0 0 0 2px rgba(62, 134, 87, 0.12);
+}
+
+.package-version-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.package-version-top strong {
+  font-size: 14px;
+}
+
+.package-version-card > span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.package-version-card code {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.package-detail {
+  display: grid;
+  gap: 18px;
+}
+
+.package-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px 0;
+}
+
+.package-detail-header .panel-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.package-detail .metric-grid {
+  padding: 16px 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.package-digest-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.package-digest-row span {
+  flex: 1;
+}
+
+.package-digest-row code {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.package-section-body {
+  display: grid;
+  gap: 16px;
+  padding: 16px 18px 18px;
+}
+
+.package-check-group h3,
+.package-ref-group h3,
+.package-scope-list h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.package-scope-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 16px 18px 18px;
+}
+
+.package-scope-list ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.package-scope-list li {
+  display: grid;
+  gap: 3px;
+  padding: 9px 11px;
+  border-radius: 7px;
+  background: var(--green-100);
+  font-size: 13px;
+}
+
+.package-scope-list li strong {
+  color: var(--green-700);
+}
+
+.package-scope-list li span {
+  color: var(--text-muted);
+}
+
+.package-scope-excluded li {
+  background: var(--amber-100);
+}
+
+.package-scope-excluded li strong {
+  color: var(--amber-700);
+}
+
+.package-ref-group {
+  display: grid;
+  gap: 10px;
+}
+
+.package-ref-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.package-ref-list li {
+  display: grid;
+  gap: 3px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.package-ref-list li span {
+  color: var(--text-muted);
+}
+
+.package-ref-list code {
+  font-size: 11px;
+}
+
 .empty-state {
   display: grid;
   justify-items: center;
@@ -1159,12 +1371,14 @@ button {
 
 @media (max-width: 1100px) {
   .layout-workspace,
-  .observation-workspace {
+  .observation-workspace,
+  .package-workspace {
     grid-template-columns: 1fr;
   }
 
   .assignment-panel,
-  .flag-panel {
+  .flag-panel,
+  .package-list {
     position: static;
   }
 
@@ -1229,6 +1443,11 @@ button {
   .bench-grid-list,
   .pass-cards,
   .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .package-scope-columns,
+  .package-detail .metric-grid {
     grid-template-columns: 1fr;
   }
 }
