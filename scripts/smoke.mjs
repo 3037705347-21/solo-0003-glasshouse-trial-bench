@@ -104,10 +104,11 @@ async function readAccessionDossier(page) {
   await page.getByTestId("dossier-no-bench").waitFor();
   await page.getByTestId("dossier-no-notices").waitFor({ state: "detached" });
 
-  // 在台架布局分配该材料后回到同一地址，档案必须实时反映，不依赖复制数据。
+  // 在台架布局把该材料分配到 E-1（E-1 上已有 acc-tom-01、acc-tom-02），
+  // 回到同一地址后档案必须实时反映，且同架关系与实际分配一致。
   await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
   await page.getByTestId("assignment-accession-select").selectOption("acc-tom-03");
-  await page.getByTestId("assign-bench-bench-east-2").click();
+  await page.getByTestId("assign-bench-bench-east-1").click();
   await page.getByText("台架分配成功", { exact: true }).waitFor();
 
   await page.goto(`${baseUrl}/#/accessions/acc-tom-03`, {
@@ -118,12 +119,17 @@ async function readAccessionDossier(page) {
   await page.getByTestId("dossier-notice-UNASSIGNED").waitFor({
     state: "detached",
   });
-  await page.getByTestId("dossier-bench").getByText("E-2").waitFor();
+  await page.getByTestId("dossier-bench").getByText("E-1").waitFor();
+  await page.getByText("3 / 4", { exact: true }).waitFor();
+  await page.getByText("同架材料（2）", { exact: true }).waitFor();
+  await page.getByTestId("dossier-mate-acc-tom-01").waitFor();
+  await page.getByTestId("dossier-mate-acc-tom-02").waitFor();
   await page.getByText("光照兼容", { exact: true }).waitFor();
 
   // 同架材料链接可以定位到另一个只读档案。
   await page.getByTestId("dossier-mate-acc-tom-01").click();
   await page.getByTestId("dossier-acc-tom-01").waitFor();
+  await page.getByText("ACC-0001 · Tiny Tim").waitFor();
   await page.getByTestId("dossier-notice-FLAGS_OPEN").waitFor();
   await page.getByText("HT_UNDER").first().waitFor();
 }
