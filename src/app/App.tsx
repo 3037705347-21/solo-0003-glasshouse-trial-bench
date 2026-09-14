@@ -4,6 +4,7 @@ import { RosterPage } from "../features/roster/RosterPage";
 import { LayoutPage } from "../features/layout/LayoutPage";
 import { ObservationPage } from "../features/observations/ObservationPage";
 import { ClearancePage } from "../features/clearance/ClearancePage";
+import { SnapshotLedgerPage } from "../features/ledger/SnapshotLedgerPage";
 
 export function App() {
   return (
@@ -14,6 +15,7 @@ export function App() {
         <Route path="/layout" element={<LayoutPage />} />
         <Route path="/observations" element={<ObservationPage />} />
         <Route path="/clearance" element={<ClearancePage />} />
+        <Route path="/clearance/ledger" element={<SnapshotLedgerPage />} />
         <Route path="*" element={<Navigate to="/roster" replace />} />
       </Routes>
     </AppShell>

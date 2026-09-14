@@ -1,15 +1,123 @@
 import type {
+  Bench,
   ClearanceBlocker,
   ClearanceMetric,
   ClearanceSnapshot,
+  Flag,
+  SnapshotBenchRef,
+  SnapshotCapture,
+  SnapshotFlagRef,
+  SnapshotPassRef,
   Trial,
   WorkspaceState,
 } from "./types";
 import { createId } from "./id";
 
+function captureTrialRef(trial: Trial | undefined, trialId: string, stateAfter: Trial["state"]) {
+  return {
+    id: trialId,
+    code: trial?.code ?? trialId,
+    cropFamily: trial?.cropFamily ?? "未知科属",
+    objective: trial?.objective ?? "",
+    season: trial?.season ?? "",
+    // ready 快照会在同一事务中把试验推进为已放行，记录应用后的状态。
+    state: stateAfter,
+  };
+}
+
+function captureAccessions(state: WorkspaceState, trialId: string) {
+  const benchByAccession = new Map<string, string>();
+  state.benches.forEach((bench) => {
+    bench.assignedIds.forEach((accessionId) => {
+      benchByAccession.set(accessionId, bench.id);
+    });
+  });
+  return state.accessions
+    .filter((accession) => accession.trialId === trialId)
+    .map((accession) => ({
+      id: accession.id,
+      accessionNo: accession.accessionNo,
+      cultivar: accession.cultivar,
+      source: accession.source,
+      quantity: accession.quantity,
+      preferredLight: accession.preferredLight,
+      assignedBenchId: benchByAccession.get(accession.id),
+      labels: [...accession.labels],
+    }));
+}
+
+function captureBenches(state: WorkspaceState, trialId: string): SnapshotBenchRef[] {
+  const trialAccessionIds = new Set(
+    state.accessions
+      .filter((accession) => accession.trialId === trialId)
+      .map((accession) => accession.id),
+  );
+  const relevant = (bench: Bench) =>
+    bench.status === "blocked" ||
+    bench.status === "quarantine" ||
+    bench.assignedIds.some((accessionId) => trialAccessionIds.has(accessionId));
+  return state.benches.filter(relevant).map((bench) => ({
+    id: bench.id,
+    code: bench.code,
+    sector: bench.sector,
+    capacity: bench.capacity,
+    assignedIds: [...bench.assignedIds],
+    lightProfile: bench.lightProfile,
+    status: bench.status,
+    blockedReason: bench.blockedReason,
+  }));
+}
+
+function captureFlags(state: WorkspaceState, trialId: string): SnapshotFlagRef[] {
+  return state.flags
+    .filter((flag) => flag.trialId === trialId)
+    .map((flag: Flag) => ({
+      id: flag.id,
+      accessionId: flag.accessionId,
+      observationPassId: flag.observationPassId,
+      code: flag.code,
+      message: flag.message,
+      severity: flag.severity,
+      state: flag.state,
+      resolutionNote: flag.resolutionNote,
+    }));
+}
+
+function capturePasses(state: WorkspaceState, trialId: string): SnapshotPassRef[] {
+  return state.observationPasses
+    .filter((pass) => pass.trialId === trialId)
+    .map((pass) => ({
+      id: pass.id,
+      observedOn: pass.observedOn,
+      observer: pass.observer,
+      entryCount: pass.entries.length,
+    }));
+}
+
+/**
+ * 生成快照的不可变引用台账。基于应用放行后的工作区计算，
+ * 这样就绪快照冻结的就是“放行后”的试验状态。
+ */
+export function buildSnapshotCapture(
+  state: WorkspaceState,
+  trialId: string,
+): SnapshotCapture {
+  const trial = state.trials.find((item) => item.id === trialId);
+  return {
+    schema: 1,
+    capturedOn: new Date().toISOString(),
+    trial: captureTrialRef(trial, trialId, trial?.state ?? "draft"),
+    accessions: captureAccessions(state, trialId),
+    benches: captureBenches(state, trialId),
+    flags: captureFlags(state, trialId),
+    observationPasses: capturePasses(state, trialId),
+  };
+}
+
 export function buildClearanceSnapshot(
   state: WorkspaceState,
   trialId: string,
+  capture?: SnapshotCapture,
 ): ClearanceSnapshot {
   const trial = state.trials.find((item) => item.id === trialId);
   const accessions = state.accessions.filter(
@@ -88,6 +196,7 @@ export function buildClearanceSnapshot(
     status: blockers.length === 0 ? "ready" : "blocked",
     metrics,
     blockers,
+    capture,
   };
 }
 
@@ -97,6 +206,44 @@ export function canClearTrial(
 ): { ready: boolean; snapshot: ClearanceSnapshot } {
   const snapshot = buildClearanceSnapshot(state, trialId);
   return { ready: snapshot.status === "ready", snapshot };
+}
+
+/**
+ * 快照创建事务：先按当前状态计算指标与阻止项；就绪时放行试验，
+ * 再基于放行后的工作区冻结引用，保证台账里记录的是“当时”的真实状态。
+ */
+export function createClearanceSnapshot(
+  state: WorkspaceState,
+  trialId: string,
+): { snapshot: ClearanceSnapshot; trials: Trial[] } {
+  const preview = buildClearanceSnapshot(state, trialId);
+  const trials = applyClearance(state, preview);
+  const postState: WorkspaceState = { ...state, trials };
+  const capture = buildSnapshotCapture(postState, trialId);
+  return {
+    snapshot: { ...preview, capture },
+    trials,
+  };
+}
+
+/**
+ * 从当前工作区重建一份等价捕获，台账用它和冻结捕获逐字段比对，
+ * 判断历史快照是否已随材料/台架/标记变化而过期。
+ */
+export function buildLiveCapture(
+  state: WorkspaceState,
+  trialId: string,
+): SnapshotCapture {
+  const trial = state.trials.find((item) => item.id === trialId);
+  return {
+    schema: 1,
+    capturedOn: "",
+    trial: captureTrialRef(trial, trialId, trial?.state ?? "draft"),
+    accessions: captureAccessions(state, trialId),
+    benches: captureBenches(state, trialId),
+    flags: captureFlags(state, trialId),
+    observationPasses: capturePasses(state, trialId),
+  };
 }
 
 export function applyClearance(

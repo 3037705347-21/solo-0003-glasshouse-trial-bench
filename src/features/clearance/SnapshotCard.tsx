@@ -5,9 +5,10 @@ import type { ClearanceSnapshot } from "../../domain/types";
 
 interface SnapshotCardProps {
   snapshot: ClearanceSnapshot;
+  heading?: string;
 }
 
-export function SnapshotCard({ snapshot }: SnapshotCardProps) {
+export function SnapshotCard({ snapshot, heading = "最新放行快照" }: SnapshotCardProps) {
   const date = new Date(snapshot.generatedOn);
   const dateLabel = Number.isNaN(date.getTime())
     ? snapshot.generatedOn
@@ -23,7 +24,7 @@ export function SnapshotCard({ snapshot }: SnapshotCardProps) {
           aria-hidden="true"
         />
         <div>
-          <h2>最新放行快照</h2>
+          <h2>{heading}</h2>
           <span>
             <CalendarDays size={14} aria-hidden="true" />
             {dateLabel}

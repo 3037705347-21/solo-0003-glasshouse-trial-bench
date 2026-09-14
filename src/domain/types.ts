@@ -89,6 +89,69 @@ export interface ClearanceBlocker {
   benchId?: string;
 }
 
+/**
+ * 快照生成瞬间的引用副本。台账靠这些冻结值回看“当时”的状态，
+ * 之后材料、台架或标记的任何修改都不会回写到历史快照。
+ */
+export interface SnapshotTrialRef {
+  id: string;
+  code: string;
+  cropFamily: string;
+  objective: string;
+  season: string;
+  state: TrialState;
+}
+
+export interface SnapshotAccessionRef {
+  id: string;
+  accessionNo: string;
+  cultivar: string;
+  source: string;
+  quantity: number;
+  preferredLight: PreferredLight;
+  assignedBenchId?: string;
+  labels: string[];
+}
+
+export interface SnapshotBenchRef {
+  id: string;
+  code: string;
+  sector: string;
+  capacity: number;
+  assignedIds: string[];
+  lightProfile: PreferredLight;
+  status: BenchStatus;
+  blockedReason?: string;
+}
+
+export interface SnapshotFlagRef {
+  id: string;
+  accessionId: string;
+  observationPassId: string;
+  code: string;
+  message: string;
+  severity: FlagSeverity;
+  state: FlagState;
+  resolutionNote?: string;
+}
+
+export interface SnapshotPassRef {
+  id: string;
+  observedOn: string;
+  observer: string;
+  entryCount: number;
+}
+
+export interface SnapshotCapture {
+  schema: 1;
+  capturedOn: string;
+  trial: SnapshotTrialRef;
+  accessions: SnapshotAccessionRef[];
+  benches: SnapshotBenchRef[];
+  flags: SnapshotFlagRef[];
+  observationPasses: SnapshotPassRef[];
+}
+
 export interface ClearanceSnapshot {
   id: string;
   trialId: string;
@@ -96,6 +159,11 @@ export interface ClearanceSnapshot {
   status: ClearanceStatus;
   metrics: ClearanceMetric[];
   blockers: ClearanceBlocker[];
+  /**
+   * 内嵌的引用快照。早于台账功能生成的历史记录没有该字段，
+   * 台账会把它们标记为“无法核对”，且仍保持只读。
+   */
+  capture?: SnapshotCapture;
 }
 
 export interface WorkspaceState {

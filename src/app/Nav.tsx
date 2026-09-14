@@ -1,4 +1,5 @@
 import {
+  Archive,
   ClipboardCheck,
   LayoutGrid,
   ListTree,
@@ -7,10 +8,11 @@ import {
 import { NavLink } from "react-router-dom";
 
 const navItems = [
-  { to: "/roster", label: "材料登记", icon: ListTree },
-  { to: "/layout", label: "台架布局", icon: LayoutGrid },
-  { to: "/observations", label: "生长观测", icon: NotebookPen },
-  { to: "/clearance", label: "试验放行", icon: ClipboardCheck },
+  { to: "/roster", label: "材料登记", icon: ListTree, end: false },
+  { to: "/layout", label: "台架布局", icon: LayoutGrid, end: false },
+  { to: "/observations", label: "生长观测", icon: NotebookPen, end: false },
+  { to: "/clearance/ledger", label: "放行台账", icon: Archive, end: false },
+  { to: "/clearance", label: "试验放行", icon: ClipboardCheck, end: true },
 ];
 
 export function Nav() {
@@ -32,6 +34,7 @@ export function Nav() {
             <li key={item.to}>
               <NavLink
                 to={item.to}
+                end={item.end}
                 className={({ isActive }) => (isActive ? "nav-link-active" : "")}
               >
                 <Icon size={18} aria-hidden="true" />

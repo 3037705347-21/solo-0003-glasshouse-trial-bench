@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { Play, ShieldCheck } from "lucide-react";
+import { Link } from "react-router-dom";
+import { History, Play, ShieldCheck } from "lucide-react";
 import { Button } from "../../components/Button";
 import { PageHeader } from "../../components/PageHeader";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import {
-  applyClearance,
   buildClearanceSnapshot,
+  createClearanceSnapshot,
 } from "../../domain/clearance";
 import { transitionTrial } from "../../domain/trial";
 import { latestSnapshotForTrial } from "../../state/selectors";
@@ -33,8 +34,7 @@ export function ClearancePage() {
   };
 
   const handleGenerate = () => {
-    const snapshot = buildClearanceSnapshot(state, trialId);
-    const trials = applyClearance(state, snapshot);
+    const { snapshot, trials } = createClearanceSnapshot(state, trialId);
     dispatch({ type: "clearance/generated", snapshot, trials });
     pushToast({
       tone: snapshot.status === "ready" ? "success" : "warning",
@@ -124,7 +124,7 @@ export function ClearancePage() {
           </div>
           <ShieldCheck size={20} className="panel-icon" aria-hidden="true" />
         </div>
-        <SnapshotCard snapshot={liveSnapshot} />
+        <SnapshotCard snapshot={liveSnapshot} heading="实时约束预览（未保存）" />
       </section>
       {latest ? (
         <section className="clearance-preview">
@@ -133,10 +133,21 @@ export function ClearancePage() {
               <span className="panel-title">已保存快照</span>
               <span className="panel-subtitle">最近生成的放行快照</span>
             </div>
+            <Link className="ledger-link" to="/clearance/ledger">
+              <History size={15} aria-hidden="true" />
+              查看快照台账（{state.clearanceSnapshots.length}）
+            </Link>
           </div>
-          <SnapshotCard snapshot={latest} />
+          <SnapshotCard snapshot={latest} heading="最近一次已保存快照" />
         </section>
-      ) : null}
+      ) : (
+        <section className="clearance-preview ledger-empty-preview">
+          <Link to="/clearance/ledger">
+            <History size={15} aria-hidden="true" />
+            打开放行快照台账
+          </Link>
+        </section>
+      )}
       <ToastRegion
         messages={toasts}
         onDismiss={(id) =>
