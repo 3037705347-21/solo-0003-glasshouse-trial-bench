@@ -24,6 +24,10 @@
     {
       "workflow_id": "advance-trial-clearance",
       "command": "node scripts/smoke.mjs advance-trial-clearance"
+    },
+    {
+      "workflow_id": "view-trial-schedule",
+      "command": "node scripts/smoke.mjs view-trial-schedule"
     }
   ]
 }

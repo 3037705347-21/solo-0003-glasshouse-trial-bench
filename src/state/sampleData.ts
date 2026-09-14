@@ -39,6 +39,46 @@ const trials: Trial[] = [
     endDate: "2026-10-08",
     state: "draft",
   },
+  {
+    id: "trial-let-04",
+    code: "LET-04",
+    cropFamily: "菊科",
+    objective: "单日遮阳处理对生菜叶缘灼伤的即时影响评估。",
+    season: "夏季",
+    startDate: "2026-09-14",
+    endDate: "2026-09-14",
+    state: "active",
+  },
+  {
+    id: "trial-cuc-05",
+    code: "CUC-05",
+    cropFamily: "葫芦科",
+    objective: "比较滴灌频率对黄瓜早期藤蔓伸长的影响（尚无观测）。",
+    season: "夏季",
+    startDate: "2026-08-24",
+    endDate: "2026-11-20",
+    state: "active",
+  },
+  {
+    id: "trial-bas-06",
+    code: "BAS-06",
+    cropFamily: "唇形科",
+    objective: "罗勒品种在补光条件下的精油含量比较，已放行收尾。",
+    season: "春季",
+    startDate: "2026-01-12",
+    endDate: "2026-04-30",
+    state: "cleared",
+  },
+  {
+    id: "trial-spi-07",
+    code: "SPI-07",
+    cropFamily: "苋科",
+    objective: "菠菜晚播批次越冬试种，因管路维修暂停后超过结束日未关闭。",
+    season: "冬季",
+    startDate: "2025-12-01",
+    endDate: "2026-03-15",
+    state: "paused",
+  },
 ];
 
 const accessions: Accession[] = [
@@ -271,6 +311,21 @@ const observationPasses: ObservationPass[] = [
       },
     ],
   },
+  {
+    id: "obs-tom-02",
+    trialId: "trial-sol-01",
+    observedOn: "2026-09-08",
+    observer: "M. Ikeda",
+    entries: [
+      {
+        accessionId: "acc-tom-01",
+        heightMm: 320,
+        leafCount: 18,
+        ecMs: 2.4,
+        notes: "坐果稳定，节间紧凑。",
+      },
+    ],
+  },
 ];
 
 const flags: Flag[] = [
@@ -298,7 +353,21 @@ const flags: Flag[] = [
   },
 ];
 
-const clearanceSnapshots: ClearanceSnapshot[] = [];
+const clearanceSnapshots: ClearanceSnapshot[] = [
+  {
+    id: "clr-bas-06-ready",
+    trialId: "trial-bas-06",
+    generatedOn: "2026-05-02T08:30:00.000Z",
+    status: "ready",
+    metrics: [
+      { label: "材料数", value: 2, detail: "该试验中的材料总数" },
+      { label: "已分配", value: 2, detail: "已放置到台架的材料数" },
+      { label: "未处理标记", value: 0, detail: "未解决的观测标记" },
+      { label: "在用台架", value: 1, detail: "至少有一个材料的台架数" },
+    ],
+    blockers: [],
+  },
+];
 
 export function createSampleWorkspaceState(): WorkspaceState {
   return {

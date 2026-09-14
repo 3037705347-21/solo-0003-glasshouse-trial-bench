@@ -58,7 +58,7 @@ export function validateTrialDraft(draft: TrialDraft): Result<TrialDraft> {
       fieldError("code", "invalid_code", "请使用类似 AUR-04 或 TM-12 的编号"),
     );
   }
-  if (draft.cropFamily.trim().length < 3) {
+  if (draft.cropFamily.trim().length < 2) {
     errors.push(
       fieldError("cropFamily", "required", "请填写作物科属"),
     );
@@ -120,6 +120,23 @@ export function createTrial(draft: TrialDraft): Result<Trial> {
     startDate: value.startDate,
     endDate: value.endDate,
     state: "draft",
+  });
+}
+
+export function updateTrial(trial: Trial, draft: TrialDraft): Result<Trial> {
+  const validated = validateTrialDraft(draft);
+  if (!validated.ok) {
+    return validated;
+  }
+  const value = validated.value;
+  return ok({
+    ...trial,
+    code: value.code,
+    cropFamily: value.cropFamily,
+    objective: value.objective,
+    season: value.season,
+    startDate: value.startDate,
+    endDate: value.endDate,
   });
 }
 

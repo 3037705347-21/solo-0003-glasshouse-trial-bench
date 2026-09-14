@@ -15,6 +15,7 @@ const scenarios = {
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
+  "view-trial-schedule": viewTrialSchedule,
 };
 
 const scenarioPaths = {
@@ -22,6 +23,7 @@ const scenarioPaths = {
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
+  "view-trial-schedule": "/schedule",
 };
 
 async function waitForServer() {
@@ -91,6 +93,31 @@ async function advanceTrialClearance(page) {
     .getByText("阻止", { exact: true })
     .first()
     .waitFor();
+}
+
+async function viewTrialSchedule(page) {
+  await page.getByTestId("schedule-timeline").waitFor();
+  // 跨月区间与单日试验都要在时间轴上出现
+  await page.getByTestId("timeline-bar-trial-sol-01").waitFor();
+  await page.getByTestId("timeline-bar-trial-let-04").waitFor();
+  // 已放行试验的关闭节点
+  await page
+    .locator('[data-testid="timeline-marker-trial-bas-06-closure-2026-05-02"]')
+    .waitFor();
+  // 无观测试验的节奏缺失
+  await page
+    .locator('[data-testid^="timeline-marker-trial-cuc-05-observation-gap-"]')
+    .waitFor();
+  // 月历视图
+  await page.getByText("月历", { exact: true }).click();
+  await page.getByTestId("schedule-month-calendar").waitFor();
+  // 季节/状态/日期范围筛选可用
+  await page.getByTestId("schedule-state-filter").selectOption("cleared");
+  await page.getByTestId("schedule-card-trial-bas-06").waitFor();
+  // 时间轴条目可跳回工作流
+  await page.getByTestId("schedule-state-filter").selectOption("active");
+  await page.getByTestId("timeline-label-trial-ama-02").click();
+  await page.waitForURL(/observations\?trial=trial-ama-02/);
 }
 
 async function runScenario(scenarioName) {

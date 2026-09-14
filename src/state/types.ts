@@ -13,6 +13,7 @@ export type WorkspaceAction =
   | { type: "hydrate"; state: WorkspaceState }
   | { type: "reset"; state: WorkspaceState }
   | { type: "trial/created"; trial: Trial }
+  | { type: "trial/updated"; trial: Trial }
   | { type: "trial/transitioned"; trialId: string; state: TrialState }
   | { type: "accession/created"; accession: Accession }
   | { type: "accession/updated"; accession: Accession }
