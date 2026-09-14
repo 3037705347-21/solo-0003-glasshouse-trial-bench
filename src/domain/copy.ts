@@ -281,9 +281,18 @@ function benchmarkTrial(
   if (trialErrors.length > 0) {
     return fail(trialErrors);
   }
+  // 模板自身的编号也算重号：复制结果必须是独立编号的新试验。
+  if (source.code.toUpperCase() === code) {
+    return fail([
+      fieldError(
+        "newCode",
+        "duplicate_source",
+        `新试验不能沿用模板自身的编号 ${source.code}，请为下一轮试验另取编号`,
+      ),
+    ]);
+  }
   const codeTaken = state.trials.some(
-    (trial) =>
-      trial.id !== source.id && trial.code.toUpperCase() === code,
+    (trial) => trial.code.toUpperCase() === code,
   );
   if (codeTaken) {
     return fail([
@@ -382,29 +391,33 @@ export function planTrialCopy(
   });
 
   const conflicts: CopyConflict[] = [];
-  if (
-    parseDateOnly(request.startDate) &&
-    parseDateOnly(request.endDate) &&
-    state.trials.some((trial) => {
-      if (trial.id === source.id) {
-        return false;
-      }
+  if (parseDateOnly(request.startDate) && parseDateOnly(request.endDate)) {
+    const nextStart = parseDateOnly(request.startDate);
+    const nextEnd = parseDateOnly(request.endDate);
+    const overlaps = state.trials.filter((trial) => {
       const start = parseDateOnly(trial.startDate);
       const end = parseDateOnly(trial.endDate);
-      const nextStart = parseDateOnly(request.startDate);
-      const nextEnd = parseDateOnly(request.endDate);
-      return (
+      return Boolean(
         start && end && nextStart && nextEnd &&
-        nextStart.getTime() <= end.getTime() &&
-        nextEnd.getTime() >= start.getTime()
+          nextStart.getTime() <= end.getTime() &&
+          nextEnd.getTime() >= start.getTime(),
       );
-    })
-  ) {
-    conflicts.push({
-      code: "DATE_OVERLAP",
-      message: "新试验日期与其它试验存在重叠，请确认季节安排",
-      blocking: false,
     });
+    // 模板自身也参与冲突检查：下一轮试验不应与模板档期重叠。
+    if (overlaps.some((trial) => trial.id === source.id)) {
+      conflicts.push({
+        code: "DATE_OVERLAP",
+        message: `新试验日期与模板 ${source.code} 的档期重叠，请确认季节节奏`,
+        blocking: false,
+      });
+    }
+    if (overlaps.some((trial) => trial.id !== source.id)) {
+      conflicts.push({
+        code: "DATE_OVERLAP",
+        message: "新试验日期与其它试验存在重叠，请确认季节安排",
+        blocking: false,
+      });
+    }
   }
 
   let sequence = nextGlobalAccessionNumber(state);

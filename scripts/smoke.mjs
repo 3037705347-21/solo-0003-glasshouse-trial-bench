@@ -101,6 +101,26 @@ async function duplicateTrialFromTemplate(page) {
   await page.getByTestId("copy-from-trial-sol-01").click();
   await page.getByTestId("copy-trial-dialog").waitFor();
 
+  // 模板自身编号必须被唯一性检查拒绝，不允许进入预览。
+  await page.getByTestId("copy-new-code").fill("SOL-01");
+  await page.getByTestId("copy-start-date").fill("2026-03-01");
+  await page.getByTestId("copy-end-date").fill("2026-03-31");
+  await page.getByTestId("copy-preview-button").click();
+  await page
+    .getByText("新试验不能沿用模板自身的编号 SOL-01", { exact: false })
+    .first()
+    .waitFor();
+
+  // 新日期与模板档期重叠时，即使编号合法也必须提示冲突。
+  await page.getByTestId("copy-new-code").fill("SOL-04");
+  await page.getByTestId("copy-preview-button").click();
+  await page.getByTestId("copy-preview").waitFor();
+  await page
+    .getByText("新试验日期与模板 SOL-01 的档期重叠", { exact: false })
+    .first()
+    .waitFor();
+  await page.getByTestId("copy-back-button").click();
+
   // 跳过第三个材料，验证预览中的跳过项与编号重排。
   await page.getByTestId("copy-accession-acc-tom-03").uncheck();
   // 重置两个材料字段，验证默认值提示。
