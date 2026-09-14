@@ -57,6 +57,64 @@ export interface ObservationPass {
   entries: ObservationEntry[];
 }
 
+export type PlanScheduleStatus =
+  | "upcoming"
+  | "due-soon"
+  | "due-today"
+  | "overdue"
+  | "completed";
+
+/**
+ * 观测计划当前的跟进状态。`stale` 表示计划建立时记录的材料快照与当前
+ * 登记数据不一致，需要工作人员重新确认后才能完成。
+ */
+export type PlanFollowUpStatus = "pending" | "stale" | "completed";
+
+/**
+ * 计划材料在建立（或最近一次重新确认）时的快照。观测计划与观测记录分开
+ * 保存，这份快照只用于保留历史并检测后续变化，永远不会回写材料或观测。
+ */
+export interface PlanAccessionSnapshot {
+  accessionId: string;
+  accessionNo: string;
+  cultivar: string;
+  benchId: string | null;
+  benchCode: string | null;
+  trialState: TrialState;
+}
+
+export interface ObservationPlan {
+  id: string;
+  trialId: string;
+  /** 计划观测日期（YYYY-MM-DD）。 */
+  scheduledOn: string;
+  assignee: string;
+  note: string;
+  accessionIds: string[];
+  accessionSnapshots: PlanAccessionSnapshot[];
+  status: PlanFollowUpStatus;
+  createdAt: string;
+  createdOn: string;
+  confirmedOn?: string;
+  completedOn?: string;
+  completedBy?: string;
+  /** 完成后关联到的真实观测记录，二者互相追溯。 */
+  linkedObservationPassId?: string;
+}
+
+export type PlanDriftCode =
+  | "BENCH_MOVED"
+  | "TRIAL_PAUSED"
+  | "TRIAL_STATE_CHANGED"
+  | "ACCESSION_NO_CHANGED"
+  | "ACCESSIONS_MISSING";
+
+export interface PlanDrift {
+  code: PlanDriftCode;
+  message: string;
+  accessionId?: string;
+}
+
 export type FlagSeverity = "info" | "warning" | "critical";
 export type FlagState = "open" | "resolved" | "waived";
 
@@ -103,6 +161,7 @@ export interface WorkspaceState {
   accessions: Accession[];
   benches: Bench[];
   observationPasses: ObservationPass[];
+  observationPlans: ObservationPlan[];
   flags: Flag[];
   clearanceSnapshots: ClearanceSnapshot[];
 }

@@ -59,6 +59,45 @@ export function workspaceReducer(
         clearanceSnapshots: [...state.clearanceSnapshots, action.snapshot],
         trials: action.trials,
       };
+    case "plan/created":
+      return {
+        ...state,
+        observationPlans: [...state.observationPlans, action.plan],
+      };
+    case "plan/updated":
+    case "plan/reconfirmed":
+    case "plan/linked":
+      return {
+        ...state,
+        observationPlans: state.observationPlans.map((plan) =>
+          plan.id === action.plan.id ? action.plan : plan,
+        ),
+      };
+    case "plan/observation-recorded": {
+      // 重复保存或重复点击完成不能生成多份观测，也不能把已完成的计划再完成一次。
+      const passAlreadySaved = state.observationPasses.some(
+        (pass) => pass.id === action.pass.id,
+      );
+      const currentPlan = state.observationPlans.find(
+        (plan) => plan.id === action.plan.id,
+      );
+      const planStillOpen =
+        currentPlan &&
+        currentPlan.status !== "completed" &&
+        !currentPlan.linkedObservationPassId;
+      return {
+        ...state,
+        observationPasses: passAlreadySaved
+          ? state.observationPasses
+          : [...state.observationPasses, action.pass],
+        flags: passAlreadySaved ? state.flags : [...state.flags, ...action.flags],
+        observationPlans: planStillOpen
+          ? state.observationPlans.map((plan) =>
+              plan.id === action.plan.id ? action.plan : plan,
+            )
+          : state.observationPlans,
+      };
+    }
     default:
       return state;
   }

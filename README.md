@@ -27,6 +27,7 @@ npm run build
 node scripts/smoke.mjs curate-accession-roster
 node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
+node scripts/smoke.mjs follow-observation-plan
 node scripts/smoke.mjs advance-trial-clearance
 ```
 
@@ -43,6 +44,7 @@ src/
     roster/               材料登记和编辑
     layout/               台架分配工作区
     observations/         观测记录和标记处理
+    plans/                观测计划、到期跟进和重新确认
     clearance/            放行快照工作区
   components/             共享 UI 原语
   styles/                 应用样式

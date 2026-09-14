@@ -20,7 +20,7 @@ export function loadWorkspaceState(): WorkspaceState {
     if (!parsed || !isWorkspaceState(parsed.state)) {
       return createSampleWorkspaceState();
     }
-    return parsed.state;
+    return normalizeWorkspaceState(parsed.state);
   } catch {
     return createSampleWorkspaceState();
   }
@@ -37,4 +37,19 @@ export function saveWorkspaceState(state: WorkspaceState): void {
 
 export function clearWorkspaceStorage(): void {
   window.localStorage.removeItem(WORKSPACE_STORAGE_KEY);
+}
+
+/**
+ * 观测计划模块晚于其他模块上线；旧版本保存的工作区没有 observationPlans。
+ * 计划数据与观测记录分开存放，这里只补齐缺失的计划数组，绝不改动历史观测。
+ */
+export function normalizeWorkspaceState(
+  state: WorkspaceState,
+): WorkspaceState {
+  return {
+    ...state,
+    observationPlans: Array.isArray(state.observationPlans)
+      ? state.observationPlans
+      : [],
+  };
 }

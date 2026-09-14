@@ -4,6 +4,7 @@ import type {
   ClearanceSnapshot,
   Flag,
   ObservationPass,
+  ObservationPlan,
   Trial,
   TrialState,
   WorkspaceState,
@@ -24,6 +25,17 @@ export type WorkspaceAction =
       type: "clearance/generated";
       snapshot: ClearanceSnapshot;
       trials: Trial[];
+    }
+  | { type: "plan/created"; plan: ObservationPlan }
+  | { type: "plan/updated"; plan: ObservationPlan }
+  | { type: "plan/reconfirmed"; plan: ObservationPlan }
+  | { type: "plan/linked"; plan: ObservationPlan }
+  // 原子动作：保存真实观测并把计划标记完成，保证重复点击只产生一份观测。
+  | {
+      type: "plan/observation-recorded";
+      pass: ObservationPass;
+      flags: Flag[];
+      plan: ObservationPlan;
     };
 
 export function isWorkspaceState(value: unknown): value is WorkspaceState {

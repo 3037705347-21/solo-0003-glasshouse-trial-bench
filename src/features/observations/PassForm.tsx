@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../../components/Button";
 import { SelectField, TextField } from "../../components/fields";
-import type { ObservationEntry } from "../../domain/types";
+import type { ObservationEntry, ObservationPass } from "../../domain/types";
 import type { ObservationDraft } from "../../domain/observation";
 import type { FieldError } from "../../domain/result";
 import { createObservationPass, deriveFlags } from "../../domain/observation";
@@ -14,6 +14,11 @@ interface PassFormProps {
   trialId: string;
   onSaved: () => void;
   onCancel: () => void;
+  /** 从观测计划进入时：限定材料范围、预填负责人与材料行。 */
+  scopedAccessionIds?: string[];
+  initialObserver?: string;
+  /** 已构造好观测记录时回调，供计划页面原子地完成计划。 */
+  onPassRecorded?: (pass: ObservationPass, flags: ReturnType<typeof deriveFlags>) => void;
 }
 
 function emptyEntry(accessionId = ""): ObservationEntry {
@@ -26,16 +31,35 @@ function emptyEntry(accessionId = ""): ObservationEntry {
   };
 }
 
-export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
+export function PassForm({
+  trialId,
+  onSaved,
+  onCancel,
+  scopedAccessionIds,
+  initialObserver,
+  onPassRecorded,
+}: PassFormProps) {
   const { state, dispatch } = useWorkspace();
-  const accessions = accessionsForTrial(state, trialId);
+  const trialAccessions = accessionsForTrial(state, trialId);
+  const scopeSet =
+    scopedAccessionIds && scopedAccessionIds.length > 0
+      ? new Set(scopedAccessionIds)
+      : null;
+  const accessions = scopeSet
+    ? trialAccessions.filter((accession) => scopeSet.has(accession.id))
+    : trialAccessions;
   const [draft, setDraft] = useState<ObservationDraft>({
     trialId,
     observedOn: todayDateOnly(),
-    observer: "",
-    entries: [emptyEntry(accessions[0]?.id ?? "")],
+    observer: initialObserver ?? "",
+    entries: [
+      emptyEntry(accessions[0]?.id ?? ""),
+      // 计划范围内有多种材料时，默认每种预填一行。
+      ...accessions.slice(1).map((accession) => emptyEntry(accession.id)),
+    ],
   });
   const [errors, setErrors] = useState<FieldError[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
   const errorFor = (field: string): string | undefined => {
     return errors.find((error) => error.field === field)?.message;
@@ -71,13 +95,28 @@ export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
   };
 
   const handleSubmit = () => {
+    // 防止重复点击保存：一次成功的提交只生成一份观测。
+    if (submitting) {
+      return;
+    }
     const result = createObservationPass(draft, state);
     if (!result.ok) {
       setErrors(result.errors);
       return;
     }
     const flags = deriveFlags(result.value, state.accessions);
-    dispatch({ type: "observation/recorded", pass: result.value, flags });
+    setSubmitting(true);
+    try {
+      if (onPassRecorded) {
+        // 计划完成路径：由父组件在同一个动作里保存观测并标记计划，
+        // 保证重复提交只产生一份观测。
+        onPassRecorded(result.value, flags);
+      } else {
+        dispatch({ type: "observation/recorded", pass: result.value, flags });
+      }
+    } finally {
+      setSubmitting(false);
+    }
     onSaved();
   };
 
@@ -198,7 +237,7 @@ export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
         <Button tone="secondary" onClick={onCancel}>
           取消
         </Button>
-        <Button type="submit" data-testid="save-observation-button">
+        <Button type="submit" disabled={submitting} data-testid="save-observation-button">
           记录观测
         </Button>
       </div>

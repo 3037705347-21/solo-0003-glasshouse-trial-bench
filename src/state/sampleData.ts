@@ -4,9 +4,11 @@ import type {
   ClearanceSnapshot,
   Flag,
   ObservationPass,
+  ObservationPlan,
   Trial,
   WorkspaceState,
 } from "../domain/types";
+import { todayDateOnly } from "../domain/rules";
 
 const trials: Trial[] = [
   {
@@ -271,6 +273,28 @@ const observationPasses: ObservationPass[] = [
       },
     ],
   },
+  {
+    id: "obs-bee-02",
+    trialId: "trial-ama-02",
+    observedOn: "2026-04-15",
+    observer: "R. Ono",
+    entries: [
+      {
+        accessionId: "acc-bee-01",
+        heightMm: 88,
+        leafCount: 9,
+        ecMs: 2.0,
+        notes: "红色色素稳定，株型紧凑。",
+      },
+      {
+        accessionId: "acc-bee-02",
+        heightMm: 92,
+        leafCount: 10,
+        ecMs: 1.9,
+        notes: "叶片颜色均匀，无明显胁迫。",
+      },
+    ],
+  },
 ];
 
 const flags: Flag[] = [
@@ -300,12 +324,145 @@ const flags: Flag[] = [
 
 const clearanceSnapshots: ClearanceSnapshot[] = [];
 
+function offsetDate(days: number): string {
+  const [year, month, day] = todayDateOnly().split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * 观测计划示例。日期相对今天生成，以便始终展示临近、当天、逾期等状态；
+ * 与 observationPasses 分开保存，仅通过关联 id 互相追溯。
+ */
+function buildSamplePlans(): ObservationPlan[] {
+  return [
+    {
+      id: "pln-tom-01",
+      trialId: "trial-sol-01",
+      scheduledOn: offsetDate(-2),
+      assignee: "M. Ikeda",
+      note: "跟踪矮化品系坐果初期株高，重点复查 Tiny Tim 低株高标记。",
+      accessionIds: ["acc-tom-01", "acc-tom-02"],
+      accessionSnapshots: [
+        {
+          accessionId: "acc-tom-01",
+          accessionNo: "ACC-0001",
+          cultivar: "Tiny Tim",
+          benchId: "bench-east-1",
+          benchCode: "E-1",
+          trialState: "active",
+        },
+        {
+          accessionId: "acc-tom-02",
+          accessionNo: "ACC-0002",
+          cultivar: "Micro Tom",
+          benchId: "bench-east-1",
+          benchCode: "E-1",
+          trialState: "active",
+        },
+      ],
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      createdOn: offsetDate(-9),
+    },
+    {
+      id: "pln-bee-01",
+      trialId: "trial-ama-02",
+      scheduledOn: offsetDate(0),
+      assignee: "R. Ono",
+      note: "限水处理后电导率复查。",
+      accessionIds: ["acc-bee-01", "acc-bee-02"],
+      accessionSnapshots: [
+        {
+          accessionId: "acc-bee-01",
+          accessionNo: "ACC-0004",
+          cultivar: "Bull's Blood",
+          // 快照记录在 W-1，但示例工作台当前没有该材料分配，触发台架漂移。
+          benchId: "bench-west-2",
+          benchCode: "W-2",
+          trialState: "active",
+        },
+        {
+          accessionId: "acc-bee-02",
+          accessionNo: "ACC-0005",
+          cultivar: "Golden Detroit",
+          benchId: "bench-west-1",
+          benchCode: "W-1",
+          trialState: "active",
+        },
+      ],
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      createdOn: offsetDate(-7),
+    },
+    {
+      id: "pln-bee-02",
+      trialId: "trial-ama-02",
+      scheduledOn: "2026-04-15",
+      assignee: "R. Ono",
+      note: "第二批叶片颜色与株高记录。",
+      accessionIds: ["acc-bee-01", "acc-bee-02"],
+      accessionSnapshots: [
+        {
+          accessionId: "acc-bee-01",
+          accessionNo: "ACC-0004",
+          cultivar: "Bull's Blood",
+          benchId: "bench-west-1",
+          benchCode: "W-1",
+          trialState: "active",
+        },
+        {
+          accessionId: "acc-bee-02",
+          accessionNo: "ACC-0005",
+          cultivar: "Golden Detroit",
+          benchId: "bench-west-1",
+          benchCode: "W-1",
+          trialState: "active",
+        },
+      ],
+      status: "completed",
+      createdAt: new Date().toISOString(),
+      createdOn: "2026-04-08",
+      confirmedOn: "2026-04-15T08:30:00.000Z",
+      completedOn: "2026-04-15T09:10:00.000Z",
+      completedBy: "R. Ono",
+      linkedObservationPassId: "obs-bee-02",
+    },
+    {
+      id: "pln-kale-01",
+      trialId: "trial-bra-03",
+      scheduledOn: offsetDate(10),
+      assignee: "S. Hara",
+      note: "羽衣甘蓝移栽前基线株高和叶片数。",
+      accessionIds: ["acc-kale-01"],
+      accessionSnapshots: [
+        {
+          accessionId: "acc-kale-01",
+          accessionNo: "ACC-0007",
+          cultivar: "Lacinato",
+          benchId: null,
+          benchCode: null,
+          trialState: "draft",
+        },
+      ],
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      createdOn: offsetDate(-2),
+    },
+  ];
+}
+
 export function createSampleWorkspaceState(): WorkspaceState {
   return {
     trials,
     accessions,
     benches,
     observationPasses,
+    observationPlans: buildSamplePlans(),
     flags,
     clearanceSnapshots,
   };

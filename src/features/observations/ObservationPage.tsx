@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { NotebookPen, Plus } from "lucide-react";
+import { CalendarCheck2, NotebookPen, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
 import { PageHeader } from "../../components/PageHeader";
@@ -9,6 +10,7 @@ import type { ObservationPass } from "../../domain/types";
 import {
   openFlagsForTrial,
   passesForTrial,
+  planForObservationPass,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { FlagPanel } from "./FlagPanel";
@@ -86,7 +88,9 @@ export function ObservationPage() {
             <p className="muted-copy">该试验还没有观测记录。</p>
           ) : (
             <div className="pass-cards">
-              {passes.map((pass) => (
+              {passes.map((pass) => {
+                const linkedPlan = planForObservationPass(state, pass.id);
+                return (
                 <article className="pass-card" key={pass.id} data-testid={`pass-${pass.id}`}>
                   <div className="pass-card-top">
                     <strong>{pass.observedOn}</strong>
@@ -105,8 +109,20 @@ export function ObservationPage() {
                       );
                     })}
                   </div>
+                  {linkedPlan ? (
+                    <Link
+                      className="pass-plan-link"
+                      to="/plans"
+                      data-testid={`pass-plan-link-${pass.id}`}
+                    >
+                      <CalendarCheck2 size={13} aria-hidden="true" />
+                      来自观测计划 · {linkedPlan.scheduledOn} ·{" "}
+                      {linkedPlan.assignee}
+                    </Link>
+                  ) : null}
                 </article>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>

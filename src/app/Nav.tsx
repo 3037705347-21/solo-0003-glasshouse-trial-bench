@@ -1,4 +1,5 @@
 import {
+  CalendarCheck2,
   ClipboardCheck,
   LayoutGrid,
   ListTree,
@@ -10,6 +11,7 @@ const navItems = [
   { to: "/roster", label: "材料登记", icon: ListTree },
   { to: "/layout", label: "台架布局", icon: LayoutGrid },
   { to: "/observations", label: "生长观测", icon: NotebookPen },
+  { to: "/plans", label: "观测计划", icon: CalendarCheck2 },
   { to: "/clearance", label: "试验放行", icon: ClipboardCheck },
 ];
 

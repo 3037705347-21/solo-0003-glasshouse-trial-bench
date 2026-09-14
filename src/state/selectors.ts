@@ -4,9 +4,16 @@ import type {
   ClearanceSnapshot,
   Flag,
   ObservationPass,
+  ObservationPlan,
+  PlanScheduleStatus,
   Trial,
   WorkspaceState,
 } from "../domain/types";
+import {
+  detectPlanDrift,
+  planFollowUpStatus,
+  planScheduleStatus,
+} from "../domain/observationPlan";
 
 export function trialById(
   state: WorkspaceState,
@@ -92,4 +99,46 @@ export function accessionStatus(
   return bench.status === "blocked" || bench.status === "quarantine"
     ? "blocked"
     : "assigned";
+}
+
+export interface PlanView {
+  plan: ObservationPlan;
+  scheduleStatus: PlanScheduleStatus;
+  followUpStatus: ReturnType<typeof planFollowUpStatus>;
+  drifts: ReturnType<typeof detectPlanDrift>;
+  linkedPass?: ObservationPass;
+}
+
+export function planView(state: WorkspaceState, plan: ObservationPlan): PlanView {
+  return {
+    plan,
+    scheduleStatus: planScheduleStatus(plan),
+    followUpStatus: planFollowUpStatus(plan, state),
+    drifts: detectPlanDrift(plan, state),
+    linkedPass: state.observationPasses.find(
+      (pass) => pass.id === plan.linkedObservationPassId,
+    ),
+  };
+}
+
+export function plansForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): PlanView[] {
+  return state.observationPlans
+    .filter((plan) => plan.trialId === trialId)
+    .map((plan) => planView(state, plan))
+    .sort((left, right) =>
+      left.plan.scheduledOn.localeCompare(right.plan.scheduledOn),
+    );
+}
+
+/** 关联到某条观测记录的计划（观测 -> 计划 方向的追溯）。 */
+export function planForObservationPass(
+  state: WorkspaceState,
+  passId: string,
+): ObservationPlan | undefined {
+  return state.observationPlans.find(
+    (plan) => plan.linkedObservationPassId === passId,
+  );
 }
