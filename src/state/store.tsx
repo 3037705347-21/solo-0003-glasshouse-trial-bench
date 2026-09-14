@@ -17,6 +17,7 @@ import {
 } from "./persistence";
 import { workspaceReducer } from "./reducer";
 import type { WorkspaceAction } from "./types";
+import { normalizeWorkspaceState } from "./migration";
 
 interface WorkspaceContextValue {
   state: WorkspaceState;
@@ -44,12 +45,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       dispatch,
       persistenceReady,
       resetWorkspace: () =>
-        dispatch({ type: "reset", state: createSampleWorkspaceState() }),
+        dispatch({
+          type: "reset",
+          state: normalizeWorkspaceState(createSampleWorkspaceState()),
+        }),
       clearWorkspace: () => {
         clearWorkspaceStorage();
         dispatch({
           type: "reset",
-          state: createSampleWorkspaceState(),
+          state: normalizeWorkspaceState(createSampleWorkspaceState()),
         });
       },
     }),

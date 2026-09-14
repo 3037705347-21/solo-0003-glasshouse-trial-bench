@@ -18,6 +18,9 @@ export type WorkspaceAction =
   | { type: "accession/updated"; accession: Accession }
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
+  | { type: "bench/created"; bench: Bench }
+  | { type: "bench/updated"; bench: Bench }
+  | { type: "bench/statusChanged"; bench: Bench }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
   | { type: "flag/transitioned"; flag: Flag }
   | {

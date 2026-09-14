@@ -1,6 +1,7 @@
 import type { WorkspaceState } from "../domain/types";
 import { isWorkspaceState } from "./types";
 import { createSampleWorkspaceState } from "./sampleData";
+import { normalizeWorkspaceState } from "./migration";
 
 export const WORKSPACE_STORAGE_KEY = "glasshouse-trial-bench:workspace:v1";
 
@@ -14,15 +15,15 @@ export function loadWorkspaceState(): WorkspaceState {
   try {
     const raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
     if (!raw) {
-      return createSampleWorkspaceState();
+      return normalizeWorkspaceState(createSampleWorkspaceState());
     }
     const parsed = JSON.parse(raw) as Partial<StoredWorkspace>;
     if (!parsed || !isWorkspaceState(parsed.state)) {
-      return createSampleWorkspaceState();
+      return normalizeWorkspaceState(createSampleWorkspaceState());
     }
-    return parsed.state;
+    return normalizeWorkspaceState(parsed.state);
   } catch {
-    return createSampleWorkspaceState();
+    return normalizeWorkspaceState(createSampleWorkspaceState());
   }
 }
 

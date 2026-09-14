@@ -12,6 +12,7 @@ const viteBin =
 
 const scenarios = {
   "curate-accession-roster": curateAccessionRoster,
+  "maintain-bench-ledger": maintainBenchLedger,
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
@@ -19,6 +20,7 @@ const scenarios = {
 
 const scenarioPaths = {
   "curate-accession-roster": "/roster",
+  "maintain-bench-ledger": "/benches",
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
@@ -57,6 +59,50 @@ async function curateAccessionRoster(page) {
   await page.getByTestId("save-accession-button").click();
   await page.getByText("Stupice", { exact: true }).first().waitFor();
   await page.getByText("ACC-0009", { exact: true }).first().waitFor();
+}
+
+async function maintainBenchLedger(page) {
+  // 新建台架：重复编号会被拒绝，改用新编号后创建成功
+  await page.getByTestId("open-create-bench").click();
+  await page.getByTestId("bench-code-input").fill("E-1");
+  await page.getByTestId("bench-sector-input").fill("东翼扩建区");
+  await page.getByTestId("bench-capacity-input").fill("6");
+  await page.getByTestId("bench-irrigation-input").fill("IR-4");
+  await page.getByTestId("save-bench-button").click();
+  await page.getByText("该台架编号已被使用").waitFor();
+  await page.getByTestId("bench-code-input").fill("E-9");
+  await page.getByTestId("save-bench-button").click();
+  await page.getByText("台架已创建", { exact: true }).waitFor();
+  await page.getByText("E-9", { exact: true }).first().waitFor();
+
+  // 新台架立即出现在布局页
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  await page.getByText("东翼扩建区").first().waitFor();
+
+  // 回到台账，把在用台架 E-1 受限：必须填写原因
+  await page.goto(`${baseUrl}/#/benches`, { waitUntil: "networkidle" });
+  await page.getByTestId("block-bench-bench-east-1").click();
+  await page.getByTestId("bench-status-reason").fill("维修滴灌管路");
+  await page.getByTestId("confirm-bench-status").click();
+  await page.getByText("台架已受限", { exact: true }).waitFor();
+
+  // 布局页的 E-1 立即显示受限且不再能分配
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  const east1Card = page.getByTestId("bench-card-bench-east-1");
+  await east1Card.getByText("受限").first().waitFor();
+  await east1Card.getByText("维修滴灌管路").waitFor();
+
+  // 放行页立即出现该台架阻止项
+  await page.goto(`${baseUrl}/#/clearance`, { waitUntil: "networkidle" });
+  await page.getByText("E-1").first().waitFor();
+
+  // 恢复：原因清除，台架回到已占用
+  await page.goto(`${baseUrl}/#/benches`, { waitUntil: "networkidle" });
+  await page.getByTestId("restore-bench-bench-east-1").click();
+  await page.getByTestId("bench-ready-ok").waitFor();
+  await page.getByTestId("confirm-bench-status").click();
+  await page.getByText("台架已恢复", { exact: true }).waitFor();
+  await page.getByTestId("edit-bench-bench-east-1").waitFor();
 }
 
 async function assignAccessionBench(page) {

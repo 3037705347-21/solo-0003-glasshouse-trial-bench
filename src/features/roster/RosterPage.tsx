@@ -110,7 +110,7 @@ export function RosterPage() {
           status === "assigned"
             ? "已分配"
             : status === "blocked"
-              ? "受限"
+              ? "台架受限/隔离"
               : "未分配";
         return <StatusBadge tone={statusTone(label)}>{label}</StatusBadge>;
       },

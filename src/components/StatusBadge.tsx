@@ -11,7 +11,7 @@ export function statusTone(
   value: string,
 ): StatusBadgeProps["tone"] {
   if (
-    ["active", "assigned", "ready", "resolved", "available", "进行中", "已分配", "就绪", "已解决", "可用"].includes(
+    ["active", "assigned", "ready", "resolved", "available", "进行中", "已分配", "已占用", "就绪", "已解决", "可用"].includes(
       value,
     )
   ) {
@@ -25,7 +25,7 @@ export function statusTone(
     return "info";
   }
   if (
-    ["blocked", "quarantine", "open", "受限", "隔离", "未处理", "严重"].includes(
+    ["blocked", "quarantine", "open", "受限", "隔离", "未处理", "严重", "台架受限/隔离"].includes(
       value,
     )
   ) {

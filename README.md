@@ -25,6 +25,7 @@ npm run build
 
 ```bash
 node scripts/smoke.mjs curate-accession-roster
+node scripts/smoke.mjs maintain-bench-ledger
 node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
 node scripts/smoke.mjs advance-trial-clearance
@@ -32,15 +33,24 @@ node scripts/smoke.mjs advance-trial-clearance
 
 每条命令都会启动并关闭一个本地 Vite 预览服务，端口为 `4177`。检查过程不调用外部服务，也不依赖在线数据库。
 
+无需浏览器的领域规则与页面渲染校验：
+
+```bash
+npm run verify          # 等于下面两条
+npm run verify:bench    # 台架台账规则、迁移、持久化往返
+npm run verify:render   # 全部路由的服务端渲染冒烟
+```
+
 ## 目录结构
 
 ```text
 src/
   app/                    路由组合和应用外壳
   domain/                 实体、校验、状态转换和规则
-  state/                  reducer、选择器、示例状态和持久化
+  state/                  reducer、选择器、示例状态、迁移和持久化
   features/
     roster/               材料登记和编辑
+    benches/              台架台账、状态切换和维护记录
     layout/               台架分配工作区
     observations/         观测记录和标记处理
     clearance/            放行快照工作区
@@ -48,6 +58,8 @@ src/
   styles/                 应用样式
 scripts/
   smoke.mjs               无头浏览器工作流检查
+  verify-bench-rules.mjs  台架台账领域规则校验
+  verify-render.mjs       路由渲染校验
 ```
 
 ## 输入与输出

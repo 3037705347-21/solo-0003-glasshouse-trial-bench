@@ -34,11 +34,17 @@ export function workspaceReducer(
       };
     case "bench/assigned":
     case "bench/released":
+    case "bench/created":
+    case "bench/updated":
+    case "bench/statusChanged":
       return {
         ...state,
-        benches: state.benches.map((bench) =>
-          bench.id === action.bench.id ? action.bench : bench,
-        ),
+        benches:
+          action.type === "bench/created"
+            ? [...state.benches, action.bench]
+            : state.benches.map((bench) =>
+                bench.id === action.bench.id ? action.bench : bench,
+              ),
       };
     case "observation/recorded":
       return {

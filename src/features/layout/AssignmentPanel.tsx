@@ -57,7 +57,7 @@ export function AssignmentPanel({
               {accessionStatus(state, selected) === "assigned"
                 ? "已分配"
                 : accessionStatus(state, selected) === "blocked"
-                  ? "受限"
+                  ? "台架受限/隔离"
                   : "未分配"}
             </StatusBadge>
           </div>

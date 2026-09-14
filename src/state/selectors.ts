@@ -7,6 +7,7 @@ import type {
   Trial,
   WorkspaceState,
 } from "../domain/types";
+import { benchOperationalStatus } from "../domain/bench";
 
 export function trialById(
   state: WorkspaceState,
@@ -89,7 +90,7 @@ export function accessionStatus(
   if (!bench) {
     return "unassigned";
   }
-  return bench.status === "blocked" || bench.status === "quarantine"
+  return benchOperationalStatus(bench) !== "available"
     ? "blocked"
     : "assigned";
 }

@@ -6,6 +6,7 @@ import type {
   WorkspaceState,
 } from "./types";
 import { createId } from "./id";
+import { benchOperationalStatus, benchStatusNote } from "./bench";
 
 export function buildClearanceSnapshot(
   state: WorkspaceState,
@@ -31,15 +32,19 @@ export function buildClearanceSnapshot(
       });
     }
   });
-  state.benches
-    .filter((bench) => bench.status === "blocked" || bench.status === "quarantine")
-    .forEach((bench) => {
+  state.benches.forEach((bench) => {
+    const operational = benchOperationalStatus(bench);
+    if (operational === "blocked" || operational === "quarantine") {
+      const note = benchStatusNote(bench);
       blockers.push({
-        code: bench.status === "blocked" ? "BENCH_BLOCKED" : "BENCH_QUARANTINE",
-        message: `Bench ${bench.code} is not available`,
+        code: operational === "blocked" ? "BENCH_BLOCKED" : "BENCH_QUARANTINE",
+        message: `台架 ${bench.code} 当前${
+          operational === "blocked" ? "受限" : "隔离"
+        }${note ? `：${note}` : ""}`,
         benchId: bench.id,
       });
-    });
+    }
+  });
   openFlags.forEach((flag) => {
     blockers.push({
       code: `FLAG_${flag.code}`,

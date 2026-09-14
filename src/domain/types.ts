@@ -29,6 +29,20 @@ export interface Accession {
 
 export type BenchStatus = "available" | "assigned" | "blocked" | "quarantine";
 
+/**
+ * 运维状态（台账管理入口在三者之间切换）。`assigned` 是由占用数派生的
+ * 展示状态，不属于运维切换目标。
+ */
+export type BenchOperationalStatus = "available" | "blocked" | "quarantine";
+
+export interface BenchStatusRecord {
+  id: string;
+  from: BenchOperationalStatus;
+  to: BenchOperationalStatus;
+  reason: string;
+  changedOn: string;
+}
+
 export interface Bench {
   id: string;
   code: string;
@@ -38,7 +52,11 @@ export interface Bench {
   lightProfile: PreferredLight;
   irrigationLine: string;
   status: BenchStatus;
+  /** 最近一次切换到受限 / 隔离时记录的原因；恢复可用后清空。 */
+  statusNote?: string;
+  /** @deprecated 旧版字段，仅用于读取兼容，新写入一律使用 statusNote。 */
   blockedReason?: string;
+  statusHistory?: BenchStatusRecord[];
 }
 
 export interface ObservationEntry {

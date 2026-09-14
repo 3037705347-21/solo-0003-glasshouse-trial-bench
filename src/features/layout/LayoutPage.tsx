@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
-import { Grid3X3 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Grid3X3, Wrench } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
+import { Button } from "../../components/Button";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import { assignAccession, releaseAccession } from "../../domain/bench";
 import { accessionById, accessionsForTrial } from "../../state/selectors";
@@ -74,7 +76,7 @@ export function LayoutPage() {
     pushToast({
       tone: "success",
         title: "材料已移出",
-        message: "该台架空位已恢复可用。",
+        message: "台架槽位已释放。",
     });
   };
 
@@ -84,6 +86,14 @@ export function LayoutPage() {
         eyebrow="台架规划"
         title="台架布局"
         description="根据光照、容量和隔离约束，将材料分配到可用台架。"
+        actions={
+          <Button tone="secondary" asChild>
+            <Link to="/benches" data-testid="goto-bench-ledger">
+              <Wrench size={16} />
+              台架台账
+            </Link>
+          </Button>
+        }
       />
       <section className="control-strip">
         <select
@@ -121,7 +131,7 @@ export function LayoutPage() {
               <BenchCard
                 key={bench.id}
                 bench={bench}
-                accessions={accessions}
+                accessions={state.accessions}
                 selectedAccession={selectedAccession}
                 onAssign={handleAssign}
                 onRelease={handleRelease}

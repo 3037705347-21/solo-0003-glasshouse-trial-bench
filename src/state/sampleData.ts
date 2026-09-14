@@ -208,7 +208,16 @@ const benches: Bench[] = [
     lightProfile: "shade",
     irrigationLine: "IR-3",
     status: "blocked",
-    blockedReason: "滴灌管路维修中",
+    statusNote: "滴灌管路维修中",
+    statusHistory: [
+      {
+        id: "bstr-north-2-1",
+        from: "available",
+        to: "blocked",
+        reason: "滴灌管路维修中",
+        changedOn: "2026-08-02T07:30:00.000Z",
+      },
+    ],
   },
 ];
 

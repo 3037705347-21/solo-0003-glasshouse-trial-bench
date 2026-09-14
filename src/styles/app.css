@@ -846,6 +846,115 @@ button {
   font-size: 12px;
 }
 
+.bench-ledger-link {
+  color: var(--rust-700);
+  font-size: 12px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.bench-ledger-link:hover {
+  text-decoration: underline;
+}
+
+.bench-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bench-note-cell {
+  max-width: 240px;
+  white-space: normal;
+  color: var(--text-muted);
+}
+
+.bench-overflow {
+  color: var(--danger);
+  font-weight: 750;
+}
+
+.status-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.status-check strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.status-check p {
+  margin: 4px 0 0;
+}
+
+.status-check-ready {
+  background: var(--green-100);
+  color: var(--green-700);
+}
+
+.status-check-blocked {
+  background: var(--danger-soft);
+  color: #6b2d26;
+}
+
+.status-issue-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.status-history {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.status-history summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.status-history-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.status-history-list li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fcfdfb;
+  font-size: 12px;
+}
+
+.status-history-list span {
+  font-weight: 700;
+}
+
+.status-history-list p {
+  margin: 0;
+  color: var(--text);
+}
+
+.status-history-list time {
+  color: var(--text-muted);
+}
+
 .observation-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
