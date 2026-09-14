@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import net from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
 
-const port = 4177;
-const baseUrl = `http://127.0.0.1:${port}`;
 const root = new URL("..", import.meta.url).pathname;
 const viteBin =
   process.platform === "win32"
@@ -24,8 +24,46 @@ const scenarioPaths = {
   "advance-trial-clearance": "/clearance",
 };
 
-async function waitForServer() {
+// Track the preview server currently running so signal handlers can clean it
+// up instead of leaving an orphaned process behind.
+let activeServer = null;
+
+function killActiveServer() {
+  if (activeServer && activeServer.exitCode === null && !activeServer.killed) {
+    activeServer.kill("SIGKILL");
+  }
+}
+
+process.on("SIGINT", () => {
+  killActiveServer();
+  process.exit(130);
+});
+process.on("SIGTERM", () => {
+  killActiveServer();
+  process.exit(143);
+});
+process.on("exit", killActiveServer);
+
+// Prefer the conventional preview port, but fall back to an ephemeral one so
+// a stale process holding 4177 does not break the run.
+async function findFreePort(preferred = 4177) {
+  const tryPort = (port) =>
+    new Promise((resolve) => {
+      const probe = net.createServer();
+      probe.once("error", () => resolve(null));
+      probe.listen(port, "127.0.0.1", () => {
+        const { port: assigned } = probe.address();
+        probe.close(() => resolve(assigned));
+      });
+    });
+  return (await tryPort(preferred)) ?? (await tryPort(0));
+}
+
+async function waitForServer(baseUrl, server) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
+    if (server.exitCode !== null) {
+      throw new Error(`Preview server exited early with code ${server.exitCode}`);
+    }
     try {
       const response = await fetch(baseUrl);
       if (response.ok) {
@@ -36,10 +74,25 @@ async function waitForServer() {
     }
     await delay(250);
   }
-  throw new Error(`Preview server did not start on port ${port}`);
+  throw new Error(`Preview server did not start at ${baseUrl}`);
 }
 
-async function freshPage(browser, path) {
+async function stopServer(server) {
+  if (server.exitCode !== null) {
+    return;
+  }
+  server.kill("SIGTERM");
+  const exited = await Promise.race([
+    new Promise((resolve) => server.once("exit", () => resolve(true))),
+    delay(3000).then(() => false),
+  ]);
+  if (!exited) {
+    server.kill("SIGKILL");
+    await new Promise((resolve) => server.once("exit", resolve));
+  }
+}
+
+async function freshPage(browser, baseUrl, path) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await page.goto(`${baseUrl}/#${path}`, { waitUntil: "networkidle" });
   await page.evaluate(() => window.localStorage.clear());
@@ -94,37 +147,73 @@ async function advanceTrialClearance(page) {
 }
 
 async function runScenario(scenarioName) {
-  const server = spawn(viteBin, ["preview", "--host", "127.0.0.1", "--port", String(port)], {
-    cwd: root,
-    stdio: "pipe",
+  const port = await findFreePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const server = spawn(
+    viteBin,
+    ["preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
+    { cwd: root, stdio: "pipe" },
+  );
+  activeServer = server;
+
+  let serverOutput = "";
+  server.stderr.on("data", (chunk) => {
+    serverOutput += chunk;
   });
 
   let browser;
   try {
-    await waitForServer();
+    await waitForServer(baseUrl, server);
     browser = await chromium.launch({ headless: true });
-    const page = await freshPage(browser, scenarioPaths[scenarioName]);
+    const page = await freshPage(browser, baseUrl, scenarioPaths[scenarioName]);
     await scenarios[scenarioName](page);
-    console.log(`✅ workflow ${scenarioName}`);
     await page.close();
+    console.log(`✅ 场景通过: ${scenarioName}`);
+  } catch (error) {
+    if (serverOutput) {
+      console.error(`--- preview server output ---\n${serverOutput.trim()}\n-----------------------------`);
+    }
+    throw error;
   } finally {
     if (browser) {
-      await browser.close();
+      await browser.close().catch(() => {});
     }
-    server.kill("SIGTERM");
-    await new Promise((resolve) => server.once("exit", resolve));
+    await stopServer(server);
+    activeServer = null;
   }
 }
 
 const requested = process.argv[2];
+const scenarioNames = Object.keys(scenarios);
 
-if (!requested || !scenarios[requested]) {
-  console.error(`Usage: node scripts/smoke.mjs <${Object.keys(scenarios).join("|")}>`);
+if (requested && !scenarios[requested]) {
+  console.error(`未知场景: ${requested}`);
+  console.error(`用法: npm run smoke -- <${scenarioNames.join("|")}>`);
+  console.error("不带参数时依次运行全部场景。");
   process.exit(2);
 }
 
-runScenario(requested).catch((error) => {
-  console.error(`❌ workflow ${requested}`);
-  console.error(error);
-  process.exit(1);
-});
+if (!existsSync(`${root}dist/index.html`)) {
+  console.error("未找到 dist/index.html,请先运行 npm run build 再执行冒烟检查。");
+  process.exit(2);
+}
+
+const queue = requested ? [requested] : scenarioNames;
+let completed = 0;
+
+for (const name of queue) {
+  console.log(`\n[smoke] (${completed + 1}/${queue.length}) 运行场景: ${name}`);
+  try {
+    await runScenario(name);
+  } catch (error) {
+    console.error(`❌ 场景失败: ${name}`);
+    console.error(error);
+    console.error(
+      `[smoke] 已通过 ${completed}/${queue.length} 个场景,在「${name}」处停止,后续场景未执行。`,
+    );
+    process.exit(1);
+  }
+  completed += 1;
+}
+
+console.log(`\n[smoke] 全部 ${queue.length} 个场景通过。`);

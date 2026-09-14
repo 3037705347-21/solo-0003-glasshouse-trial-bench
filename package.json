@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "typecheck": "tsc -b",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4177",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "verify": "node scripts/verify.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
