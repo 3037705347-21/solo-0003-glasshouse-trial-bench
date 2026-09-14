@@ -153,13 +153,93 @@ async function recordObservationPass(page) {
 }
 
 async function advanceTrialClearance(page) {
+  // 进行中的试验可以生成快照，约束未满足时被阻止
   await page.getByTestId("generate-clearance").click();
-  await page.getByText("放行被阻止", { exact: true }).waitFor();
+  await page.getByText("放行被阻止", { exact: true }).first().waitFor();
   await page
     .getByTestId("clearance-snapshot")
     .getByText("阻止", { exact: true })
     .first()
     .waitFor();
+
+  // 暂停中的试验不能直接放行，快照被阻止且状态保持已暂停
+  await page.getByRole("link", { name: "试验管理" }).click();
+  await page
+    .locator("tr", { hasText: "SOL-01" })
+    .getByRole("button", { name: "暂停" })
+    .click();
+  await page.getByText("试验已暂停", { exact: true }).first().waitFor();
+  await page.getByRole("link", { name: "试验放行" }).click();
+  await page
+    .getByTestId("clearance-trial-select")
+    .selectOption({ label: "SOL-01 - 茄科（已暂停）" });
+  await page.getByTestId("generate-clearance").click();
+  await page.getByText("放行被阻止", { exact: true }).first().waitFor();
+  await page
+    .getByText("试验已暂停，请先恢复为进行中再申请放行", { exact: true })
+    .first()
+    .waitFor();
+  await page.waitForFunction(() => {
+    const select = document.querySelector('[data-testid="clearance-trial-select"]');
+    return [...select.options].some(
+      (option) => option.textContent.includes("SOL-01") && option.textContent.includes("已暂停"),
+    );
+  });
+
+  // 恢复为进行中后，状态阻止项从实时视图中消失
+  await page.getByRole("link", { name: "试验管理" }).click();
+  await page
+    .locator("tr", { hasText: "SOL-01" })
+    .getByRole("button", { name: "恢复" })
+    .click();
+  await page.getByText("试验已恢复", { exact: true }).first().waitFor();
+  await page.getByRole("link", { name: "试验放行" }).click();
+  await page.waitForFunction(() => {
+    const liveCard = document.querySelector('[data-testid="clearance-snapshot"]');
+    return liveCard && !liveCard.textContent.includes("请先恢复为进行中");
+  });
+
+  // 已放行是终态：没有生成快照入口，实时视图提示无需重复申请
+  await page.evaluate(() => {
+    const raw = window.localStorage.getItem("glasshouse-trial-bench:workspace:v1");
+    const stored = JSON.parse(raw);
+    stored.state.trials.push({
+      id: "trial-don-99",
+      code: "DON-99",
+      cropFamily: "豆科",
+      objective: "已完成的豌豆品系比较试验。",
+      season: "春季",
+      startDate: "2026-01-10",
+      endDate: "2026-03-20",
+      state: "cleared",
+    });
+    window.localStorage.setItem("glasshouse-trial-bench:workspace:v1", JSON.stringify(stored));
+  });
+  await page.reload({ waitUntil: "networkidle" });
+  await page
+    .getByTestId("clearance-trial-select")
+    .selectOption({ label: "DON-99 - 豆科（已放行）" });
+  await page.getByTestId("clearance-sealed").waitFor();
+  await page.waitForFunction(
+    () => !document.querySelector('[data-testid="generate-clearance"]'),
+  );
+  await page
+    .getByText("试验已放行，无需重复申请", { exact: true })
+    .first()
+    .waitFor();
+
+  // 试验管理页中已放行试验封存，没有任何操作入口
+  await page.getByRole("link", { name: "试验管理" }).click();
+  await page
+    .locator("tr", { hasText: "DON-99" })
+    .getByText("已封存", { exact: true })
+    .waitFor();
+  await page.waitForFunction(() => {
+    const row = [...document.querySelectorAll("tr")].find((item) =>
+      item.textContent.includes("DON-99"),
+    );
+    return row && !row.querySelector("button");
+  });
 }
 
 async function runScenario(scenarioName) {

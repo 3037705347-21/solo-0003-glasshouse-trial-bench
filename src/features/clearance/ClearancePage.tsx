@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Play, ShieldCheck } from "lucide-react";
 import { Button } from "../../components/Button";
 import { PageHeader } from "../../components/PageHeader";
+import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import {
   applyClearance,
@@ -83,6 +84,10 @@ export function ClearancePage() {
               <Play size={16} />
               启动试验
             </Button>
+          ) : trial?.state === "cleared" ? (
+            <span data-testid="clearance-sealed">
+              <StatusBadge tone={statusTone("已放行")}>已放行</StatusBadge>
+            </span>
           ) : (
             <Button onClick={handleGenerate} data-testid="generate-clearance">
               <ShieldCheck size={16} />

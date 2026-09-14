@@ -3,9 +3,24 @@ import type {
   ClearanceMetric,
   ClearanceSnapshot,
   Trial,
+  TrialState,
   WorkspaceState,
 } from "./types";
 import { createId } from "./id";
+import { canTransitionTrial, transitionTrial } from "./trial";
+
+function trialClearanceBlockerMessage(state: TrialState): string {
+  switch (state) {
+    case "draft":
+      return "请先将试验转为进行中，再申请放行";
+    case "paused":
+      return "试验已暂停，请先恢复为进行中再申请放行";
+    case "cleared":
+      return "试验已放行，无需重复申请";
+    default:
+      return "当前状态不能申请放行";
+  }
+}
 
 export function buildClearanceSnapshot(
   state: WorkspaceState,
@@ -53,10 +68,10 @@ export function buildClearanceSnapshot(
         message: "该试验没有材料",
     });
   }
-  if (trial?.state === "draft") {
+  if (trial && !canTransitionTrial(trial.state, "cleared")) {
     blockers.push({
-      code: "TRIAL_DRAFT",
-      message: "请先将试验转为进行中，再申请放行",
+      code: "TRIAL_STATE",
+      message: trialClearanceBlockerMessage(trial.state),
     });
   }
   const metrics: ClearanceMetric[] = [
@@ -106,9 +121,13 @@ export function applyClearance(
   if (snapshot.status !== "ready") {
     return state.trials;
   }
-  return state.trials.map((trial) =>
-    trial.id === snapshot.trialId ? { ...trial, state: "cleared" } : trial,
-  );
+  return state.trials.map((trial) => {
+    if (trial.id !== snapshot.trialId) {
+      return trial;
+    }
+    const result = transitionTrial(trial, "cleared");
+    return result.ok ? result.value : trial;
+  });
 }
 
 export function snapshotForTrial(
