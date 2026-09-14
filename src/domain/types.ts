@@ -41,6 +41,29 @@ export interface Bench {
   blockedReason?: string;
 }
 
+export type ReservationLifecycle = "active" | "cancelled";
+export type ReservationVerdict = "valid" | "conflict" | "invalid" | "cancelled";
+
+export interface BenchReservation {
+  id: string;
+  code: string;
+  requestKey: string;
+  trialId: string;
+  benchId: string;
+  startDate: string;
+  endDate: string;
+  slots: number;
+  note: string;
+  status: ReservationLifecycle;
+  consumedAccessionIds: string[];
+  bookedOn: string;
+  // 登记时的台架属性快照；台架被修改后用于重新判定预留是否失效。
+  benchCode: string;
+  sectorSnapshot: string;
+  lightProfileSnapshot: PreferredLight;
+  benchStatusSnapshot: BenchStatus;
+}
+
 export interface ObservationEntry {
   accessionId: string;
   heightMm: number;
@@ -102,6 +125,7 @@ export interface WorkspaceState {
   trials: Trial[];
   accessions: Accession[];
   benches: Bench[];
+  reservations: BenchReservation[];
   observationPasses: ObservationPass[];
   flags: Flag[];
   clearanceSnapshots: ClearanceSnapshot[];

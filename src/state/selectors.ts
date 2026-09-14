@@ -1,12 +1,17 @@
 import type {
   Accession,
   Bench,
+  BenchReservation,
   ClearanceSnapshot,
   Flag,
   ObservationPass,
   Trial,
   WorkspaceState,
 } from "../domain/types";
+import {
+  evaluateReservations,
+  type ReservationEvaluation,
+} from "../domain/reservation";
 
 export function trialById(
   state: WorkspaceState,
@@ -92,4 +97,27 @@ export function accessionStatus(
   return bench.status === "blocked" || bench.status === "quarantine"
     ? "blocked"
     : "assigned";
+}
+
+export function reservationById(
+  state: WorkspaceState,
+  reservationId: string,
+): BenchReservation | undefined {
+  return state.reservations.find((item) => item.id === reservationId);
+}
+
+export function reservationEvaluations(
+  state: WorkspaceState,
+): Map<string, ReservationEvaluation> {
+  return evaluateReservations(state);
+}
+
+export function reservationStatusCounts(
+  evaluations: Map<string, ReservationEvaluation>,
+): Record<"valid" | "conflict" | "invalid" | "cancelled", number> {
+  const counts = { valid: 0, conflict: 0, invalid: 0, cancelled: 0 };
+  evaluations.forEach((evaluation) => {
+    counts[evaluation.verdict] += 1;
+  });
+  return counts;
 }

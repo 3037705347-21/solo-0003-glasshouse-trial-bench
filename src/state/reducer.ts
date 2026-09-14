@@ -33,11 +33,45 @@ export function workspaceReducer(
         ),
       };
     case "bench/assigned":
+      return {
+        ...state,
+        benches: state.benches.map((bench) =>
+          bench.id === action.bench.id ? action.bench : bench,
+        ),
+        reservations: action.reservation
+          ? state.reservations.map((reservation) =>
+              reservation.id === action.reservation!.id
+                ? action.reservation!
+                : reservation,
+            )
+          : state.reservations,
+      };
     case "bench/released":
       return {
         ...state,
         benches: state.benches.map((bench) =>
           bench.id === action.bench.id ? action.bench : bench,
+        ),
+      };
+    case "bench/updated":
+      return {
+        ...state,
+        benches: state.benches.map((bench) =>
+          bench.id === action.bench.id ? action.bench : bench,
+        ),
+      };
+    case "reservation/created":
+      return {
+        ...state,
+        reservations: [...state.reservations, action.reservation],
+      };
+    case "reservation/cancelled":
+      return {
+        ...state,
+        reservations: state.reservations.map((reservation) =>
+          reservation.id === action.reservation.id
+            ? action.reservation
+            : reservation,
         ),
       };
     case "observation/recorded":

@@ -2,7 +2,13 @@ import { useMemo, useState } from "react";
 import { Grid3X3 } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
-import { assignAccession, releaseAccession } from "../../domain/bench";
+import { releaseAccession } from "../../domain/bench";
+import {
+  canAssignAccessionToBench,
+  overallPlanningWindow,
+  planBenchCapacity,
+  planAssignment,
+} from "../../domain/reservation";
 import { accessionById, accessionsForTrial } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { AssignmentPanel } from "./AssignmentPanel";
@@ -33,13 +39,41 @@ export function LayoutPage() {
     [state.benches],
   );
 
+  const planningWindow = useMemo(
+    () => overallPlanningWindow(state),
+    [state],
+  );
+
+  const capacityPlans = useMemo(() => {
+    const map = new Map(
+      sortedBenches.map((bench) => [
+        bench.id,
+        planBenchCapacity(state, planningWindow, bench),
+      ]),
+    );
+    return map;
+  }, [state, sortedBenches, planningWindow]);
+
+  const assignableByBench = useMemo(() => {
+    const map = new Map<string, boolean>();
+    if (selectedAccessionId) {
+      sortedBenches.forEach((bench) => {
+        map.set(
+          bench.id,
+          canAssignAccessionToBench(state, selectedAccessionId, bench.id),
+        );
+      });
+    }
+    return map;
+  }, [state, sortedBenches, selectedAccessionId]);
+
   const handleAssign = (accessionId: string, benchId: string) => {
     const accession = accessionById(state, accessionId);
     const bench = state.benches.find((item) => item.id === benchId);
     if (!accession || !bench) {
       return;
     }
-    const result = assignAccession(accession, bench);
+    const result = planAssignment(state, accessionId, benchId);
     if (!result.ok) {
       pushToast({
         tone: "error",
@@ -48,11 +82,17 @@ export function LayoutPage() {
       });
       return;
     }
-    dispatch({ type: "bench/assigned", bench: result.value });
+    dispatch({
+      type: "bench/assigned",
+      bench: result.value.bench,
+      reservation: result.value.consumedReservation ?? undefined,
+    });
     pushToast({
       tone: "success",
-        title: "台架分配成功",
-        message: `${accession.cultivar} 已分配到 ${bench.code}`,
+      title: "台架分配成功",
+      message: result.value.consumedReservation
+        ? `${accession.cultivar} 已分配到 ${bench.code}，并消耗预留 ${result.value.consumedReservation.code}`
+        : `${accession.cultivar} 已分配到 ${bench.code}（无预留可消耗）`,
     });
   };
 
@@ -123,6 +163,8 @@ export function LayoutPage() {
                 bench={bench}
                 accessions={accessions}
                 selectedAccession={selectedAccession}
+                plan={capacityPlans.get(bench.id)}
+                assignable={assignableByBench.get(bench.id) ?? false}
                 onAssign={handleAssign}
                 onRelease={handleRelease}
               />

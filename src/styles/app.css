@@ -1173,6 +1173,249 @@ button {
   }
 }
 
+@media (max-width: 1100px) {
+  .layout-workspace,
+  .observation-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .assignment-panel,
+  .flag-panel {
+    position: static;
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.capacity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 14px;
+  padding: 18px;
+}
+
+.capacity-card {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fdfefc;
+}
+
+.capacity-card-over {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgba(181, 58, 50, 0.12);
+}
+
+.capacity-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.capacity-card-header strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 15px;
+}
+
+.capacity-spark {
+  display: grid;
+  grid-template-columns: repeat(28, minmax(0, 1fr));
+  gap: 2px;
+  height: 34px;
+  align-items: stretch;
+}
+
+.capacity-cell {
+  border-radius: 2px;
+  min-height: 100%;
+}
+
+.capacity-cell-empty {
+  background: var(--surface-soft);
+}
+
+.capacity-cell-mid {
+  background: #9fc5ab;
+}
+
+.capacity-cell-high {
+  background: var(--green-600);
+}
+
+.capacity-cell-full {
+  background: var(--amber-700);
+}
+
+.capacity-cell-over {
+  background: var(--danger);
+}
+
+.capacity-figures {
+  display: flex;
+  gap: 26px;
+  margin: 0;
+}
+
+.capacity-figures div {
+  display: grid;
+  gap: 2px;
+}
+
+.capacity-figures dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.capacity-figures dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.capacity-figure-zero {
+  color: var(--danger);
+}
+
+.capacity-peak-date {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.capacity-card-over .capacity-peak-date {
+  color: var(--danger);
+}
+
+.capacity-maintain-link {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--green-700);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.capacity-maintain-link:hover {
+  color: var(--green-600);
+  text-decoration: underline;
+}
+
+.bench-reservation-summary {
+  display: grid;
+  gap: 6px;
+}
+
+.bench-plan-copy {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.bench-plan-copy strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.bench-plan-copy span {
+  display: block;
+  margin-top: 2px;
+}
+
+.reservation-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.reservation-chevron {
+  transition: transform 120ms ease;
+  color: var(--text-muted);
+}
+
+.reservation-chevron-open {
+  transform: rotate(180deg);
+  color: var(--text);
+}
+
+.reservation-detail-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+.reservation-detail {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fcfdfb;
+}
+
+.reservation-detail header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.reservation-detail p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.reservation-meta {
+  display: flex;
+  gap: 28px;
+  margin: 0;
+}
+
+.reservation-meta dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.reservation-meta dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.reservation-issue-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reservation-issue-list li {
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: var(--danger-soft);
+  color: #6b2d26;
+  font-size: 13px;
+}
+
+.reservation-conflicts p {
+  margin-bottom: 6px;
+}
+
 @media (max-width: 760px) {
   .app-shell {
     grid-template-columns: 1fr;

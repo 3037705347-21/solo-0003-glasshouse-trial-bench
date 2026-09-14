@@ -26,6 +26,7 @@ npm run build
 ```bash
 node scripts/smoke.mjs curate-accession-roster
 node scripts/smoke.mjs assign-accession-bench
+node scripts/smoke.mjs reserve-bench-capacity
 node scripts/smoke.mjs record-observation-pass
 node scripts/smoke.mjs advance-trial-clearance
 ```
@@ -42,6 +43,7 @@ src/
   features/
     roster/               材料登记和编辑
     layout/               台架分配工作区
+    reservations/         台架容量预留、容量总览与台架维护
     observations/         观测记录和标记处理
     clearance/            放行快照工作区
   components/             共享 UI 原语
@@ -52,7 +54,7 @@ scripts/
 
 ## 输入与输出
 
-- 输入：试验信息、材料信息、台架约束、观测测量、标记处理和放行请求。
-- 输出：本地持久化工作区、更新的台架布局、派生生长标记和放行快照。
+- 输入：试验信息、材料信息、台架约束、容量预留、观测测量、标记处理和放行请求。
+- 输出：本地持久化工作区、更新的台架布局、预留判定（有效/冲突/失效）、派生生长标记和放行快照。
 
 本地使用不需要环境变量。

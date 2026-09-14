@@ -3,12 +3,14 @@ import { Button } from "../../components/Button";
 import { ProgressBar } from "../../components/ProgressBar";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { Accession, Bench } from "../../domain/types";
-import { canAssignAccession } from "../../domain/bench";
+import type { BenchCapacityPlan } from "../../domain/reservation";
 
 interface BenchCardProps {
   bench: Bench;
   accessions: Accession[];
   selectedAccession?: Accession;
+  plan?: BenchCapacityPlan;
+  assignable: boolean;
   onAssign: (accessionId: string, benchId: string) => void;
   onRelease: (accessionId: string, benchId: string) => void;
 }
@@ -17,6 +19,8 @@ export function BenchCard({
   bench,
   accessions,
   selectedAccession,
+  plan,
+  assignable,
   onAssign,
   onRelease,
 }: BenchCardProps) {
@@ -24,9 +28,18 @@ export function BenchCard({
     bench.assignedIds.includes(accession.id),
   );
   const freeSlots = Math.max(0, bench.capacity - assigned.length);
-  const compatible = Boolean(
-    selectedAccession && canAssignAccession(selectedAccession, bench),
-  );
+  const compatible = Boolean(selectedAccession && assignable);
+  const activeHeld = plan
+    ? plan.evaluations.filter(
+        (evaluation) =>
+          evaluation.verdict === "valid" ||
+          evaluation.verdict === "conflict",
+      ).length
+    : 0;
+  const invalidHeld = plan
+    ? plan.evaluations.filter((evaluation) => evaluation.verdict === "invalid")
+        .length
+    : 0;
 
   return (
     <article
@@ -68,11 +81,34 @@ export function BenchCard({
           <dd>{freeSlots}</dd>
         </div>
       </dl>
-      <ProgressBar
-        value={assigned.length}
-        max={bench.capacity}
-        tone={freeSlots === 0 ? "critical" : freeSlots === 1 ? "warning" : "positive"}
-      />
+      {plan ? (
+        <div className="bench-reservation-summary" data-testid={`plan-${bench.id}`}>
+          <ProgressBar
+            value={plan.peakLoad}
+            max={bench.capacity}
+            tone={
+              plan.minFree === 0
+                ? "critical"
+                : plan.minFree <= 1
+                  ? "warning"
+                  : "positive"
+            }
+          />
+          <p className="bench-plan-copy">
+            计划期最少可分配 <strong>{plan.minFree}</strong> 个槽位
+            <span>
+              （峰值 {plan.peakLoad}/{bench.capacity}，{activeHeld} 个有效预留
+              {invalidHeld > 0 ? `，${invalidHeld} 个失效` : ""}）
+            </span>
+          </p>
+        </div>
+      ) : (
+        <ProgressBar
+          value={assigned.length}
+          max={bench.capacity}
+          tone={freeSlots === 0 ? "critical" : freeSlots === 1 ? "warning" : "positive"}
+        />
+      )}
       <div className="bench-assignments">
         {assigned.length === 0 ? (
           <p className="muted-copy">暂无分配材料。</p>

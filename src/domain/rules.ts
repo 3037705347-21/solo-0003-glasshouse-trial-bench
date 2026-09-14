@@ -64,3 +64,32 @@ export function isDateOnOrBefore(date: string, boundary: string): boolean {
   const right = parseDateOnly(boundary);
   return Boolean(left && right && left.getTime() <= right.getTime());
 }
+
+export interface DateWindow {
+  startDate: string;
+  endDate: string;
+}
+
+/** 两个闭区间日期窗口是否有重叠（同一天也算重叠）。 */
+export function windowsOverlap(left: DateWindow, right: DateWindow): boolean {
+  return !(left.endDate < right.startDate || right.endDate < left.startDate);
+}
+
+/** 枚举闭区间内的每一天（YYYY-MM-DD），日期非法时返回空数组。 */
+export function eachDateInclusive(window: DateWindow): string[] {
+  const start = parseDateOnly(window.startDate);
+  const end = parseDateOnly(window.endDate);
+  if (!start || !end || start.getTime() > end.getTime()) {
+    return [];
+  }
+  const days: string[] = [];
+  const cursor = new Date(start.getTime());
+  while (cursor.getTime() <= end.getTime()) {
+    const year = cursor.getFullYear();
+    const month = String(cursor.getMonth() + 1).padStart(2, "0");
+    const day = String(cursor.getDate()).padStart(2, "0");
+    days.push(`${year}-${month}-${day}`);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
+}

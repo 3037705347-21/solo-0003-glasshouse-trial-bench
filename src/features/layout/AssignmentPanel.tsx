@@ -1,10 +1,10 @@
 import { ArrowRight, ListPlus } from "lucide-react";
 import { SelectField } from "../../components/fields";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
-import type { Accession, Bench } from "../../domain/types";
+import type { Accession } from "../../domain/types";
 import { accessionStatus } from "../../state/selectors";
 import type { WorkspaceState } from "../../domain/types";
-import { canAssignAccession } from "../../domain/bench";
+import { canAssignAccessionToBench } from "../../domain/reservation";
 
 interface AssignmentPanelProps {
   state: WorkspaceState;
@@ -26,7 +26,9 @@ export function AssignmentPanel({
     (accession) => accession.id === selectedAccessionId,
   );
   const compatibleBenches = selected
-    ? state.benches.filter((bench) => canAssignAccession(selected, bench))
+    ? state.benches.filter((bench) =>
+        canAssignAccessionToBench(state, selected.id, bench.id),
+      )
     : [];
 
   return (

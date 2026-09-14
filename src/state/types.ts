@@ -1,6 +1,7 @@
 import type {
   Accession,
   Bench,
+  BenchReservation,
   ClearanceSnapshot,
   Flag,
   ObservationPass,
@@ -16,8 +17,11 @@ export type WorkspaceAction =
   | { type: "trial/transitioned"; trialId: string; state: TrialState }
   | { type: "accession/created"; accession: Accession }
   | { type: "accession/updated"; accession: Accession }
-  | { type: "bench/assigned"; bench: Bench }
+  | { type: "bench/assigned"; bench: Bench; reservation?: BenchReservation }
   | { type: "bench/released"; bench: Bench }
+  | { type: "bench/updated"; bench: Bench }
+  | { type: "reservation/created"; reservation: BenchReservation }
+  | { type: "reservation/cancelled"; reservation: BenchReservation }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
   | { type: "flag/transitioned"; flag: Flag }
   | {
@@ -39,4 +43,20 @@ export function isWorkspaceState(value: unknown): value is WorkspaceState {
     Array.isArray(candidate.flags) &&
     Array.isArray(candidate.clearanceSnapshots)
   );
+}
+
+/** 兼容旧版存储：补齐预留数组并过滤结构不完整的预留记录。 */
+export function normalizeWorkspaceState(
+  state: WorkspaceState,
+): WorkspaceState {
+  const reservations = Array.isArray(state.reservations)
+    ? state.reservations.filter(
+        (reservation) =>
+          reservation &&
+          typeof reservation.id === "string" &&
+          typeof reservation.trialId === "string" &&
+          typeof reservation.benchId === "string",
+      )
+    : [];
+  return { ...state, reservations };
 }

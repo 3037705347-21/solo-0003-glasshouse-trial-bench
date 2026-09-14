@@ -13,6 +13,7 @@ const viteBin =
 const scenarios = {
   "curate-accession-roster": curateAccessionRoster,
   "assign-accession-bench": assignAccessionBench,
+  "reserve-bench-capacity": reserveBenchCapacity,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
 };
@@ -20,6 +21,7 @@ const scenarios = {
 const scenarioPaths = {
   "curate-accession-roster": "/roster",
   "assign-accession-bench": "/layout",
+  "reserve-bench-capacity": "/reservations",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
 };
@@ -64,6 +66,51 @@ async function assignAccessionBench(page) {
   await page.getByTestId("assign-bench-bench-east-2").click();
   await page.getByText("台架分配成功", { exact: true }).waitFor();
   await page.getByTestId("bench-card-bench-east-2").getByText("Yellow Pear").waitFor();
+}
+
+async function reserveBenchCapacity(page) {
+  // 为 SOL-01 在 E-2（全日照、容量 4）预留 3 个跨期槽位。
+  await page.getByTestId("open-create-reservation").click();
+  await page.getByTestId("reservation-trial-select").selectOption("trial-sol-01");
+  await page.getByTestId("reservation-bench-select").selectOption("bench-east-2");
+  await page.getByTestId("reservation-start-input").fill("2026-03-01");
+  await page.getByTestId("reservation-end-input").fill("2026-06-30");
+  await page.getByTestId("reservation-slots-input").fill("3");
+  await page.getByTestId("save-reservation-button").click();
+  await page.getByText("预留已登记", { exact: false }).first().waitFor();
+  await page.getByText("RSV-0007", { exact: true }).first().waitFor();
+
+  // 计划期最少可分配空间应显示为 1（容量 4 - 持有 3）。
+  const planCard = page.getByTestId("capacity-card-bench-east-2");
+  await planCard.getByText("最少可分配").waitFor();
+
+  // 再登记一个与 RSV-0007 同窗口同容量、再要 3 槽位的竞争预留，必须判为冲突。
+  await page.getByTestId("open-create-reservation").click();
+  await page.getByTestId("reservation-trial-select").selectOption("trial-sol-01");
+  await page.getByTestId("reservation-bench-select").selectOption("bench-east-2");
+  await page.getByTestId("reservation-start-input").fill("2026-03-01");
+  await page.getByTestId("reservation-end-input").fill("2026-06-30");
+  await page.getByTestId("reservation-slots-input").fill("3");
+  await page.getByTestId("save-reservation-button").click();
+  await page.getByText("存在冲突", { exact: false }).first().waitFor();
+
+  // 仅看冲突预留并展开：必须指出与 RSV-0007 重叠。
+  await page.getByRole("tab", { name: /冲突/ }).click();
+  await page.getByTestId(/^expand-reservation-/).first().click();
+  await page.getByTestId("reservation-conflicts").getByText("RSV-0007").waitFor();
+
+  // 取消冲突预留：不能影响任何已实际分配的材料。
+  await page.getByTestId(/^cancel-reservation-/).first().click();
+  await page.getByText("预留已取消", { exact: true }).waitFor();
+
+  // 把 E-2 转入维护停用，旧预留 RSV-0007 应重新判定为失效。
+  await page.getByTestId("maintain-bench-bench-east-2").click();
+  await page.getByTestId("bench-status-select").selectOption("blocked");
+  await page.getByTestId("save-bench-button").click();
+  await page.getByText("台架已更新", { exact: true }).waitFor();
+  await page.getByRole("tab", { name: /失效/ }).click();
+  await page.getByTestId(/^expand-reservation-/).first().click();
+  await page.getByTestId("reservation-invalid-reasons").waitFor();
 }
 
 async function recordObservationPass(page) {
