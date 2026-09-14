@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { NotebookPen, Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
 import { PageHeader } from "../../components/PageHeader";
-import { StatusBadge, statusTone } from "../../components/StatusBadge";
+import { StatusBadge } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
-import type { ObservationPass } from "../../domain/types";
 import {
   openFlagsForTrial,
   passesForTrial,
@@ -16,11 +16,35 @@ import { PassForm } from "./PassForm";
 
 export function ObservationPage() {
   const { state } = useWorkspace();
-  const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const trialParam = searchParams.get("trial");
+  const passParam = searchParams.get("pass");
+  const accessionParam = searchParams.get("accession");
+  const [trialId, setTrialId] = useState(() =>
+    trialParam && state.trials.some((trial) => trial.id === trialParam)
+      ? trialParam
+      : state.trials[0]?.id ?? "",
+  );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const passes = passesForTrial(state, trialId);
   const flags = openFlagsForTrial(state, trialId);
+
+  // 从标记工作台的溯源链接跳回时，选中对应试验。
+  useEffect(() => {
+    if (trialParam && trialParam !== trialId) {
+      setTrialId(trialParam);
+    }
+  }, [trialParam, trialId]);
+
+  const selectTrial = (next: string) => {
+    setTrialId(next);
+    const params = new URLSearchParams(searchParams);
+    params.delete("pass");
+    params.delete("accession");
+    params.set("trial", next);
+    setSearchParams(params, { replace: true });
+  };
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -54,17 +78,27 @@ export function ObservationPage() {
         title="观测记录"
         description="录入测量数据并呈现放行前需要处理的生长标记。"
         actions={
-          <Button onClick={() => setDialogOpen(true)} data-testid="open-observation-form">
-            <Plus size={16} />
-            新建观测
-          </Button>
+          <>
+            <Link
+              to={`/flags?trial=${encodeURIComponent(trialId)}`}
+              className="button button-secondary button-md"
+              data-testid="open-flag-workbench"
+            >
+              <NotebookPen size={16} />
+              标记工作台
+            </Link>
+            <Button onClick={() => setDialogOpen(true)} data-testid="open-observation-form">
+              <Plus size={16} />
+              新建观测
+            </Button>
+          </>
         }
       />
       <section className="control-strip">
         <select
           className="compact-select"
           value={trialId}
-          onChange={(event) => setTrialId(event.target.value)}
+          onChange={(event) => selectTrial(event.target.value)}
           aria-label="选择试验"
           data-testid="observation-trial-select"
         >
@@ -87,7 +121,11 @@ export function ObservationPage() {
           ) : (
             <div className="pass-cards">
               {passes.map((pass) => (
-                <article className="pass-card" key={pass.id} data-testid={`pass-${pass.id}`}>
+                <article
+                  className={`pass-card ${pass.id === passParam ? "pass-card-highlight" : ""}`}
+                  key={pass.id}
+                  data-testid={`pass-${pass.id}`}
+                >
                   <div className="pass-card-top">
                     <strong>{pass.observedOn}</strong>
                     <span>{pass.observer}</span>
@@ -98,9 +136,15 @@ export function ObservationPage() {
                       const accession = state.accessions.find(
                         (item) => item.id === entry.accessionId,
                       );
+                      const isSource = entry.accessionId === accessionParam;
                       return (
-                        <StatusBadge tone="neutral" key={entry.accessionId}>
-                          {accession?.accessionNo ?? entry.accessionId}
+                        <StatusBadge
+                          tone={isSource ? "critical" : "neutral"}
+                          key={entry.accessionId}
+                        >
+                          {isSource
+                            ? `受影响材料 · ${accession?.accessionNo ?? entry.accessionId}`
+                            : accession?.accessionNo ?? entry.accessionId}
                         </StatusBadge>
                       );
                     })}

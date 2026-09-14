@@ -15,6 +15,7 @@ const scenarios = {
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
+  "triage-flag-workbench": triageFlagWorkbench,
 };
 
 const scenarioPaths = {
@@ -22,6 +23,7 @@ const scenarioPaths = {
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
+  "triage-flag-workbench": "/flags",
 };
 
 async function waitForServer() {
@@ -89,6 +91,38 @@ async function advanceTrialClearance(page) {
   await page
     .getByTestId("clearance-snapshot")
     .getByText("阻止", { exact: true })
+    .first()
+    .waitFor();
+}
+
+async function triageFlagWorkbench(page) {
+  // 台账默认展示全部试验的开放 / 已解决 / 已豁免标记，共 7 条。
+  await page.getByTestId("flag-row-flag-tom-01").waitFor();
+  await page.getByTestId("flag-row-flag-kale-cross-01").waitFor();
+
+  // 处理后又被另一个试验引用：同一材料上累计 5 条标记。
+  await page.getByTestId("flag-accession-filter").selectOption("acc-tom-01");
+  await page.getByText("跨试验引用").first().waitFor();
+
+  // 打开一条严重开放标记的追溯详情，填写说明并解决。
+  await page.getByTestId("flag-row-flag-tom-02-ec").click();
+  await page.getByTestId("flag-detail").waitFor();
+  await page
+    .getByTestId("workbench-resolution-note")
+    .fill("已用清水冲洗基质三次并复测电导率回落至正常范围");
+  await page.getByTestId("workbench-resolve").click();
+
+  // 处理后弹窗内转为只读历史记录，原说明被保留。
+  await page.getByTestId("saved-resolution-note").waitFor();
+  await page.getByText("不再阻挡").waitFor();
+
+  // 立即反映到放行结果：SOL-01 未处理标记计数下降。
+  await page.goto(`${baseUrl}/#/clearance?trial=trial-sol-01`, {
+    waitUntil: "networkidle",
+  });
+  await page
+    .getByTestId("clearance-snapshot")
+    .getByText("2", { exact: true })
     .first()
     .waitFor();
 }

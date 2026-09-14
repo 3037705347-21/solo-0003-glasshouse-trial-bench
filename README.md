@@ -27,6 +27,7 @@ npm run build
 node scripts/smoke.mjs curate-accession-roster
 node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
+node scripts/smoke.mjs triage-flag-workbench
 node scripts/smoke.mjs advance-trial-clearance
 ```
 

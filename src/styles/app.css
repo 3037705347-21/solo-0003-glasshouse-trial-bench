@@ -1157,6 +1157,298 @@ button {
   font-size: 14px;
 }
 
+/* 可点击表格行（标记工作台台账） */
+.data-table-clickable tbody tr {
+  cursor: pointer;
+}
+
+.data-table-clickable tbody tr:focus-visible {
+  outline: 2px solid var(--green-600);
+  outline-offset: -2px;
+}
+
+/* 标记工作台 */
+.flag-summary-grid {
+  padding: 0;
+}
+
+.flag-filter-bar {
+  align-items: flex-end;
+}
+
+.flag-date-filter {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.flag-date-filter label {
+  display: grid;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.compact-date {
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fcfdfb;
+  color: var(--text);
+}
+
+.flag-cell-time,
+.flag-cell-resolution small,
+.flag-related-time {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.flag-cell-accession {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.flag-cell-code {
+  display: grid;
+  gap: 2px;
+}
+
+.flag-cell-code code {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.flag-cell-code small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.flag-cell-resolution {
+  display: grid;
+  gap: 3px;
+  max-width: 280px;
+}
+
+.flag-cell-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.flag-missing {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.trace-link {
+  color: var(--green-700);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.trace-link:hover {
+  text-decoration: underline;
+}
+
+/* 来源观测高亮 */
+.pass-card-highlight {
+  border-color: var(--rust-700);
+  box-shadow: 0 0 0 2px var(--rust-100);
+}
+
+/* 标记详情弹窗 */
+.flag-detail {
+  display: grid;
+  gap: 18px;
+}
+
+.flag-detail-header {
+  display: grid;
+  gap: 10px;
+}
+
+.flag-detail-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.flag-detail-title strong {
+  font-size: 17px;
+}
+
+.flag-detail-code-label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.flag-detail-message {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.flag-trace-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.flag-trace-item {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fcfdfb;
+}
+
+.flag-trace-item dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.flag-trace-item dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.flag-measurements h4,
+.flag-related h4,
+.flag-resolution h4 {
+  margin: 0 0 9px;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.flag-measurement-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.flag-measurement {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.flag-measurement span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.flag-measurement strong {
+  font-size: 16px;
+}
+
+.flag-entry-notes {
+  margin: 9px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.flag-clearance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.flag-clearance-row > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.flag-related {
+  display: grid;
+  gap: 8px;
+}
+
+.flag-related h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flag-related-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flag-related-list li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.flag-related-list code {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.flag-related-msg {
+  flex: 1 1 auto;
+  color: var(--text-muted);
+}
+
+.flag-resolution {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fcfdfb;
+}
+
+.flag-resolution-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.flag-resolution-note-saved {
+  margin: 0;
+  padding: 11px 12px;
+  border-left: 3px solid var(--green-600);
+  border-radius: 0 7px 7px 0;
+  background: var(--green-100);
+  color: #20432b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 @media (max-width: 1100px) {
   .layout-workspace,
   .observation-workspace {
@@ -1230,5 +1522,23 @@ button {
   .pass-cards,
   .metric-grid {
     grid-template-columns: 1fr;
+  }
+
+  .flag-trace-grid,
+  .flag-measurement-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .flag-filter-bar .compact-select,
+  .flag-filter-bar .segmented-tabs {
+    width: 100%;
+  }
+
+  .flag-date-filter {
+    width: 100%;
+  }
+
+  .flag-date-filter label {
+    flex: 1;
   }
 }

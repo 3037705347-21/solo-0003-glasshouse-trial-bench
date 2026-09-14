@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { Play, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Flag, Play, ShieldCheck } from "lucide-react";
 import { Button } from "../../components/Button";
 import { PageHeader } from "../../components/PageHeader";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
@@ -14,10 +15,30 @@ import { SnapshotCard } from "./SnapshotCard";
 
 export function ClearancePage() {
   const { state, dispatch } = useWorkspace();
-  const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const trialParam = searchParams.get("trial");
+  const [trialId, setTrialId] = useState(() =>
+    trialParam && state.trials.some((trial) => trial.id === trialParam)
+      ? trialParam
+      : state.trials[0]?.id ?? "",
+  );
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const latest = latestSnapshotForTrial(state, trialId);
   const trial = state.trials.find((item) => item.id === trialId);
+
+  // 从标记工作台跳转过来时预选对应试验。
+  useEffect(() => {
+    if (trialParam && trialParam !== trialId) {
+      setTrialId(trialParam);
+    }
+  }, [trialParam, trialId]);
+
+  const selectTrial = (next: string) => {
+    setTrialId(next);
+    const params = new URLSearchParams(searchParams);
+    params.set("trial", next);
+    setSearchParams(params, { replace: true });
+  };
 
   const liveSnapshot = useMemo(
     () => buildClearanceSnapshot(state, trialId),
@@ -78,24 +99,34 @@ export function ClearancePage() {
         title="放行检查"
         description="检查跨模块约束，并生成一次不可变的放行快照。"
         actions={
-          trial?.state === "draft" ? (
-            <Button onClick={handleActivate}>
-              <Play size={16} />
-              启动试验
-            </Button>
-          ) : (
-            <Button onClick={handleGenerate} data-testid="generate-clearance">
-              <ShieldCheck size={16} />
-              生成快照
-            </Button>
-          )
+          <>
+            <Link
+              to={`/flags?state=open&trial=${encodeURIComponent(trialId)}`}
+              className="button button-secondary button-md"
+              data-testid="open-flag-workbench-clearance"
+            >
+              <Flag size={16} />
+              处理标记
+            </Link>
+            {trial?.state === "draft" ? (
+              <Button onClick={handleActivate}>
+                <Play size={16} />
+                启动试验
+              </Button>
+            ) : (
+              <Button onClick={handleGenerate} data-testid="generate-clearance">
+                <ShieldCheck size={16} />
+                生成快照
+              </Button>
+            )}
+          </>
         }
       />
       <section className="control-strip">
         <select
           className="compact-select"
           value={trialId}
-          onChange={(event) => setTrialId(event.target.value)}
+          onChange={(event) => selectTrial(event.target.value)}
           aria-label="选择试验"
           data-testid="clearance-trial-select"
         >

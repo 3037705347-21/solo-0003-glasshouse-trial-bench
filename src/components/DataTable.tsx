@@ -11,6 +11,8 @@ interface DataTableProps<T> {
   rows: T[];
   rowKey: (row: T) => string;
   emptyMessage?: string;
+  onRowClick?: (row: T) => void;
+  rowTestId?: (row: T) => string;
 }
 
 export function DataTable<T>({
@@ -18,10 +20,12 @@ export function DataTable<T>({
   rows,
   rowKey,
   emptyMessage = "暂无数据。",
+  onRowClick,
+  rowTestId,
 }: DataTableProps<T>) {
   return (
     <div className="data-table-wrap">
-      <table className="data-table">
+      <table className={`data-table ${onRowClick ? "data-table-clickable" : ""}`}>
         <thead>
           <tr>
             {columns.map((column) => (
@@ -38,7 +42,23 @@ export function DataTable<T>({
             </tr>
           ) : (
             rows.map((row) => (
-              <tr key={rowKey(row)}>
+              <tr
+                key={rowKey(row)}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                data-testid={rowTestId?.(row)}
+                tabIndex={onRowClick ? 0 : undefined}
+                role={onRowClick ? "button" : undefined}
+                onKeyDown={
+                  onRowClick
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onRowClick(row);
+                        }
+                      }
+                    : undefined
+                }
+              >
                 {columns.map((column) => (
                   <td key={column.key}>{column.render(row)}</td>
                 ))}

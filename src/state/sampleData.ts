@@ -271,9 +271,57 @@ const observationPasses: ObservationPass[] = [
       },
     ],
   },
+  {
+    // 同一次观测在同一材料上同时派生多条关键标记，覆盖“同次观测多标记”。
+    id: "obs-tom-02",
+    trialId: "trial-sol-01",
+    observedOn: "2026-03-05",
+    observer: "M. Ikeda",
+    entries: [
+      {
+        accessionId: "acc-tom-01",
+        heightMm: 430,
+        leafCount: 4,
+        ecMs: 3.8,
+        notes: "徒长伴随盐害，基质需要冲洗，继续追踪。",
+      },
+      {
+        accessionId: "acc-tom-02",
+        heightMm: 428,
+        leafCount: 9,
+        ecMs: 2.4,
+        notes: "靠近光源一侧株高超过上限。",
+      },
+    ],
+  },
+  {
+    // 草稿试验在可行性核对中引用番茄材料作为跨试验参照：
+    // 材料登记在 SOL-01，却被 BRA-03 的观测引用。
+    id: "obs-kale-01",
+    trialId: "trial-bra-03",
+    observedOn: "2026-07-24",
+    observer: "S. Mori",
+    entries: [
+      {
+        accessionId: "acc-kale-01",
+        heightMm: 76,
+        leafCount: 8,
+        ecMs: 1.9,
+        notes: "羽衣甘蓝出苗整齐，作为基准。",
+      },
+      {
+        accessionId: "acc-tom-01",
+        heightMm: 52,
+        leafCount: 6,
+        ecMs: 2.0,
+        notes: "借用番茄矮化材料核对株高判定口径。",
+      },
+    ],
+  },
 ];
 
 const flags: Flag[] = [
+  // acc-tom-01 累计四条标记，覆盖“同一材料多条标记”。
   {
     id: "flag-tom-01",
     trialId: "trial-sol-01",
@@ -282,8 +330,10 @@ const flags: Flag[] = [
     code: "HT_UNDER",
     message: "Tiny Tim 低于 60 毫米生长阈值",
     severity: "warning",
-    state: "open",
+    state: "resolved",
     createdOn: "2026-02-26T09:00:00.000Z",
+    resolvedOn: "2026-02-27T02:30:00.000Z",
+    resolutionNote: "已调整补光时长并复测，株高回到 64 毫米，标记关闭。",
   },
   {
     id: "flag-bee-01",
@@ -295,6 +345,67 @@ const flags: Flag[] = [
     severity: "warning",
     state: "open",
     createdOn: "2026-04-08T09:00:00.000Z",
+  },
+  {
+    id: "flag-tom-02-underleaf",
+    trialId: "trial-sol-01",
+    accessionId: "acc-tom-01",
+    observationPassId: "obs-tom-02",
+    code: "LEAF_LOW",
+    message: "Tiny Tim 的真叶数少于 5 片",
+    severity: "warning",
+    state: "waived",
+    createdOn: "2026-03-05T08:45:00.000Z",
+    resolvedOn: "2026-03-06T01:10:00.000Z",
+    resolutionNote: "该矮化品系真叶展开本身偏慢，经负责人确认对放行无影响后豁免。",
+  },
+  {
+    id: "flag-tom-02-over",
+    trialId: "trial-sol-01",
+    accessionId: "acc-tom-01",
+    observationPassId: "obs-tom-02",
+    code: "HT_OVER",
+    message: "Tiny Tim 高于 420 毫米生长阈值",
+    severity: "critical",
+    state: "open",
+    createdOn: "2026-03-05T08:45:00.000Z",
+  },
+  {
+    id: "flag-tom-02-ec",
+    trialId: "trial-sol-01",
+    accessionId: "acc-tom-01",
+    observationPassId: "obs-tom-02",
+    code: "EC_HIGH",
+    message: "Tiny Tim 的基质电导率偏高",
+    severity: "critical",
+    state: "open",
+    createdOn: "2026-03-05T08:45:00.000Z",
+  },
+  {
+    id: "flag-tom-03-over",
+    trialId: "trial-sol-01",
+    accessionId: "acc-tom-02",
+    observationPassId: "obs-tom-02",
+    code: "HT_OVER",
+    message: "Micro Tom 高于 420 毫米生长阈值",
+    severity: "critical",
+    state: "open",
+    createdOn: "2026-03-05T08:45:00.000Z",
+  },
+  {
+    // 标记处理（豁免）后，该材料仍被另一个试验 BRA-03 的观测引用；
+    // 溯源时要能看出它登记在 SOL-01、被 BRA-03 跨试验引用。
+    id: "flag-kale-cross-01",
+    trialId: "trial-bra-03",
+    accessionId: "acc-tom-01",
+    observationPassId: "obs-kale-01",
+    code: "HT_UNDER",
+    message: "Tiny Tim 低于 60 毫米生长阈值",
+    severity: "warning",
+    state: "waived",
+    createdOn: "2026-07-24T07:20:00.000Z",
+    resolvedOn: "2026-07-24T08:05:00.000Z",
+    resolutionNote: "该材料仅用于跨试验判定口径核对，豁免本次观测标记。",
   },
 ];
 

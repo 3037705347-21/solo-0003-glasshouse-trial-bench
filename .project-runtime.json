@@ -22,6 +22,10 @@
       "command": "node scripts/smoke.mjs record-observation-pass"
     },
     {
+      "workflow_id": "triage-flag-workbench",
+      "command": "node scripts/smoke.mjs triage-flag-workbench"
+    },
+    {
       "workflow_id": "advance-trial-clearance",
       "command": "node scripts/smoke.mjs advance-trial-clearance"
     }
