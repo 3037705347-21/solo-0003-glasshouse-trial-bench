@@ -308,5 +308,6 @@ export function createSampleWorkspaceState(): WorkspaceState {
     observationPasses,
     flags,
     clearanceSnapshots,
+    importBatches: [],
   };
 }

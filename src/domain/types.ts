@@ -98,6 +98,16 @@ export interface ClearanceSnapshot {
   blockers: ClearanceBlocker[];
 }
 
+export interface ImportBatch {
+  id: string;
+  importedAt: string;
+  trialId: string;
+  totalRows: number;
+  importedCount: number;
+  skippedCount: number;
+  accessionNos: string[];
+}
+
 export interface WorkspaceState {
   trials: Trial[];
   accessions: Accession[];
@@ -105,4 +115,5 @@ export interface WorkspaceState {
   observationPasses: ObservationPass[];
   flags: Flag[];
   clearanceSnapshots: ClearanceSnapshot[];
+  importBatches: ImportBatch[];
 }

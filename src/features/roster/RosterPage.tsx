@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Leaf, Plus, Sprout } from "lucide-react";
+import { Leaf, Plus, Sprout, Upload } from "lucide-react";
 import { Button } from "../../components/Button";
 import { DataTable, type DataColumn } from "../../components/DataTable";
 import { Dialog } from "../../components/Dialog";
@@ -20,6 +20,7 @@ import {
   benchForAccession,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { BatchImportDialog } from "./BatchImportDialog";
 import { RosterForm } from "./RosterForm";
 
 type RosterSegment = "all" | "assigned" | "unassigned";
@@ -30,6 +31,7 @@ export function RosterPage() {
   const [query, setQuery] = useState("");
   const [segment, setSegment] = useState<RosterSegment>("all");
   const [editorOpen, setEditorOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editingAccession, setEditingAccession] = useState<Accession | undefined>();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -146,10 +148,20 @@ export function RosterPage() {
         title="材料登记"
         description="维护将进入观测和台架分配流程的植物品系。"
         actions={
-          <Button onClick={openCreate} data-testid="open-create-accession">
-            <Plus size={16} />
-            新建材料
-          </Button>
+          <>
+            <Button
+              tone="secondary"
+              onClick={() => setImportOpen(true)}
+              data-testid="open-batch-import"
+            >
+              <Upload size={16} />
+              批量导入
+            </Button>
+            <Button onClick={openCreate} data-testid="open-create-accession">
+              <Plus size={16} />
+              新建材料
+            </Button>
+          </>
         }
       />
       <section className="control-strip">
@@ -227,6 +239,29 @@ export function RosterPage() {
           />
         ) : (
           <p>请先创建试验，再添加材料。</p>
+        )}
+      </Dialog>
+      <Dialog
+        open={importOpen}
+        title="批量导入材料"
+        onClose={() => setImportOpen(false)}
+        wide
+      >
+        {trialFilter ? (
+          <BatchImportDialog
+            defaultTrialId={trialFilter}
+            onCancel={() => setImportOpen(false)}
+            onImported={(batch) => {
+              setImportOpen(false);
+              pushToast({
+                tone: "success",
+                title: "批量导入完成",
+                message: `已导入 ${batch.importedCount} 条材料，跳过 ${batch.skippedCount} 行。`,
+              });
+            }}
+          />
+        ) : (
+          <p>请先创建试验，再批量导入材料。</p>
         )}
       </Dialog>
       <ToastRegion

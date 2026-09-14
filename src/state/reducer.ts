@@ -32,6 +32,12 @@ export function workspaceReducer(
           accession.id === action.accession.id ? action.accession : accession,
         ),
       };
+    case "accession/batch-imported":
+      return {
+        ...state,
+        accessions: [...state.accessions, ...action.accessions],
+        importBatches: [...state.importBatches, action.batch],
+      };
     case "bench/assigned":
     case "bench/released":
       return {

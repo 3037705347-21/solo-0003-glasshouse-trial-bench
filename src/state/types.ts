@@ -3,6 +3,7 @@ import type {
   Bench,
   ClearanceSnapshot,
   Flag,
+  ImportBatch,
   ObservationPass,
   Trial,
   TrialState,
@@ -16,6 +17,11 @@ export type WorkspaceAction =
   | { type: "trial/transitioned"; trialId: string; state: TrialState }
   | { type: "accession/created"; accession: Accession }
   | { type: "accession/updated"; accession: Accession }
+  | {
+      type: "accession/batch-imported";
+      accessions: Accession[];
+      batch: ImportBatch;
+    }
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }

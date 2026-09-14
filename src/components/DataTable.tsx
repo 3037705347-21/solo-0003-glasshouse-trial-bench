@@ -11,6 +11,7 @@ interface DataTableProps<T> {
   rows: T[];
   rowKey: (row: T) => string;
   emptyMessage?: string;
+  rowClassName?: (row: T) => string;
 }
 
 export function DataTable<T>({
@@ -18,6 +19,7 @@ export function DataTable<T>({
   rows,
   rowKey,
   emptyMessage = "暂无数据。",
+  rowClassName,
 }: DataTableProps<T>) {
   return (
     <div className="data-table-wrap">
@@ -38,7 +40,10 @@ export function DataTable<T>({
             </tr>
           ) : (
             rows.map((row) => (
-              <tr key={rowKey(row)}>
+              <tr
+                key={rowKey(row)}
+                className={rowClassName ? rowClassName(row) : undefined}
+              >
                 {columns.map((column) => (
                   <td key={column.key}>{column.render(row)}</td>
                 ))}
