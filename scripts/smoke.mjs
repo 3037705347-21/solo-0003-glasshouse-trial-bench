@@ -105,7 +105,7 @@ async function followObservationPlan(page) {
   await page.getByTestId("save-plan-button").click();
   await page.getByText("计划已建立", { exact: true }).waitFor();
 
-  // 2. 进入完成对话框，录入计划范围内的测量并保存。
+  // 2. 进入完成对话框，录入计划范围内的测量。
   await page.getByTestId(/plan-complete-pln_/).first().click();
   await page
     .locator(".entry-row")
@@ -113,28 +113,43 @@ async function followObservationPlan(page) {
     .locator('input[type="number"]')
     .nth(0)
     .fill("72");
-  await page.getByTestId("save-observation-button").click();
-  await page.getByText("计划已完成", { exact: true }).waitFor();
 
-  // 3. 完成后的计划只关联一份观测，且不能再次完成。
-  await page.getByTestId(/plan-card-pln_/).first().getByText(/已关联观测/).waitFor();
+  // 3. 在同一次浏览器任务里连续触发三次提交（中间没有渲染机会，因此能越过 UI
+  //    提交锁），每次都会生成全新观测编号。真正的幂等必须在 reducer 层：同一计划
+  //    一旦完成，后续提交整条忽略，不能再追加观测或标记。
+  const saveHandle = await page.getByTestId("save-observation-button").elementHandle();
+  await page.evaluate((button) => {
+    button.click();
+    button.click();
+    button.click();
+  }, saveHandle);
+
+  // 完成后的计划只关联一份观测，即使被重复完成三次。等待确定性的关联框，
+  // 而不是会因三次同步回调而堆叠的提示条。
+  await page
+    .getByTestId(/plan-card-pln_/)
+    .first()
+    .getByText(/已关联观测/)
+    .waitFor();
   if ((await page.getByText(/已关联观测/).count()) !== 1) {
     throw new Error("重复完成生成了多份观测关联");
   }
 
-  // 4. 刷新页面后计划、关联与观测都仍然存在，历史没有被改写。
+  // 4. 刷新页面后计划、关联与观测都仍然存在，历史没有被改写，关联仍只有一份。
   await page.reload({ waitUntil: "networkidle" });
   await page.getByText("已完成", { exact: true }).first().waitFor();
   if ((await page.getByText(/已关联观测/).count()) !== 1) {
     throw new Error("刷新后观测关联数量发生变化");
   }
 
-  // 该试验的观测历史从 1 条增加到 2 条（计划完成只新增一次）。
+  // 该试验的观测历史从 1 条增加到 2 条：三次提交只应真正落库一次。
   await page.goto(`${baseUrl}/#/observations`, { waitUntil: "networkidle" });
   if ((await page.locator(".pass-card").count()) !== 2) {
-    throw new Error("计划完成产生的观测数量不正确");
+    throw new Error("重复完成产生了多份观测记录");
   }
-  await page.getByText(/来自观测计划/).waitFor();
+  if ((await page.getByText(/来自观测计划/).count()) !== 1) {
+    throw new Error("刷新后计划反向关联数量不正确");
+  }
 
   // 5. 漂移：切到 AMA-02，已有计划因材料移出台架而要求重新确认。
   await page.goto(`${baseUrl}/#/plans`, { waitUntil: "networkidle" });

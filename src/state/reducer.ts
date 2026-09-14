@@ -74,28 +74,33 @@ export function workspaceReducer(
         ),
       };
     case "plan/observation-recorded": {
-      // 重复保存或重复点击完成不能生成多份观测，也不能把已完成的计划再完成一次。
-      const passAlreadySaved = state.observationPasses.some(
-        (pass) => pass.id === action.pass.id,
-      );
+      // 真正的幂等：同一计划一旦完成（或已关联观测、已不存在），后续重复提交
+      // 整条忽略。不能只按观测编号去重——重复提交每次都会生成新编号，那样仍会
+      // 追加第二份孤立观测和标记。
       const currentPlan = state.observationPlans.find(
         (plan) => plan.id === action.plan.id,
       );
-      const planStillOpen =
-        currentPlan &&
-        currentPlan.status !== "completed" &&
-        !currentPlan.linkedObservationPassId;
+      if (
+        !currentPlan ||
+        currentPlan.status === "completed" ||
+        currentPlan.linkedObservationPassId
+      ) {
+        return state;
+      }
+      // 同一观测动作被重复派发时也不重复入库（编号相同的情形）。
+      const passAlreadySaved = state.observationPasses.some(
+        (pass) => pass.id === action.pass.id,
+      );
+      if (passAlreadySaved) {
+        return state;
+      }
       return {
         ...state,
-        observationPasses: passAlreadySaved
-          ? state.observationPasses
-          : [...state.observationPasses, action.pass],
-        flags: passAlreadySaved ? state.flags : [...state.flags, ...action.flags],
-        observationPlans: planStillOpen
-          ? state.observationPlans.map((plan) =>
-              plan.id === action.plan.id ? action.plan : plan,
-            )
-          : state.observationPlans,
+        observationPasses: [...state.observationPasses, action.pass],
+        flags: [...state.flags, ...action.flags],
+        observationPlans: state.observationPlans.map((plan) =>
+          plan.id === action.plan.id ? action.plan : plan,
+        ),
       };
     }
     default:
