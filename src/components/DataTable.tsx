@@ -10,6 +10,7 @@ interface DataTableProps<T> {
   columns: Array<DataColumn<T>>;
   rows: T[];
   rowKey: (row: T) => string;
+  rowTestId?: (row: T) => string;
   emptyMessage?: string;
 }
 
@@ -17,6 +18,7 @@ export function DataTable<T>({
   columns,
   rows,
   rowKey,
+  rowTestId,
   emptyMessage = "暂无数据。",
 }: DataTableProps<T>) {
   return (
@@ -38,7 +40,10 @@ export function DataTable<T>({
             </tr>
           ) : (
             rows.map((row) => (
-              <tr key={rowKey(row)}>
+              <tr
+                key={rowKey(row)}
+                data-testid={rowTestId ? rowTestId(row) : undefined}
+              >
                 {columns.map((column) => (
                   <td key={column.key}>{column.render(row)}</td>
                 ))}

@@ -243,6 +243,64 @@ const observationPasses: ObservationPass[] = [
     ],
   },
   {
+    id: "obs-tom-02",
+    trialId: "trial-sol-01",
+    observedOn: "2026-03-12",
+    observer: "M. Ikeda",
+    entries: [
+      {
+        accessionId: "acc-tom-01",
+        heightMm: 92,
+        leafCount: 8,
+        ecMs: 1.9,
+        notes: "节间开始拉长，整体整齐。",
+      },
+      {
+        accessionId: "acc-tom-02",
+        heightMm: 105,
+        leafCount: 9,
+        ecMs: 1.8,
+        notes: "真叶展开均匀。",
+      },
+      {
+        accessionId: "acc-tom-03",
+        heightMm: 138,
+        leafCount: 12,
+        ecMs: 2.4,
+        notes: "定植后恢复良好。",
+      },
+    ],
+  },
+  {
+    id: "obs-tom-03",
+    trialId: "trial-sol-01",
+    observedOn: "2026-03-26",
+    observer: "R. Ono",
+    entries: [
+      {
+        accessionId: "acc-tom-01",
+        heightMm: 121,
+        leafCount: 10,
+        ecMs: 2.2,
+        notes: "矮化性状稳定。",
+      },
+      {
+        accessionId: "acc-tom-02",
+        heightMm: 134,
+        leafCount: 11,
+        ecMs: 2.1,
+        notes: "开始现蕾。",
+      },
+      {
+        accessionId: "acc-tom-03",
+        heightMm: 196,
+        leafCount: 15,
+        ecMs: 3.6,
+        notes: "生长旺盛，基质盐分偏高。",
+      },
+    ],
+  },
+  {
     id: "obs-bee-01",
     trialId: "trial-ama-02",
     observedOn: "2026-04-08",
@@ -271,6 +329,35 @@ const observationPasses: ObservationPass[] = [
       },
     ],
   },
+  {
+    id: "obs-bee-02",
+    trialId: "trial-ama-02",
+    observedOn: "2026-04-22",
+    observer: "R. Ono",
+    entries: [
+      {
+        accessionId: "acc-bee-01",
+        heightMm: 88,
+        leafCount: 11,
+        ecMs: 2.4,
+        notes: "叶色加深，展开良好。",
+      },
+      {
+        accessionId: "acc-bee-02",
+        heightMm: 95,
+        leafCount: 12,
+        ecMs: 2.3,
+        notes: "金色叶片色调稳定。",
+      },
+      {
+        accessionId: "acc-bee-03",
+        heightMm: 71,
+        leafCount: 9,
+        ecMs: 2.5,
+        notes: "倒苗已恢复，长势追平。",
+      },
+    ],
+  },
 ];
 
 const flags: Flag[] = [
@@ -284,6 +371,17 @@ const flags: Flag[] = [
     severity: "warning",
     state: "open",
     createdOn: "2026-02-26T09:00:00.000Z",
+  },
+  {
+    id: "flag-tom-02",
+    trialId: "trial-sol-01",
+    accessionId: "acc-tom-03",
+    observationPassId: "obs-tom-03",
+    code: "EC_HIGH",
+    message: "Yellow Pear 的基质电导率偏高",
+    severity: "critical",
+    state: "open",
+    createdOn: "2026-03-26T09:30:00.000Z",
   },
   {
     id: "flag-bee-01",

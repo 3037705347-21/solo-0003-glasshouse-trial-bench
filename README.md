@@ -1,6 +1,6 @@
 # 温室试验台
 
-温室试验台是一个离线优先的 React 工作台，用于管理作物试验。它把材料登记、台架分配、生长观测和放行检查集中到一个本地浏览器工具中。
+温室试验台是一个离线优先的 React 工作台，用于管理作物试验。它把材料登记、台架分配、生长观测、趋势分析和放行检查集中到一个本地浏览器工具中。
 
 ## 本地运行
 
@@ -27,6 +27,7 @@ npm run build
 node scripts/smoke.mjs curate-accession-roster
 node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
+node scripts/smoke.mjs review-growth-trends
 node scripts/smoke.mjs advance-trial-clearance
 ```
 
@@ -43,6 +44,7 @@ src/
     roster/               材料登记和编辑
     layout/               台架分配工作区
     observations/         观测记录和标记处理
+    trends/               生长趋势分析
     clearance/            放行快照工作区
   components/             共享 UI 原语
   styles/                 应用样式

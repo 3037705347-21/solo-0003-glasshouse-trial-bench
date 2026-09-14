@@ -20,6 +20,13 @@ export const GROWTH_BOUNDS = {
   ecMs: { min: 0.1, max: 12 },
 };
 
+export const GROWTH_THRESHOLDS = {
+  heightUnderMm: 60,
+  heightOverMm: 420,
+  leafLowCount: 5,
+  ecHighMs: 3.5,
+} as const;
+
 export const TRIAL_SEASONS = [
   "冬季",
   "春季",

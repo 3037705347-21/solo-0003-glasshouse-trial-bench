@@ -14,6 +14,7 @@ const scenarios = {
   "curate-accession-roster": curateAccessionRoster,
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
+  "review-growth-trends": reviewGrowthTrends,
   "advance-trial-clearance": advanceTrialClearance,
 };
 
@@ -21,6 +22,7 @@ const scenarioPaths = {
   "curate-accession-roster": "/roster",
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
+  "review-growth-trends": "/trends",
   "advance-trial-clearance": "/clearance",
 };
 
@@ -81,6 +83,30 @@ async function recordObservationPass(page) {
     (count) => document.querySelectorAll('[data-testid^="pass-"]').length > count,
     before,
   );
+}
+
+async function reviewGrowthTrends(page) {
+  await page.getByTestId("trend-chart-heightMm").waitFor();
+  await page.getByTestId("trend-chart-leafCount").waitFor();
+  await page.getByTestId("trend-chart-ecMs").waitFor();
+  // 触发阈值且带标记的点可以打开溯源详情。
+  await page.getByTestId("trend-point-ecMs-obs-tom-03-acc-tom-03").click();
+  const detail = page.getByTestId("trend-point-detail");
+  await detail.getByText("2026-03-26", { exact: false }).waitFor();
+  await detail.getByText("EC_HIGH", { exact: true }).waitFor();
+  // 切换材料组合后趋势立即刷新。
+  await page.getByTestId("trend-accession-acc-tom-01").click();
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll(
+        '[data-testid="trend-point-heightMm-obs-tom-01-acc-tom-01"]',
+      ).length === 0,
+  );
+  // 溯源表仍保留其他材料在对应日期的记录。
+  await page
+    .getByTestId("trend-row-obs-tom-02-acc-tom-02")
+    .getByText("2026-03-12", { exact: true })
+    .waitFor();
 }
 
 async function advanceTrialClearance(page) {

@@ -6,7 +6,7 @@ import type {
   WorkspaceState,
 } from "./types";
 import { createId } from "./id";
-import { GROWTH_BOUNDS, parseDateOnly, todayDateOnly } from "./rules";
+import { GROWTH_BOUNDS, GROWTH_THRESHOLDS, parseDateOnly, todayDateOnly } from "./rules";
 import { fail, fieldError, ok, type Result } from "./result";
 
 export interface ObservationDraft {
@@ -171,7 +171,7 @@ export function deriveFlags(
     if (!accession) {
       return;
     }
-    if (entry.heightMm < 60) {
+    if (entry.heightMm < GROWTH_THRESHOLDS.heightUnderMm) {
       flags.push(
         makeFlag(
           {
@@ -179,14 +179,14 @@ export function deriveFlags(
             accessionId: entry.accessionId,
             observationPassId: pass.id,
             code: "HT_UNDER",
-            message: `${accession.cultivar} 低于 60 毫米生长阈值`,
+            message: `${accession.cultivar} 低于 ${GROWTH_THRESHOLDS.heightUnderMm} 毫米生长阈值`,
             severity: "warning",
           },
           createdOn,
         ),
       );
     }
-    if (entry.heightMm >= 420) {
+    if (entry.heightMm >= GROWTH_THRESHOLDS.heightOverMm) {
       flags.push(
         makeFlag(
           {
@@ -194,14 +194,14 @@ export function deriveFlags(
             accessionId: entry.accessionId,
             observationPassId: pass.id,
             code: "HT_OVER",
-            message: `${accession.cultivar} 高于 420 毫米生长阈值`,
+            message: `${accession.cultivar} 高于 ${GROWTH_THRESHOLDS.heightOverMm} 毫米生长阈值`,
             severity: "critical",
           },
           createdOn,
         ),
       );
     }
-    if (entry.leafCount < 5) {
+    if (entry.leafCount < GROWTH_THRESHOLDS.leafLowCount) {
       flags.push(
         makeFlag(
           {
@@ -209,14 +209,14 @@ export function deriveFlags(
             accessionId: entry.accessionId,
             observationPassId: pass.id,
             code: "LEAF_LOW",
-            message: `${accession.cultivar} 的真叶数少于 5 片`,
+            message: `${accession.cultivar} 的真叶数少于 ${GROWTH_THRESHOLDS.leafLowCount} 片`,
             severity: "warning",
           },
           createdOn,
         ),
       );
     }
-    if (entry.ecMs >= 3.5) {
+    if (entry.ecMs >= GROWTH_THRESHOLDS.ecHighMs) {
       flags.push(
         makeFlag(
           {
