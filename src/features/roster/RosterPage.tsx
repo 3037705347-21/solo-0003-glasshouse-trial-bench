@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Leaf, Plus, Sprout } from "lucide-react";
+import { FileText, Plus, Sprout } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { DataTable, type DataColumn } from "../../components/DataTable";
 import { Dialog } from "../../components/Dialog";
@@ -63,7 +64,13 @@ export function RosterPage() {
       key: "accessionNo",
       header: "材料编号",
       render: (accession) => (
-        <span className="table-primary">{accession.accessionNo}</span>
+        <Link
+          to={`/accessions/${accession.id}`}
+          className="table-primary table-link"
+          data-testid={`accession-dossier-link-${accession.id}`}
+        >
+          {accession.accessionNo}
+        </Link>
       ),
     },
     {
@@ -119,17 +126,27 @@ export function RosterPage() {
       key: "actions",
       header: "",
       render: (accession) => (
-        <Button
-          tone="ghost"
-          size="sm"
-          onClick={() => {
-            setEditingAccession(accession);
-            setEditorOpen(true);
-          }}
-          data-testid={`edit-accession-${accession.id}`}
-        >
-          编辑
-        </Button>
+        <div className="row-actions">
+          <Link
+            to={`/accessions/${accession.id}`}
+            className="button button-ghost button-sm"
+            data-testid={`open-dossier-${accession.id}`}
+          >
+            <FileText size={14} />
+            档案
+          </Link>
+          <Button
+            tone="ghost"
+            size="sm"
+            onClick={() => {
+              setEditingAccession(accession);
+              setEditorOpen(true);
+            }}
+            data-testid={`edit-accession-${accession.id}`}
+          >
+            编辑
+          </Button>
+        </div>
       ),
     },
   ];

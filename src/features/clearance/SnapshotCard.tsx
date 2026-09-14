@@ -1,4 +1,5 @@
 import { CalendarDays, CircleCheck, CircleX } from "lucide-react";
+import { Link } from "react-router-dom";
 import { MetricCard } from "../../components/MetricCard";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { ClearanceSnapshot } from "../../domain/types";
@@ -59,7 +60,17 @@ export function SnapshotCard({ snapshot }: SnapshotCardProps) {
             {snapshot.blockers.map((blocker, index) => (
               <li key={`${blocker.code}-${index}`}>
                 <code>{blocker.code}</code>
-                <span>{blocker.message}</span>
+                {blocker.accessionId ? (
+                  <Link
+                    to={`/accessions/${blocker.accessionId}`}
+                    className="dossier-link"
+                    data-testid={`blocker-dossier-${blocker.accessionId}`}
+                  >
+                    {blocker.message}
+                  </Link>
+                ) : (
+                  <span>{blocker.message}</span>
+                )}
               </li>
             ))}
           </ul>

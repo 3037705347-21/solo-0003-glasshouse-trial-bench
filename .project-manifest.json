@@ -39,6 +39,11 @@
       "responsibility": "放行预览、快照生成和阻止项展示"
     },
     {
+      "id": "dossier",
+      "path": "src/features/dossier",
+      "responsibility": "只读材料档案：实时聚合试验归属、来源繁殖、台架占用、观测、标记和放行记录"
+    },
+    {
       "id": "components",
       "path": "src/components",
       "responsibility": "共享表单、表格、弹窗、标签、指标、toast 和空状态原语"
@@ -108,6 +113,20 @@
       "failure": "被阻止的快照列出每个具体阻止项",
       "verification": "无头浏览器为示例试验生成被阻止的快照",
       "module_ids": ["app", "domain", "state", "clearance"]
+    },
+    {
+      "id": "read-accession-dossier",
+      "name": "查阅只读材料档案",
+      "entry": "GET /#/accessions/acc-tom-03",
+      "steps": [
+        "直接打开材料地址并按编号定位档案",
+        "从当前工作区状态实时聚合归属、台架、观测、标记和快照",
+        "在其他页面改变台架分配后回到同一地址确认内容实时变化"
+      ],
+      "success": "档案显示最新事实、来源与当前影响，无独立档案数据",
+      "failure": "编号不存在时显示可返回材料登记的空状态",
+      "verification": "无头浏览器直接打开档案，分配台架后重访并确认实时更新",
+      "module_ids": ["app", "domain", "state", "dossier"]
     }
   ]
 }

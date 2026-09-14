@@ -1,4 +1,5 @@
 import { Check, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { ProgressBar } from "../../components/ProgressBar";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
@@ -80,7 +81,15 @@ export function BenchCard({
           assigned.map((accession) => (
             <div className="bench-accession-row" key={accession.id}>
               <div>
-                <strong>{accession.cultivar}</strong>
+                <strong>
+                  <Link
+                    to={`/accessions/${accession.id}`}
+                    className="dossier-link"
+                    data-testid={`bench-accession-dossier-${accession.id}`}
+                  >
+                    {accession.cultivar}
+                  </Link>
+                </strong>
                 <span>{accession.accessionNo}</span>
               </div>
               <Button

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { NotebookPen, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
 import { PageHeader } from "../../components/PageHeader";
@@ -99,9 +100,16 @@ export function ObservationPage() {
                         (item) => item.id === entry.accessionId,
                       );
                       return (
-                        <StatusBadge tone="neutral" key={entry.accessionId}>
-                          {accession?.accessionNo ?? entry.accessionId}
-                        </StatusBadge>
+                        <Link
+                          to={`/accessions/${entry.accessionId}`}
+                          key={entry.accessionId}
+                          className="dossier-tag-link"
+                          data-testid={`observation-dossier-${entry.accessionId}`}
+                        >
+                          <StatusBadge tone="neutral">
+                            {accession?.accessionNo ?? entry.accessionId}
+                          </StatusBadge>
+                        </Link>
                       );
                     })}
                   </div>

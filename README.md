@@ -28,6 +28,7 @@ node scripts/smoke.mjs curate-accession-roster
 node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
 node scripts/smoke.mjs advance-trial-clearance
+node scripts/smoke.mjs read-accession-dossier
 ```
 
 每条命令都会启动并关闭一个本地 Vite 预览服务，端口为 `4177`。检查过程不调用外部服务，也不依赖在线数据库。
@@ -44,6 +45,7 @@ src/
     layout/               台架分配工作区
     observations/         观测记录和标记处理
     clearance/            放行快照工作区
+    dossier/              只读材料档案（实时聚合，无独立数据）
   components/             共享 UI 原语
   styles/                 应用样式
 scripts/

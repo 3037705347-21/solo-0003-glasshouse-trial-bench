@@ -15,6 +15,7 @@ const scenarios = {
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
+  "read-accession-dossier": readAccessionDossier,
 };
 
 const scenarioPaths = {
@@ -22,6 +23,7 @@ const scenarioPaths = {
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
+  "read-accession-dossier": "/accessions/acc-tom-03",
 };
 
 async function waitForServer() {
@@ -91,6 +93,39 @@ async function advanceTrialClearance(page) {
     .getByText("阻止", { exact: true })
     .first()
     .waitFor();
+}
+
+async function readAccessionDossier(page) {
+  // 直接打开一个未分配材料的档案地址：必须能看到未分配的事实来源与影响。
+  await page.getByTestId("dossier-acc-tom-03").waitFor();
+  await page.getByText("ACC-0003 · Yellow Pear").waitFor();
+  await page.getByTestId("dossier-notice-UNASSIGNED").waitFor();
+  await page.getByText("尚未分配台架", { exact: true }).waitFor();
+  await page.getByTestId("dossier-no-bench").waitFor();
+  await page.getByTestId("dossier-no-notices").waitFor({ state: "detached" });
+
+  // 在台架布局分配该材料后回到同一地址，档案必须实时反映，不依赖复制数据。
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  await page.getByTestId("assignment-accession-select").selectOption("acc-tom-03");
+  await page.getByTestId("assign-bench-bench-east-2").click();
+  await page.getByText("台架分配成功", { exact: true }).waitFor();
+
+  await page.goto(`${baseUrl}/#/accessions/acc-tom-03`, {
+    waitUntil: "networkidle",
+  });
+  await page.getByTestId("dossier-acc-tom-03").waitFor();
+  await page.getByTestId("dossier-no-bench").waitFor({ state: "detached" });
+  await page.getByTestId("dossier-notice-UNASSIGNED").waitFor({
+    state: "detached",
+  });
+  await page.getByTestId("dossier-bench").getByText("E-2").waitFor();
+  await page.getByText("光照兼容", { exact: true }).waitFor();
+
+  // 同架材料链接可以定位到另一个只读档案。
+  await page.getByTestId("dossier-mate-acc-tom-01").click();
+  await page.getByTestId("dossier-acc-tom-01").waitFor();
+  await page.getByTestId("dossier-notice-FLAGS_OPEN").waitFor();
+  await page.getByText("HT_UNDER").first().waitFor();
 }
 
 async function runScenario(scenarioName) {
