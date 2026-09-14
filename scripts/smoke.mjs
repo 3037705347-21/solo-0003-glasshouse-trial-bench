@@ -14,6 +14,7 @@ const scenarios = {
   "curate-accession-roster": curateAccessionRoster,
   "assign-accession-bench": assignAccessionBench,
   "reserve-bench-capacity": reserveBenchCapacity,
+  "reserve-after-assignment": reserveAfterAssignment,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
 };
@@ -22,6 +23,7 @@ const scenarioPaths = {
   "curate-accession-roster": "/roster",
   "assign-accession-bench": "/layout",
   "reserve-bench-capacity": "/reservations",
+  "reserve-after-assignment": "/layout",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
 };
@@ -111,6 +113,60 @@ async function reserveBenchCapacity(page) {
   await page.getByRole("tab", { name: /失效/ }).click();
   await page.getByTestId(/^expand-reservation-/).first().click();
   await page.getByTestId("reservation-invalid-reasons").waitFor();
+}
+
+async function reserveAfterAssignment(page) {
+  // 回归：先分配材料、再登记预留。同试验先于预留占用的真实材料必须作为冲突方。
+  await page.getByTestId("assignment-accession-select").selectOption("acc-tom-03");
+  await page.getByTestId("assign-bench-bench-east-2").click();
+  await page.getByText("台架分配成功", { exact: true }).waitFor();
+  await page.getByTestId("bench-card-bench-east-2").getByText("Yellow Pear").waitFor();
+
+  // E-2 容量 4，Yellow Pear 已真实占 1 槽；登记 4 槽预留 → 5 > 4 冲突。
+  await page.goto(`${baseUrl}/#/reservations`, { waitUntil: "networkidle" });
+  await page.getByTestId("open-create-reservation").click();
+  await page.getByTestId("reservation-trial-select").selectOption("trial-sol-01");
+  await page.getByTestId("reservation-bench-select").selectOption("bench-east-2");
+  await page.getByTestId("reservation-slots-input").fill("4");
+  await page.getByTestId("save-reservation-button").click();
+  await page.getByText("存在冲突", { exact: false }).first().waitFor();
+
+  // 展开冲突预留：冲突详情必须指出同试验 SOL-01 先占的真实材料（不能为空）。
+  await page.getByRole("tab", { name: /冲突/ }).click();
+  await page.getByTestId(/^expand-reservation-/).first().click();
+  const conflictPanel = page.getByTestId("reservation-conflicts");
+  await conflictPanel.waitFor();
+  await conflictPanel.getByText("SOL-01").waitFor();
+  await conflictPanel.getByText("未消耗本预留").waitFor();
+
+  // 取消冲突预留不影响已实际分配的 Yellow Pear。
+  await page.getByTestId(/^cancel-reservation-/).first().click();
+  await page.getByText("预留已取消", { exact: true }).waitFor();
+
+  // 改登记 3 槽预留（1 真实 + 3 持有 = 4）→ 有效。
+  await page.getByRole("tab", { name: /全部/ }).click();
+  await page.getByTestId("open-create-reservation").click();
+  await page.getByTestId("reservation-trial-select").selectOption("trial-sol-01");
+  await page.getByTestId("reservation-bench-select").selectOption("bench-east-2");
+  await page.getByTestId("reservation-slots-input").fill("3");
+  await page.getByTestId("save-reservation-button").click();
+  await page.getByText("预留已登记", { exact: false }).first().waitFor();
+
+  // 已有预留消费逻辑不变：分配同试验的未分配材料必须消耗该预留。
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  await page.getByTestId("assignment-accession-select").selectOption("acc-tom-01");
+  await page.getByTestId("assign-bench-bench-east-2").click();
+  await page.getByText("消耗预留", { exact: false }).first().waitFor();
+  await page.getByTestId("bench-card-bench-east-2").getByText("Tiny Tim").waitFor();
+
+  // 取消已部分履约的预留：已分配的 Yellow Pear 与 Tiny Tim 仍留在台架。
+  await page.goto(`${baseUrl}/#/reservations`, { waitUntil: "networkidle" });
+  await page.getByTestId(/^cancel-reservation-/).first().click();
+  await page.getByText("预留已取消", { exact: true }).waitFor();
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  const card = page.getByTestId("bench-card-bench-east-2");
+  await card.getByText("Yellow Pear").waitFor();
+  await card.getByText("Tiny Tim").waitFor();
 }
 
 async function recordObservationPass(page) {

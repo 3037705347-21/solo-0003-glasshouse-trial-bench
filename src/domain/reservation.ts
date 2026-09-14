@@ -72,14 +72,37 @@ function realCountOn(
   }, 0);
 }
 
-/** 按试验归集某天台架上真实材料占用的试验编号。 */
+/** 该预留当前确实在架的履约材料 ID（未匹配到台架/材料的历史记录会被剔除）。 */
+function consumedAccessionsOnBench(
+  reservation: BenchReservation,
+  bench: Bench | undefined,
+): Set<string> {
+  if (!bench) {
+    return new Set();
+  }
+  return new Set(
+    reservation.consumedAccessionIds.filter((accessionId) =>
+      bench.assignedIds.includes(accessionId),
+    ),
+  );
+}
+
+/**
+ * 按试验归集某天台架上真实材料占用的试验编号。
+ * excludeAccessionIds 中的材料（通常是该预留自己已消耗的履约材料）不计入，
+ * 但同试验先于预留存在、未消耗预留的真实材料仍然作为竞争方保留。
+ */
 function realTrialGroupsOn(
   bench: Bench,
   state: WorkspaceState,
   date: string,
+  excludeAccessionIds: Set<string> = new Set(),
 ): Map<string, string> {
   const groups = new Map<string, string>();
   bench.assignedIds.forEach((accessionId) => {
+    if (excludeAccessionIds.has(accessionId)) {
+      return;
+    }
     const accession = state.accessions.find((item) => item.id === accessionId);
     if (!accession) {
       return;
@@ -274,7 +297,6 @@ function evaluateBench(
       held: heldAt(item.reservation, state, bench, date),
     }));
     const real = realCountOn(bench, state, date);
-    const realGroups = realTrialGroupsOn(bench, state, date);
 
     holdings.forEach(({ item, held }) => {
       if (held === 0) {
@@ -293,6 +315,17 @@ function evaluateBench(
         conflictGroups.set(id, []);
       }
       const ownTrial = item.reservation.trialId;
+      // 只排除该预留自己已消耗的履约材料；同试验其他在架真实材料仍会竞争容量。
+      const ownConsumed = consumedAccessionsOnBench(
+        item.reservation,
+        bench,
+      );
+      const realGroups = realTrialGroupsOn(
+        bench,
+        state,
+        date,
+        ownConsumed,
+      );
       holdings.forEach((entry) => {
         if (entry.item.reservation.id === id || entry.held === 0) {
           return;
@@ -310,15 +343,15 @@ function evaluateBench(
         }
       });
       realGroups.forEach((trialCode, trialId) => {
-        if (trialId === ownTrial) {
-          return;
-        }
-        const key = `trial:${trialId}`;
+        const isOwnTrial = trialId === ownTrial;
+        const key = `trial:${trialId}:${isOwnTrial ? "own" : "other"}`;
         if (!conflictMap.get(id)?.has(key)) {
           conflictMap.get(id)?.add(key);
           conflictGroups.get(id)?.push({
             kind: "trial",
-            label: `试验 ${trialCode} 已实际分配的材料`,
+            label: isOwnTrial
+              ? `试验 ${trialCode} 先于本预留占用的实际材料（未消耗本预留）`
+              : `试验 ${trialCode} 已实际分配的材料`,
           });
         }
       });
@@ -845,6 +878,16 @@ export function planAssignment(
 
   // 汇总容量突破当天的重叠预留/试验，给出明确冲突方。
   const blockerLabels = new Map<string, ReservationConflictGroup>();
+  const consumedOnBench = new Set(
+    state.reservations
+      .filter(
+        (reservation) =>
+          reservation.benchId === bench.id &&
+          reservation.status !== "cancelled",
+      )
+      .flatMap((reservation) => reservation.consumedAccessionIds)
+      .filter((accessionId) => bench.assignedIds.includes(accessionId)),
+  );
   days.forEach((date) => {
     const real = realCountOn(bench, state, date);
     const holdings = [...evaluations.values()]
@@ -873,15 +916,20 @@ export function planAssignment(
         label: `预留 ${current.reservation.code}（试验 ${trial?.code ?? "未知"}）`,
       });
     });
-    realTrialGroupsOn(bench, state, date).forEach((trialCode, trialId) => {
-      if (trialId === accession.trialId) {
-        return;
-      }
-      blockerLabels.set(`trial:${trialId}`, {
-        kind: "trial",
-        label: `试验 ${trialCode} 已实际分配的材料`,
-      });
-    });
+    realTrialGroupsOn(bench, state, date, consumedOnBench).forEach(
+      (trialCode, trialId) => {
+        const isOwnTrial = trialId === accession.trialId;
+        blockerLabels.set(
+          `trial:${trialId}:${isOwnTrial ? "own" : "other"}`,
+          {
+            kind: "trial",
+            label: isOwnTrial
+              ? `试验 ${trialCode} 已在该台架上的实际材料（未消耗预留）`
+              : `试验 ${trialCode} 已实际分配的材料`,
+          },
+        );
+      },
+    );
   });
 
   return fail([
