@@ -7,6 +7,13 @@ import type {
   Trial,
   WorkspaceState,
 } from "../domain/types";
+import { isBenchCompatible } from "../domain/rules";
+
+export type AccessionPlacementStatus =
+  | "assigned"
+  | "unassigned"
+  | "blocked"
+  | "light-conflict";
 
 export function trialById(
   state: WorkspaceState,
@@ -38,6 +45,22 @@ export function benchForAccession(
   return state.benches.find((bench) =>
     bench.assignedIds.includes(accessionId),
   );
+}
+
+/**
+ * 列出当前处于光照冲突中的台架分配。
+ */
+export function lightConflicts(
+  state: WorkspaceState,
+): Array<{ accession: Accession; bench: Bench }> {
+  const conflicts: Array<{ accession: Accession; bench: Bench }> = [];
+  state.accessions.forEach((accession) => {
+    const bench = benchForAccession(state, accession.id);
+    if (bench && !isBenchCompatible(accession, bench)) {
+      conflicts.push({ accession, bench });
+    }
+  });
+  return conflicts;
 }
 
 export function openFlagsForTrial(
@@ -84,12 +107,16 @@ export function benchUtilization(
 export function accessionStatus(
   state: WorkspaceState,
   accession: Accession,
-): "assigned" | "unassigned" | "blocked" {
+): AccessionPlacementStatus {
   const bench = benchForAccession(state, accession.id);
   if (!bench) {
     return "unassigned";
   }
-  return bench.status === "blocked" || bench.status === "quarantine"
-    ? "blocked"
-    : "assigned";
+  if (bench.status === "blocked" || bench.status === "quarantine") {
+    return "blocked";
+  }
+  if (!isBenchCompatible(accession, bench)) {
+    return "light-conflict";
+  }
+  return "assigned";
 }

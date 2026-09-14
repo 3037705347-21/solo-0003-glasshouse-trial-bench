@@ -6,6 +6,7 @@ import type {
   WorkspaceState,
 } from "./types";
 import { createId } from "./id";
+import { isBenchCompatible, lightProfileLabel } from "./rules";
 
 export function buildClearanceSnapshot(
   state: WorkspaceState,
@@ -22,12 +23,30 @@ export function buildClearanceSnapshot(
     (flag) => flag.trialId === trialId && flag.state === "open",
   );
   const blockers: ClearanceBlocker[] = [];
+  const lightConflicts: Array<{ accessionId: string; benchCode: string }> = [];
   accessions.forEach((accession) => {
     if (!assignedIds.has(accession.id)) {
       blockers.push({
         code: "UNASSIGNED",
         message: `${accession.accessionNo} has no bench assignment`,
         accessionId: accession.id,
+      });
+      return;
+    }
+    const bench = state.benches.find((item) =>
+      item.assignedIds.includes(accession.id),
+    );
+    if (bench && !isBenchCompatible(accession, bench)) {
+      lightConflicts.push({ accessionId: accession.id, benchCode: bench.code });
+      blockers.push({
+        code: "LIGHT_CONFLICT",
+        message: `${accession.accessionNo} 需要${lightProfileLabel(
+          accession.preferredLight,
+        )}光照，但仍在 ${bench.code}（${lightProfileLabel(
+          bench.lightProfile,
+        )}）上，请将其移出台架后重新分配`,
+        accessionId: accession.id,
+        benchId: bench.id,
       });
     }
   });
@@ -67,8 +86,21 @@ export function buildClearanceSnapshot(
     },
     {
       label: "已分配",
-      value: accessions.filter((item) => assignedIds.has(item.id)).length,
-      detail: "已放置到台架的材料数",
+      value: accessions.filter(
+        (item) =>
+          assignedIds.has(item.id) &&
+          !lightConflicts.some((conflict) => conflict.accessionId === item.id),
+      ).length,
+      detail: "已放置到光照兼容台架的材料数",
+    },
+    {
+      label: "光照冲突",
+      value: lightConflicts.length,
+      detail: lightConflicts.length
+        ? `材料光照与台架不一致：${lightConflicts
+            .map((conflict) => conflict.benchCode)
+            .join("、")}，需移出后重新分配`
+        : "材料光照与所在台架保持一致",
     },
     {
       label: "未处理标记",

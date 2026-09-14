@@ -1,10 +1,10 @@
-import { ArrowRight, ListPlus } from "lucide-react";
+import { ArrowRight, ListPlus, TriangleAlert } from "lucide-react";
 import { SelectField } from "../../components/fields";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
-import type { Accession, Bench } from "../../domain/types";
-import { accessionStatus } from "../../state/selectors";
-import type { WorkspaceState } from "../../domain/types";
+import type { Accession, WorkspaceState } from "../../domain/types";
+import { accessionStatus, benchForAccession } from "../../state/selectors";
 import { canAssignAccession } from "../../domain/bench";
+import { isBenchCompatible, lightProfileLabel } from "../../domain/rules";
 
 interface AssignmentPanelProps {
   state: WorkspaceState;
@@ -28,6 +28,25 @@ export function AssignmentPanel({
   const compatibleBenches = selected
     ? state.benches.filter((bench) => canAssignAccession(selected, bench))
     : [];
+  const selectedBench = selected
+    ? benchForAccession(state, selected.id)
+    : undefined;
+  const selectedHasConflict = Boolean(
+    selected && selectedBench && !isBenchCompatible(selected, selectedBench),
+  );
+
+  const statusLabel = (status: ReturnType<typeof accessionStatus>): string => {
+    if (status === "assigned") {
+      return "已分配";
+    }
+    if (status === "blocked") {
+      return "受限";
+    }
+    if (status === "light-conflict") {
+      return "光照冲突";
+    }
+    return "未分配";
+  };
 
   return (
     <aside className="assignment-panel">
@@ -54,18 +73,36 @@ export function AssignmentPanel({
           <div className="assignment-details">
             <span>{selected.accessionNo}</span>
             <StatusBadge tone={statusTone(accessionStatus(state, selected))}>
-              {accessionStatus(state, selected) === "assigned"
-                ? "已分配"
-                : accessionStatus(state, selected) === "blocked"
-                  ? "受限"
-                  : "未分配"}
+              {statusLabel(accessionStatus(state, selected))}
             </StatusBadge>
           </div>
           <p>{selected.genotypeNote}</p>
+          {selectedHasConflict && selectedBench ? (
+            <div
+              className="assignment-conflict"
+              role="alert"
+              data-testid="assignment-conflict"
+            >
+              <TriangleAlert size={16} aria-hidden="true" />
+              <div>
+                <strong>
+                  仍在 {selectedBench.code}（
+                  {lightProfileLabel(selectedBench.lightProfile)}）上
+                </strong>
+                <p>
+                  材料需要{lightProfileLabel(selected.preferredLight)}
+                  光照，与当前台架不兼容。请先在右侧台架卡片上把它移出
+                  {selectedBench.code}，再重新分配。
+                </p>
+              </div>
+            </div>
+          ) : null}
           <div className="assignment-compatible">
             <ArrowRight size={16} aria-hidden="true" />
             <span>
-              可分配到 {compatibleBenches.length} 个台架
+              {selectedHasConflict
+                ? `移出后可分配到 ${compatibleBenches.length} 个兼容台架`
+                : `可分配到 ${compatibleBenches.length} 个台架`}
             </span>
           </div>
         </div>

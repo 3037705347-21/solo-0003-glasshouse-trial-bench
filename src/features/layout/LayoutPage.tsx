@@ -1,9 +1,14 @@
 import { useMemo, useState } from "react";
-import { Grid3X3 } from "lucide-react";
+import { Grid3X3, TriangleAlert } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import { assignAccession, releaseAccession } from "../../domain/bench";
-import { accessionById, accessionsForTrial } from "../../state/selectors";
+import { lightProfileLabel } from "../../domain/rules";
+import {
+  accessionById,
+  accessionsForTrial,
+  lightConflicts,
+} from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { AssignmentPanel } from "./AssignmentPanel";
 import { BenchCard } from "./BenchCard";
@@ -24,6 +29,7 @@ export function LayoutPage() {
 
   const accessions = accessionsForTrial(state, trialId);
   const selectedAccession = accessionById(state, selectedAccessionId);
+  const conflicts = lightConflicts(state);
 
   const sortedBenches = useMemo(
     () =>
@@ -103,6 +109,31 @@ export function LayoutPage() {
           ))}
         </select>
       </section>
+      {conflicts.length > 0 ? (
+        <section
+          className="conflict-banner"
+          role="alert"
+          data-testid="layout-conflict-banner"
+        >
+          <TriangleAlert size={18} aria-hidden="true" />
+          <div>
+            <strong>
+              {conflicts.length} 个材料的光照条件与所在台架不一致
+            </strong>
+            <ul>
+              {conflicts.map(({ accession, bench }) => (
+                <li key={accession.id}>
+                  {accession.accessionNo} {accession.cultivar} 需要
+                  {lightProfileLabel(accession.preferredLight)}
+                  ，但仍在 {bench.code}（
+                  {lightProfileLabel(bench.lightProfile)}
+                  ）上——请将其移出台架后重新分配。
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      ) : null}
       <div className="layout-workspace">
         <AssignmentPanel
           state={state}
@@ -121,7 +152,7 @@ export function LayoutPage() {
               <BenchCard
                 key={bench.id}
                 bench={bench}
-                accessions={accessions}
+                accessions={state.accessions}
                 selectedAccession={selectedAccession}
                 onAssign={handleAssign}
                 onRelease={handleRelease}

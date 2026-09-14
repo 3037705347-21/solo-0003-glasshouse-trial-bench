@@ -25,7 +25,7 @@ export function statusTone(
     return "info";
   }
   if (
-    ["blocked", "quarantine", "open", "受限", "隔离", "未处理", "严重"].includes(
+    ["blocked", "quarantine", "open", "light-conflict", "受限", "隔离", "未处理", "严重", "光照冲突"].includes(
       value,
     )
   ) {

@@ -494,6 +494,48 @@ button {
   grid-column: span 2;
 }
 
+.form-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.form-notice svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.form-notice strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.form-notice p {
+  margin: 0;
+}
+
+.form-notice-danger {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.form-notice-info {
+  border-color: var(--line-strong);
+  background: var(--blue-100);
+  color: var(--blue-700);
+}
+
+.conflict-text {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 .editor-form {
   display: grid;
   gap: 22px;
@@ -844,6 +886,72 @@ button {
   margin: 0;
   color: var(--danger);
   font-size: 12px;
+}
+
+.bench-card-conflict {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgba(181, 58, 50, 0.12);
+}
+
+.bench-accession-row-conflict {
+  border: 1px solid var(--danger);
+  background: var(--danger-soft);
+}
+
+.bench-accession-conflict {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 4px !important;
+  color: var(--danger) !important;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.conflict-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 18px;
+  padding: 12px 16px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.conflict-banner svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.conflict-banner ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.assignment-conflict {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.assignment-conflict svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.assignment-conflict p {
+  margin: 2px 0 0;
 }
 
 .observation-workspace {

@@ -1,9 +1,10 @@
-import { Check, X } from "lucide-react";
+import { Check, TriangleAlert, X } from "lucide-react";
 import { Button } from "../../components/Button";
 import { ProgressBar } from "../../components/ProgressBar";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { Accession, Bench } from "../../domain/types";
 import { canAssignAccession } from "../../domain/bench";
+import { isBenchCompatible, lightProfileLabel } from "../../domain/rules";
 
 interface BenchCardProps {
   bench: Bench;
@@ -27,10 +28,16 @@ export function BenchCard({
   const compatible = Boolean(
     selectedAccession && canAssignAccession(selectedAccession, bench),
   );
+  const conflicting = assigned.filter(
+    (accession) => !isBenchCompatible(accession, bench),
+  );
+  const hasConflict = conflicting.length > 0;
 
   return (
     <article
-      className={`bench-card ${compatible ? "bench-card-compatible" : ""}`}
+      className={`bench-card ${compatible ? "bench-card-compatible" : ""} ${
+        hasConflict ? "bench-card-conflict" : ""
+      }`}
       data-testid={`bench-card-${bench.id}`}
     >
       <header className="bench-card-header">
@@ -77,28 +84,55 @@ export function BenchCard({
         {assigned.length === 0 ? (
           <p className="muted-copy">暂无分配材料。</p>
         ) : (
-          assigned.map((accession) => (
-            <div className="bench-accession-row" key={accession.id}>
-              <div>
-                <strong>{accession.cultivar}</strong>
-                <span>{accession.accessionNo}</span>
-              </div>
-              <Button
-                tone="ghost"
-                size="sm"
-                className="icon-button"
-                onClick={() => onRelease(accession.id, bench.id)}
-                aria-label={`将 ${accession.cultivar} 从台架 ${bench.code} 移出`}
+          assigned.map((accession) => {
+            const rowConflict = !isBenchCompatible(accession, bench);
+            return (
+              <div
+                className={`bench-accession-row ${
+                  rowConflict ? "bench-accession-row-conflict" : ""
+                }`}
+                key={accession.id}
+                data-testid={`bench-row-${accession.id}`}
               >
-                <X size={16} />
-              </Button>
-            </div>
-          ))
+                <div>
+                  <strong>{accession.cultivar}</strong>
+                  <span>{accession.accessionNo}</span>
+                  {rowConflict ? (
+                    <span
+                      className="bench-accession-conflict"
+                      data-testid={`bench-light-conflict-${accession.id}`}
+                    >
+                      <TriangleAlert size={12} aria-hidden="true" />
+                      材料需{lightProfileLabel(
+                        accession.preferredLight,
+                      )}，台架为{lightProfileLabel(
+                        bench.lightProfile,
+                      )}，光照冲突，请移出
+                    </span>
+                  ) : null}
+                </div>
+                <Button
+                  tone="ghost"
+                  size="sm"
+                  className="icon-button"
+                  onClick={() => onRelease(accession.id, bench.id)}
+                  aria-label={`将 ${accession.cultivar} 从台架 ${bench.code} 移出`}
+                >
+                  <X size={16} />
+                </Button>
+              </div>
+            );
+          })
         )}
       </div>
       <footer className="bench-card-footer">
         {bench.status === "blocked" ? (
           <p className="bench-reason">{bench.blockedReason}</p>
+        ) : null}
+        {hasConflict ? (
+          <p className="bench-reason" data-testid={`bench-conflict-summary-${bench.id}`}>
+            {conflicting.length} 个材料与台架光照不兼容，需移出后重新分配
+          </p>
         ) : null}
         <Button
           tone="secondary"

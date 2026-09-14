@@ -32,6 +32,12 @@ node scripts/smoke.mjs advance-trial-clearance
 
 每条命令都会启动并关闭一个本地 Vite 预览服务，端口为 `4177`。检查过程不调用外部服务，也不依赖在线数据库。
 
+编辑已分配材料的光照条件后，台架一致性可通过以下脚本一次性验证四种组合（已分配/未分配 × 兼容/不兼容光照），预览端口为 `4178`：
+
+```bash
+node scripts/verify-light-consistency.mjs
+```
+
 ## 目录结构
 
 ```text

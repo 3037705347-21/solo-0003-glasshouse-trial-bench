@@ -33,6 +33,16 @@ export function isBenchCompatible(accession: Accession, bench: Bench): boolean {
   );
 }
 
+export function lightProfileLabel(light: PreferredLight): string {
+  if (light === "full-sun") {
+    return "全日照";
+  }
+  if (light === "partial-shade") {
+    return "半阴";
+  }
+  return "遮阴";
+}
+
 export function normalizeLabels(labels: string[]): string[] {
   return Array.from(
     new Set(

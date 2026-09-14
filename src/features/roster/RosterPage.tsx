@@ -12,6 +12,7 @@ import {
   accessionMatchesQuery,
   nextAccessionNumber,
 } from "../../domain/accession";
+import { isBenchCompatible } from "../../domain/rules";
 import type { Accession } from "../../domain/types";
 import {
   accessionById,
@@ -49,7 +50,8 @@ export function RosterPage() {
       .filter((accession) => {
         const status = accessionStatus(state, accession);
         if (segment === "assigned") {
-          return status === "assigned";
+          // 光照冲突的材料物理上仍占用台架，归入“已分配”视图
+          return status === "assigned" || status === "light-conflict";
         }
         if (segment === "unassigned") {
           return status === "unassigned";
@@ -98,7 +100,20 @@ export function RosterPage() {
       header: "台架",
       render: (accession) => {
         const bench = benchForAccession(state, accession.id);
-        return bench ? bench.code : "未分配";
+        if (!bench) {
+          return "未分配";
+        }
+        const conflict = !isBenchCompatible(accession, bench);
+        return conflict ? (
+          <span
+            className="conflict-text"
+            data-testid={`bench-conflict-${accession.id}`}
+          >
+            {bench.code}（光照冲突，需移出）
+          </span>
+        ) : (
+          bench.code
+        );
       },
     },
     {
@@ -111,7 +126,9 @@ export function RosterPage() {
             ? "已分配"
             : status === "blocked"
               ? "受限"
-              : "未分配";
+              : status === "light-conflict"
+                ? "光照冲突"
+                : "未分配";
         return <StatusBadge tone={statusTone(label)}>{label}</StatusBadge>;
       },
     },
@@ -212,17 +229,28 @@ export function RosterPage() {
             nextAccessionNo={nextAccessionNumber(state)}
             accession={editingAccession}
             onCancel={() => setEditorOpen(false)}
-            onSaved={() => {
+            onSaved={(outcome) => {
+              const wasEditing = Boolean(editingAccession);
               setEditorOpen(false);
-              pushToast({
-                tone: "success",
-                title: editingAccession
-                  ? "材料已更新"
-                  : "材料已创建",
-                message: editingAccession
-                  ? `${editingAccession.accessionNo} 已更新。`
-                  : "该材料现在可以分配到台架。",
-              });
+              if (wasEditing && outcome.lightConflict) {
+                pushToast({
+                  tone: "warning",
+                  title: "材料已更新，但与台架光照冲突",
+                  message: `该材料需要从台架 ${
+                    outcome.benchCode ?? ""
+                  } 移出，再重新分配到光照兼容的台架；布局页和放行检查已标记该冲突。`,
+                });
+              } else {
+                pushToast({
+                  tone: "success",
+                  title: wasEditing ? "材料已更新" : "材料已创建",
+                  message: wasEditing
+                    ? outcome.benchCode
+                      ? `光照与台架 ${outcome.benchCode} 保持兼容，无需移动。`
+                      : `${editingAccession?.accessionNo ?? ""} 已更新。`
+                    : "该材料现在可以分配到台架。",
+                });
+              }
             }}
           />
         ) : (
