@@ -97,6 +97,14 @@ async function advanceTrialClearance(page) {
 
 const STORAGE_KEY = "glasshouse-trial-bench:workspace:v1";
 
+async function editAccessionSource(page, accessionId, source) {
+  await page.goto(`${baseUrl}/#/roster`, { waitUntil: "networkidle" });
+  await page.getByTestId(`edit-accession-${accessionId}`).click();
+  await page.getByLabel("来源").fill(source);
+  await page.getByTestId("save-accession-button").click();
+  await page.getByText("材料已更新", { exact: true }).first().waitFor();
+}
+
 async function storedWorkspace(page) {
   const raw = await page.evaluate((key) => window.localStorage.getItem(key), STORAGE_KEY);
   return JSON.parse(raw).state;
@@ -136,6 +144,9 @@ async function reviewSnapshotLedger(page) {
   await page.getByTestId("flag-resolution-note").fill("复测已恢复正常。");
   await page.getByTestId("resolve-flag").click();
   await page.getByText("该试验没有未处理的标记。").waitFor();
+
+  // 3b. 回归验证：修改材料来源后，所有历史快照都必须变“已过期”
+  await editAccessionSource(page, "acc-tom-01", "Pioneer Seed Lab (2026 更新批次)");
   await page.goto(`${baseUrl}/#/clearance`, { waitUntil: "networkidle" });
   await delay(1100);
   await page.getByTestId("generate-clearance").click();
@@ -159,15 +170,20 @@ async function reviewSnapshotLedger(page) {
   await page.getByText("没有匹配的快照").waitFor();
   await page.getByTestId("ledger-result-filter").selectOption("all");
 
-  // 7. 按时效筛选：处理标记后最早两份必然过期
+  // 7. 按时效筛选：标记处理 + 来源修改后，最早两份必然过期
   await page.getByTestId("ledger-freshness-filter").selectOption("stale");
   const staleCount = await rows.count();
   if (staleCount !== 2) {
     throw new Error(`预期 2 份过期快照，实际 ${staleCount} 份`);
   }
+  // 过期原因必须具体到材料来源的变化，而不是笼统标记（两份旧快照都应出现）
+  await page
+    .getByText(/来源：Pioneer Seed Lab → Pioneer Seed Lab \(2026 更新批次\)/)
+    .first()
+    .waitFor();
   await page.getByTestId("ledger-freshness-filter").selectOption("all");
 
-  // 8. 打开最早的过期快照，引用关系显示标记的当时/当前对比
+  // 8. 打开最早的过期快照，引用关系显示标记与材料来源的当时/当前对比
   await page
     .locator('[data-testid^="ledger-row-"]')
     .last()
@@ -177,6 +193,12 @@ async function reviewSnapshotLedger(page) {
   const dialog = page.getByRole("dialog");
   await dialog.getByText("当时：未处理").first().waitFor();
   await dialog.getByText("当前：已解决").first().waitFor();
+  // 旧快照冻结旧来源，当前来源单独展示，且该行被标记为已变化
+  const changedAccession = dialog.locator('[data-testid="ref-材料-acc-tom-01"]');
+  await changedAccession.getByText("当时来源：Pioneer Seed Lab；台架 E-1").waitFor();
+  await changedAccession.getByText(/当前来源：Pioneer Seed Lab \(2026 更新批次\)/).waitFor();
+  await changedAccession.getByText("ACC-0001 · Tiny Tim").waitFor();
+  await changedAccession.getByText("已变化", { exact: true }).waitFor();
   // 历史快照内容本身不变：指标仍记录当时的未处理标记数
   await dialog.getByText("未处理标记", { exact: true }).waitFor();
 

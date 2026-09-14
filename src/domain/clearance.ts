@@ -43,6 +43,9 @@ function captureAccessions(state: WorkspaceState, trialId: string) {
       preferredLight: accession.preferredLight,
       assignedBenchId: benchByAccession.get(accession.id),
       labels: [...accession.labels],
+      propagatedOn: accession.propagatedOn,
+      trayCells: accession.trayCells,
+      genotypeNote: accession.genotypeNote,
     }));
 }
 

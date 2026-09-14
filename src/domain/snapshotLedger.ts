@@ -101,6 +101,24 @@ function compareTrial(
   }
 }
 
+/** 旧快照可能没有冻结较新加入的字段，缺失时不参与差异判断。 */
+function pushChangedField(
+  changes: string[],
+  label: string,
+  frozen: unknown,
+  live: unknown,
+  render?: (frozenValue: unknown, liveValue: unknown) => string,
+): void {
+  if (frozen === undefined || frozen === live) {
+    return;
+  }
+  changes.push(
+    render
+      ? render(frozen, live)
+      : `${label}：${String(frozen)} → ${String(live)}`,
+  );
+}
+
 function compareAccession(
   frozen: SnapshotAccessionRef,
   live: Accession | undefined,
@@ -115,22 +133,25 @@ function compareAccession(
     });
     return;
   }
+  // 材料表单中所有可编辑字段都必须参与比对：
+  // 编号、品种、来源、繁殖日期、数量、穴盘规格、适宜光照、标签、基因型说明。
   const changes: string[] = [];
-  if (frozen.accessionNo !== live.accessionNo) {
-    changes.push(`编号：${frozen.accessionNo} → ${live.accessionNo}`);
-  }
-  if (frozen.cultivar !== live.cultivar) {
-    changes.push(`品种：${frozen.cultivar} → ${live.cultivar}`);
-  }
-  if (frozen.quantity !== live.quantity) {
-    changes.push(`数量：${frozen.quantity} → ${live.quantity}`);
-  }
-  if (frozen.preferredLight !== live.preferredLight) {
-    changes.push("适宜光照已修改");
-  }
+  pushChangedField(changes, "编号", frozen.accessionNo, live.accessionNo);
+  pushChangedField(changes, "品种", frozen.cultivar, live.cultivar);
+  pushChangedField(changes, "来源", frozen.source, live.source);
+  pushChangedField(changes, "繁殖日期", frozen.propagatedOn, live.propagatedOn);
+  pushChangedField(changes, "数量", frozen.quantity, live.quantity);
+  pushChangedField(changes, "穴盘规格", frozen.trayCells, live.trayCells, (before, after) =>
+    `穴盘规格：${before} 孔 → ${after} 孔`);
+  pushChangedField(changes, "适宜光照", frozen.preferredLight, live.preferredLight, () =>
+    "适宜光照已修改");
   if (!sameSet(frozen.labels, live.labels)) {
-    changes.push("标签已修改");
+    changes.push(
+      `标签：${frozen.labels.join("、") || "（无）"} → ${live.labels.join("、") || "（无）"}`,
+    );
   }
+  pushChangedField(changes, "基因型说明", frozen.genotypeNote, live.genotypeNote, () =>
+    "基因型 / 批次说明已修改");
   if (changes.length > 0) {
     drifts.push({
       kind: "ACCESSION_CHANGED",
@@ -401,11 +422,13 @@ export function resolveSnapshotReferences(
     return {
       id: frozen.id,
       title: `${frozen.accessionNo} · ${frozen.cultivar}`,
-      subtitle: `${frozen.source} · ${frozen.quantity} 株`,
+      subtitle: `${frozen.source} · ${frozen.quantity} 株${
+        frozen.trayCells !== undefined ? ` · ${frozen.trayCells} 孔` : ""
+      }`,
       status: !live ? "missing" : drift ? "changed" : "unchanged",
-      frozenText: `当时：${frozenBenchCode(capture, frozen.assignedBenchId)}`,
+      frozenText: `当时来源：${frozen.source}；${frozenBenchCode(capture, frozen.assignedBenchId)}`,
       liveText: live
-        ? `当前：${live.quantity} 株；${accessionBenchText(benchOfAccession(state, frozen.id))}`
+        ? `当前来源：${live.source}；${live.quantity} 株；${accessionBenchText(benchOfAccession(state, frozen.id))}`
         : "当前：材料已不存在",
       driftDetail: drift?.detail,
     };

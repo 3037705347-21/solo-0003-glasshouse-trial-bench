@@ -111,6 +111,10 @@ export interface SnapshotAccessionRef {
   preferredLight: PreferredLight;
   assignedBenchId?: string;
   labels: string[];
+  // 早于本次修订生成的快照里没有以下字段，比对时按“未知、不判差异”处理。
+  propagatedOn?: string;
+  trayCells?: number;
+  genotypeNote?: string;
 }
 
 export interface SnapshotBenchRef {
