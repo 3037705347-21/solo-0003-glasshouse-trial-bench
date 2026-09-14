@@ -2,24 +2,18 @@ import type { Accession, Bench, PreferredLight } from "./types";
 import { BENCH_LIGHT_COMPATIBILITY } from "./rules";
 import { fail, fieldError, ok, type Result } from "./result";
 
-export function canAssignAccession(accession: Accession, bench: Bench): boolean {
-  if (bench.status === "blocked" || bench.status === "quarantine") {
-    return false;
-  }
-  if (bench.assignedIds.includes(accession.id)) {
-    return false;
-  }
-  if (bench.assignedIds.length >= bench.capacity) {
-    return false;
-  }
-  return BENCH_LIGHT_COMPATIBILITY[accession.preferredLight].includes(
-    bench.lightProfile,
-  );
+export function canAssignAccession(
+  accession: Accession,
+  bench: Bench,
+  benches: Bench[],
+): boolean {
+  return validateBenchAssignment(accession, bench, benches).ok;
 }
 
 export function validateBenchAssignment(
   accession: Accession,
   bench: Bench,
+  benches: Bench[],
 ): Result<{ accessionId: string; benchId: string }> {
   if (bench.status === "blocked") {
     return fail([
@@ -36,6 +30,16 @@ export function validateBenchAssignment(
         "benchId",
         "quarantine",
         `台架 ${bench.code} 正在隔离`,
+      ),
+    ]);
+  }
+  const occupyingBench = findBenchForAccession(benches, accession);
+  if (occupyingBench && occupyingBench.id !== bench.id) {
+    return fail([
+      fieldError(
+        "benchId",
+        "assigned_elsewhere",
+        `${accession.cultivar} 已分配到台架 ${occupyingBench.code}，一个材料同一时间只能占据一个台架，请先移出后再分配`,
       ),
     ]);
   }
@@ -76,8 +80,9 @@ export function validateBenchAssignment(
 export function assignAccession(
   accession: Accession,
   bench: Bench,
+  benches: Bench[],
 ): Result<Bench> {
-  const validated = validateBenchAssignment(accession, bench);
+  const validated = validateBenchAssignment(accession, bench, benches);
   if (!validated.ok) {
     return validated;
   }

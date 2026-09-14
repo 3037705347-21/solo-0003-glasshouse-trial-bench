@@ -39,7 +39,7 @@ export function LayoutPage() {
     if (!accession || !bench) {
       return;
     }
-    const result = assignAccession(accession, bench);
+    const result = assignAccession(accession, bench, state.benches);
     if (!result.ok) {
       pushToast({
         tone: "error",
@@ -121,6 +121,7 @@ export function LayoutPage() {
               <BenchCard
                 key={bench.id}
                 bench={bench}
+                benches={state.benches}
                 accessions={accessions}
                 selectedAccession={selectedAccession}
                 onAssign={handleAssign}

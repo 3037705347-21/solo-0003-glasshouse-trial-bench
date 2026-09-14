@@ -2,7 +2,7 @@ import { ArrowRight, ListPlus } from "lucide-react";
 import { SelectField } from "../../components/fields";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { Accession, Bench } from "../../domain/types";
-import { accessionStatus } from "../../state/selectors";
+import { accessionStatus, benchForAccession } from "../../state/selectors";
 import type { WorkspaceState } from "../../domain/types";
 import { canAssignAccession } from "../../domain/bench";
 
@@ -26,8 +26,13 @@ export function AssignmentPanel({
     (accession) => accession.id === selectedAccessionId,
   );
   const compatibleBenches = selected
-    ? state.benches.filter((bench) => canAssignAccession(selected, bench))
+    ? state.benches.filter((bench) =>
+        canAssignAccession(selected, bench, state.benches),
+      )
     : [];
+  const currentBench = selected
+    ? benchForAccession(state, selected.id)
+    : undefined;
 
   return (
     <aside className="assignment-panel">
@@ -65,7 +70,9 @@ export function AssignmentPanel({
           <div className="assignment-compatible">
             <ArrowRight size={16} aria-hidden="true" />
             <span>
-              可分配到 {compatibleBenches.length} 个台架
+              {currentBench
+                ? `已分配至 ${currentBench.code}，需先移出才能分配到其他台架`
+                : `可分配到 ${compatibleBenches.length} 个台架`}
             </span>
           </div>
         </div>

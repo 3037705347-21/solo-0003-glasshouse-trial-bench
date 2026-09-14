@@ -7,6 +7,7 @@ import { canAssignAccession } from "../../domain/bench";
 
 interface BenchCardProps {
   bench: Bench;
+  benches: Bench[];
   accessions: Accession[];
   selectedAccession?: Accession;
   onAssign: (accessionId: string, benchId: string) => void;
@@ -15,6 +16,7 @@ interface BenchCardProps {
 
 export function BenchCard({
   bench,
+  benches,
   accessions,
   selectedAccession,
   onAssign,
@@ -25,7 +27,7 @@ export function BenchCard({
   );
   const freeSlots = Math.max(0, bench.capacity - assigned.length);
   const compatible = Boolean(
-    selectedAccession && canAssignAccession(selectedAccession, bench),
+    selectedAccession && canAssignAccession(selectedAccession, bench, benches),
   );
 
   return (
