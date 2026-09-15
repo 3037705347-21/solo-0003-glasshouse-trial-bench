@@ -5,7 +5,8 @@ import { SelectField, TextField } from "../../components/fields";
 import type { ObservationEntry } from "../../domain/types";
 import type { ObservationDraft } from "../../domain/observation";
 import type { FieldError } from "../../domain/result";
-import { createObservationPass, deriveFlags } from "../../domain/observation";
+import { createObservationPass } from "../../domain/observation";
+import { recordObservationFlags } from "../../domain/flag";
 import { todayDateOnly } from "../../domain/rules";
 import { activeAccessionsForTrial } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
@@ -76,8 +77,17 @@ export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
       setErrors(result.errors);
       return;
     }
-    const flags = deriveFlags(result.value, state.accessions);
-    dispatch({ type: "observation/recorded", pass: result.value, flags });
+    const outcome = recordObservationFlags(
+      result.value,
+      state.accessions,
+      state.flags,
+    );
+    dispatch({
+      type: "observation/recorded",
+      pass: result.value,
+      flags: outcome.flags,
+      updatedFlags: outcome.updatedFlags,
+    });
     onSaved();
   };
 

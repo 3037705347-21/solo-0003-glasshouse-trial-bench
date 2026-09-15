@@ -7,10 +7,7 @@ import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import type { ObservationPass } from "../../domain/types";
 import { isAccessionRetired } from "../../domain/accession";
-import {
-  openFlagsForTrial,
-  passesForTrial,
-} from "../../state/selectors";
+import { flagsForTrial, passesForTrial } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { FlagPanel } from "./FlagPanel";
 import { PassForm } from "./PassForm";
@@ -21,7 +18,7 @@ export function ObservationPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const passes = passesForTrial(state, trialId);
-  const flags = openFlagsForTrial(state, trialId);
+  const flags = flagsForTrial(state, trialId);
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -120,7 +117,7 @@ export function ObservationPage() {
             </div>
           )}
         </section>
-        <FlagPanel flags={flags} />
+        <FlagPanel key={trialId} flags={flags} />
       </div>
       <Dialog
         open={dialogOpen}

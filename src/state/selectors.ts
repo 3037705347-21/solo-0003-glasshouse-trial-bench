@@ -77,13 +77,13 @@ export function benchForAccession(
   );
 }
 
-export function openFlagsForTrial(
+export function flagsForTrial(
   state: WorkspaceState,
   trialId: string,
 ): Flag[] {
-  return state.flags.filter(
-    (flag) => flag.trialId === trialId && flag.state === "open",
-  );
+  return state.flags
+    .filter((flag) => flag.trialId === trialId)
+    .sort((left, right) => right.createdOn.localeCompare(left.createdOn));
 }
 
 export function passesForTrial(

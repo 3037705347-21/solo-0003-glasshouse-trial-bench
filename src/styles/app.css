@@ -907,9 +907,12 @@ button {
   display: grid;
   justify-items: center;
   gap: 7px;
-  padding: 24px;
+  padding: 36px 24px;
   color: var(--text-muted);
   text-align: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
 .flag-list {
@@ -928,6 +931,7 @@ button {
   background: transparent;
   color: var(--text-muted);
   font-size: 12px;
+  flex-wrap: wrap;
 }
 
 .flag-list-item-active {
@@ -956,6 +960,129 @@ button {
 .flag-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.flag-panel-heading {
+  justify-content: flex-start;
+}
+
+.flag-editor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.flag-relation {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  color: var(--rust-700);
+}
+
+.flag-prior-conclusion {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--rust-700);
+  border-radius: 6px;
+  background: #fcf7f1;
+  display: grid;
+  gap: 4px;
+}
+
+.flag-prior-conclusion span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rust-700);
+}
+
+.flag-prior-conclusion p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.flag-followup-zone {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+
+.flag-history {
+  display: grid;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.flag-history-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.flag-history ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.flag-history li {
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+  display: grid;
+  gap: 3px;
+}
+
+.flag-history li > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flag-history time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.flag-history li p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.clearance-drift {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #d8b48f;
+  border-left: 4px solid var(--rust-700);
+  border-radius: 10px;
+  background: #fdf6ee;
+  color: #8a4a22;
+}
+
+.clearance-drift strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.clearance-drift span {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.flag-blocker-scope {
+  font-size: 12px;
+  color: var(--rust-700);
 }
 
 .entry-editor {

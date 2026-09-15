@@ -299,7 +299,28 @@ const flags: Flag[] = [
     message: "Tiny Tim 低于 60 毫米生长阈值",
     severity: "warning",
     state: "open",
+    scope: "accession",
     createdOn: "2026-02-26T09:00:00.000Z",
+    history: [
+      {
+        id: "flh-tom-01-created",
+        at: "2026-02-26T09:00:00.000Z",
+        action: "created",
+        note: "标记由观测数据派生。",
+      },
+      {
+        id: "flh-tom-01-resolved",
+        at: "2026-02-27T03:20:00.000Z",
+        action: "resolved",
+        note: "复测株高回到 64 毫米，判定为穴盘边缘暂时缺水导致。",
+      },
+      {
+        id: "flh-tom-01-reopened",
+        at: "2026-03-05T08:10:00.000Z",
+        action: "reopened",
+        note: "复查发现整片穴盘仍低于阈值，原处理结论不成立，重新打开。",
+      },
+    ],
   },
   {
     id: "flag-bee-01",
@@ -309,8 +330,57 @@ const flags: Flag[] = [
     code: "HT_UNDER",
     message: "Chioggia 低于 60 毫米生长阈值",
     severity: "warning",
-    state: "open",
+    state: "superseded",
+    scope: "accession",
     createdOn: "2026-04-08T09:00:00.000Z",
+    resolvedOn: "2026-04-09T02:30:00.000Z",
+    resolutionNote: "边缘倒苗已扶正并补光，按单株问题豁免处理。",
+    supersededById: "flag-bee-02",
+    history: [
+      {
+        id: "flh-bee-01-created",
+        at: "2026-04-08T09:00:00.000Z",
+        action: "created",
+        note: "标记由观测数据派生。",
+      },
+      {
+        id: "flh-bee-01-waived",
+        at: "2026-04-09T02:30:00.000Z",
+        action: "waived",
+        note: "边缘倒苗已扶正并补光，按单株问题豁免处理。",
+      },
+      {
+        id: "flh-bee-01-escalated",
+        at: "2026-04-12T07:45:00.000Z",
+        action: "escalated",
+        note: "复查发现西翼灌溉分区 EC 普遍偏高，影响范围超出该材料，升级为全试验排查。",
+        followUpFlagId: "flag-bee-02",
+      },
+    ],
+  },
+  {
+    id: "flag-bee-02",
+    trialId: "trial-ama-02",
+    accessionId: "acc-bee-03",
+    observationPassId: "obs-bee-01",
+    code: "HT_UNDER",
+    message: "Chioggia 低于 60 毫米生长阈值",
+    severity: "critical",
+    state: "open",
+    scope: "trial",
+    createdOn: "2026-04-12T07:45:00.000Z",
+    followUpOfId: "flag-bee-01",
+    followUpType: "escalation",
+    escalationNote:
+      "复查发现西翼灌溉分区 EC 普遍偏高，影响范围超出该材料，升级为全试验排查。",
+    history: [
+      {
+        id: "flh-bee-02-created",
+        at: "2026-04-12T07:45:00.000Z",
+        action: "created",
+        note: "扩大处理范围：复查发现西翼灌溉分区 EC 普遍偏高，影响范围超出该材料，升级为全试验排查。",
+      },
+    ],
   },
 ];
 

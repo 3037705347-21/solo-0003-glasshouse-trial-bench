@@ -1,4 +1,9 @@
-import type { Accession, WorkspaceState } from "../domain/types";
+import type {
+  Accession,
+  Flag,
+  FlagHistoryEntry,
+  WorkspaceState,
+} from "../domain/types";
 import { isWorkspaceState } from "./types";
 import { createSampleWorkspaceState } from "./sampleData";
 
@@ -16,12 +21,49 @@ function normalizeAccession(accession: Accession): Accession {
   };
 }
 
+/**
+ * 兼容旧版标记：补齐范围、流水和跟进字段。
+ * 旧标记没有 history，就从 createdOn 与处理结论合成只追加流水，
+ * 保证升级后的“旧处理结论不消失”。
+ */
+export function normalizeFlag(flag: Flag): Flag {
+  const history: FlagHistoryEntry[] = Array.isArray(flag.history)
+    ? flag.history
+    : [];
+  if (history.length === 0) {
+    history.push({
+      id: `${flag.id}-created`,
+      at: flag.createdOn,
+      action: "created",
+      note: "标记由观测数据派生。",
+    });
+    if (
+      (flag.state === "resolved" || flag.state === "waived") &&
+      flag.resolvedOn &&
+      flag.resolutionNote
+    ) {
+      history.push({
+        id: `${flag.id}-closed`,
+        at: flag.resolvedOn,
+        action: flag.state,
+        note: flag.resolutionNote,
+      });
+    }
+  }
+  return {
+    ...flag,
+    scope: flag.scope ?? "accession",
+    history,
+  };
+}
+
 export function normalizeWorkspaceState(
   state: WorkspaceState,
 ): WorkspaceState {
   return {
     ...state,
     accessions: state.accessions.map(normalizeAccession),
+    flags: state.flags.map(normalizeFlag),
   };
 }
 

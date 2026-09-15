@@ -7,6 +7,7 @@ import type {
 } from "./types";
 import { createId } from "./id";
 import { isAccessionRetired } from "./accession";
+import { isBlockingFlag } from "./flag";
 
 export function buildClearanceSnapshot(
   state: WorkspaceState,
@@ -25,11 +26,9 @@ export function buildClearanceSnapshot(
   const assignedIds = new Set(
     state.benches.flatMap((bench) => bench.assignedIds),
   );
-  const openFlags = state.flags.filter(
+  const blockingFlags = state.flags.filter(
     (flag) =>
-      flag.trialId === trialId &&
-      flag.state === "open" &&
-      activeAccessionIds.has(flag.accessionId),
+      flag.trialId === trialId && isBlockingFlag(flag, activeAccessionIds),
   );
   const blockers: ClearanceBlocker[] = [];
   activeAccessions.forEach((accession) => {
@@ -50,11 +49,15 @@ export function buildClearanceSnapshot(
         benchId: bench.id,
       });
     });
-  openFlags.forEach((flag) => {
+  blockingFlags.forEach((flag) => {
     blockers.push({
       code: `FLAG_${flag.code}`,
-      message: flag.message,
+      message:
+        flag.scope === "trial"
+          ? `${flag.message}（升级为全试验范围）`
+          : flag.message,
       accessionId: flag.accessionId,
+      flagId: flag.id,
     });
   });
   if (activeAccessions.length === 0) {
@@ -87,8 +90,17 @@ export function buildClearanceSnapshot(
     },
     {
       label: "未处理标记",
-      value: openFlags.length,
-      detail: "未解决的观测标记",
+      value: blockingFlags.length,
+      detail: "当前会阻止放行的开放标记（含复发与升级跟进）",
+    },
+    {
+      label: "已处理标记",
+      value: state.flags.filter(
+        (flag) =>
+          flag.trialId === trialId &&
+          (flag.state === "resolved" || flag.state === "waived"),
+      ).length,
+      detail: "保留处理结论、可被重开或升级的标记数",
     },
     {
       label: "在用台架",
@@ -141,4 +153,19 @@ export function snapshotForTrial(
 
 export function blockerCount(snapshot: ClearanceSnapshot): number {
   return snapshot.blockers.length;
+}
+
+/**
+ * 已放行试验的当前状态是否已经偏离放行时的判断。
+ * 历史快照保持不变；只说明“当下重新计算会被阻止”，提醒用户重新生成快照。
+ */
+export function clearanceHasDrifted(
+  state: WorkspaceState,
+  trialId: string,
+): boolean {
+  const trial = state.trials.find((item) => item.id === trialId);
+  if (!trial || trial.state !== "cleared") {
+    return false;
+  }
+  return buildClearanceSnapshot(state, trialId).status === "blocked";
 }

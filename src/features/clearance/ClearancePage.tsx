@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { Play, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Play, ShieldCheck } from "lucide-react";
 import { Button } from "../../components/Button";
 import { PageHeader } from "../../components/PageHeader";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import {
   applyClearance,
   buildClearanceSnapshot,
+  clearanceHasDrifted,
 } from "../../domain/clearance";
 import { transitionTrial } from "../../domain/trial";
 import { latestSnapshotForTrial } from "../../state/selectors";
@@ -18,6 +19,7 @@ export function ClearancePage() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const latest = latestSnapshotForTrial(state, trialId);
   const trial = state.trials.find((item) => item.id === trialId);
+  const hasDrifted = clearanceHasDrifted(state, trialId);
 
   const liveSnapshot = useMemo(
     () => buildClearanceSnapshot(state, trialId),
@@ -84,13 +86,28 @@ export function ClearancePage() {
               启动试验
             </Button>
           ) : (
-            <Button onClick={handleGenerate} data-testid="generate-clearance">
+            <Button
+              onClick={handleGenerate}
+              data-testid="generate-clearance"
+              tone={hasDrifted ? "danger" : "primary"}
+            >
               <ShieldCheck size={16} />
               生成快照
             </Button>
           )
         }
       />
+      {hasDrifted ? (
+        <section className="clearance-drift" data-testid="clearance-drift">
+          <AlertTriangle size={18} aria-hidden="true" />
+          <div>
+            <strong>放行后情况已变化</strong>
+            <span>
+              该试验虽已放行，但按当前材料、台架和标记重新计算会被阻止。历史快照保持不变，请处理新问题后重新生成快照确认。
+            </span>
+          </div>
+        </section>
+      ) : null}
       <section className="control-strip">
         <select
           className="compact-select"

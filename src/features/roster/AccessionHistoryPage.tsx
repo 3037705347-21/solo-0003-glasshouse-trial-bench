@@ -6,8 +6,10 @@ import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { isAccessionRetired } from "../../domain/accession";
+import { flagStateLabel } from "../../domain/flag";
 import type {
   AccessionRetirementRecord,
+  Flag,
   ObservationEntry,
 } from "../../domain/types";
 import {
@@ -32,6 +34,48 @@ function displayDateTime(value: string): string {
 
 function lifecycleTone(record: AccessionRetirementRecord) {
   return record.restoredAt ? "neutral" : "warning";
+}
+
+function FlagHistoryRow({
+  flag,
+  relatedFlags,
+}: {
+  flag: Flag;
+  relatedFlags: Flag[];
+}) {
+  const navigate = useNavigate();
+  const followUp = flag.followUpOfId
+    ? relatedFlags.find((item) => item.id === flag.followUpOfId)
+    : undefined;
+  const scopeTag =
+    flag.scope === "trial"
+      ? flag.followUpType === "escalation"
+        ? "升级跟进 · 全试验"
+        : "全试验范围"
+      : flag.followUpType === "recurrence"
+        ? "复发跟进"
+        : undefined;
+  return (
+    <div className="history-list-row" data-testid={`history-flag-${flag.id}`}>
+      <div>
+        <strong>{flag.code}</strong>
+        <StatusBadge tone={statusTone(flagStateLabel(flag))}>
+          {flagStateLabel(flag)}
+        </StatusBadge>
+        {scopeTag ? <StatusBadge tone="info">{scopeTag}</StatusBadge> : null}
+      </div>
+      <span>{flag.message}</span>
+      {followUp ? (
+        <Button
+          tone="ghost"
+          size="sm"
+          onClick={() => navigate("/observations")}
+        >
+          跟进自 {followUp.code}（{flagStateLabel(followUp)}）
+        </Button>
+      ) : null}
+    </div>
+  );
 }
 
 export function AccessionHistoryPage() {
@@ -279,15 +323,11 @@ export function AccessionHistoryPage() {
           ) : (
             <div className="history-list">
               {relatedFlags.map((flag) => (
-                <div className="history-list-row" key={flag.id}>
-                  <div>
-                    <strong>{flag.code}</strong>
-                    <StatusBadge tone={statusTone(flag.severity)}>
-                      {flag.severity}
-                    </StatusBadge>
-                  </div>
-                  <span>{flag.message}</span>
-                </div>
+                <FlagHistoryRow
+                  flag={flag}
+                  relatedFlags={relatedFlags}
+                  key={flag.id}
+                />
               ))}
               {relatedSnapshots.map((snapshot) => (
                 <div className="history-list-row" key={snapshot.id}>

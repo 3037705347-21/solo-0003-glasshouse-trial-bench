@@ -1,5 +1,17 @@
-import type { WorkspaceState } from "../domain/types";
+import type { Flag, WorkspaceState } from "../domain/types";
 import type { WorkspaceAction } from "./types";
+
+function mergeFlags(
+  current: Flag[],
+  created: Flag[],
+  updated: Flag[],
+): Flag[] {
+  const updatesById = new Map(updated.map((flag) => [flag.id, flag]));
+  return [
+    ...current.map((flag) => updatesById.get(flag.id) ?? flag),
+    ...created,
+  ];
+}
 
 export function workspaceReducer(
   state: WorkspaceState,
@@ -44,7 +56,7 @@ export function workspaceReducer(
       return {
         ...state,
         observationPasses: [...state.observationPasses, action.pass],
-        flags: [...state.flags, ...action.flags],
+        flags: mergeFlags(state.flags, action.flags, action.updatedFlags),
       };
     case "flag/transitioned":
       return {
@@ -52,6 +64,16 @@ export function workspaceReducer(
         flags: state.flags.map((flag) =>
           flag.id === action.flag.id ? action.flag : flag,
         ),
+      };
+    case "flag/escalated":
+      return {
+        ...state,
+        flags: [
+          ...state.flags.map((flag) =>
+            flag.id === action.superseded.id ? action.superseded : flag,
+          ),
+          action.followUp,
+        ],
       };
     case "clearance/generated":
       return {
