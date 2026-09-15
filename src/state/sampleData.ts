@@ -1,5 +1,6 @@
 import type {
   Accession,
+  Attachment,
   Bench,
   ClearanceSnapshot,
   Flag,
@@ -316,6 +317,8 @@ const flags: Flag[] = [
 
 const clearanceSnapshots: ClearanceSnapshot[] = [];
 
+const attachments: Attachment[] = [];
+
 export function createSampleWorkspaceState(): WorkspaceState {
   return {
     trials,
@@ -324,5 +327,6 @@ export function createSampleWorkspaceState(): WorkspaceState {
     observationPasses,
     flags,
     clearanceSnapshots,
+    attachments,
   };
 }

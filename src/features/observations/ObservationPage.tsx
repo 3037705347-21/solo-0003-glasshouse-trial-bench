@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { NotebookPen, Plus } from "lucide-react";
+import { NotebookPen, Paperclip, Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
 import { PageHeader } from "../../components/PageHeader";
@@ -7,11 +7,13 @@ import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import type { ObservationPass } from "../../domain/types";
 import { isAccessionRetired } from "../../domain/accession";
+import { attachmentsForSubject } from "../../domain/attachment";
 import {
   openFlagsForTrial,
   passesForTrial,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { AttachmentDialog } from "../attachments/AttachmentDialog";
 import { FlagPanel } from "./FlagPanel";
 import { PassForm } from "./PassForm";
 
@@ -19,6 +21,7 @@ export function ObservationPage() {
   const { state } = useWorkspace();
   const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [attachmentPass, setAttachmentPass] = useState<ObservationPass | undefined>();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const passes = passesForTrial(state, trialId);
   const flags = openFlagsForTrial(state, trialId);
@@ -87,36 +90,54 @@ export function ObservationPage() {
             <p className="muted-copy">该试验还没有观测记录。</p>
           ) : (
             <div className="pass-cards">
-              {passes.map((pass) => (
-                <article className="pass-card" key={pass.id} data-testid={`pass-${pass.id}`}>
-                  <div className="pass-card-top">
-                    <strong>{pass.observedOn}</strong>
-                    <span>{pass.observer}</span>
-                  </div>
-                  <p>{pass.entries.length} 条测量记录</p>
-                  <div className="pass-card-tags">
-                    {pass.entries.map((entry) => {
-                      const accession = state.accessions.find(
-                        (item) => item.id === entry.accessionId,
-                      );
-                      return (
-                        <StatusBadge
-                          tone={
-                            accession && isAccessionRetired(accession)
-                              ? "warning"
-                              : "neutral"
-                          }
-                          key={entry.accessionId}
-                        >
-                          {accession
-                            ? `${accession.accessionNo}${isAccessionRetired(accession) ? " 已停用" : ""}`
-                            : entry.accessionId}
-                        </StatusBadge>
-                      );
-                    })}
-                  </div>
-                </article>
-              ))}
+              {passes.map((pass) => {
+                const attachmentCount = attachmentsForSubject(
+                  state,
+                  "observationPass",
+                  pass.id,
+                ).length;
+                return (
+                  <article className="pass-card" key={pass.id} data-testid={`pass-${pass.id}`}>
+                    <div className="pass-card-top">
+                      <strong>{pass.observedOn}</strong>
+                      <span>{pass.observer}</span>
+                    </div>
+                    <p>{pass.entries.length} 条测量记录</p>
+                    <div className="pass-card-tags">
+                      {pass.entries.map((entry) => {
+                        const accession = state.accessions.find(
+                          (item) => item.id === entry.accessionId,
+                        );
+                        return (
+                          <StatusBadge
+                            tone={
+                              accession && isAccessionRetired(accession)
+                                ? "warning"
+                                : "neutral"
+                            }
+                            key={entry.accessionId}
+                          >
+                            {accession
+                              ? `${accession.accessionNo}${isAccessionRetired(accession) ? " 已停用" : ""}`
+                              : entry.accessionId}
+                          </StatusBadge>
+                        );
+                      })}
+                    </div>
+                    <div className="pass-card-actions">
+                      <Button
+                        tone="ghost"
+                        size="sm"
+                        onClick={() => setAttachmentPass(pass)}
+                        data-testid={`attachments-pass-${pass.id}`}
+                      >
+                        <Paperclip size={14} />
+                        附件{attachmentCount > 0 ? ` ${attachmentCount}` : ""}
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>
@@ -145,6 +166,14 @@ export function ObservationPage() {
           <p>请先创建试验，再录入观测。</p>
         )}
       </Dialog>
+      {attachmentPass ? (
+        <AttachmentDialog
+          subjectKind="observationPass"
+          subjectId={attachmentPass.id}
+          subjectLabel={`观测 ${attachmentPass.observedOn} · ${attachmentPass.observer}`}
+          onClose={() => setAttachmentPass(undefined)}
+        />
+      ) : null}
       <ToastRegion
         messages={toasts}
         onDismiss={(id) =>

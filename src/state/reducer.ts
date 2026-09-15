@@ -32,6 +32,20 @@ export function workspaceReducer(
           accession.id === action.accession.id ? action.accession : accession,
         ),
       };
+    case "accession/duplicated":
+      return {
+        ...state,
+        accessions: [...state.accessions, action.accession],
+        attachments: [...state.attachments, ...action.attachments],
+      };
+    case "accession/merged":
+      return {
+        ...state,
+        accessions: state.accessions.map((accession) =>
+          accession.id === action.accession.id ? action.accession : accession,
+        ),
+        attachments: [...state.attachments, ...action.attachments],
+      };
     case "bench/assigned":
     case "bench/released":
       return {
@@ -51,6 +65,15 @@ export function workspaceReducer(
         ...state,
         flags: state.flags.map((flag) =>
           flag.id === action.flag.id ? action.flag : flag,
+        ),
+      };
+    case "attachment/added":
+      return { ...state, attachments: [...state.attachments, action.attachment] };
+    case "attachment/removed":
+      return {
+        ...state,
+        attachments: state.attachments.filter(
+          (attachment) => attachment.id !== action.attachmentId,
         ),
       };
     case "clearance/generated":

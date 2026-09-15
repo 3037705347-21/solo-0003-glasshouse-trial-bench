@@ -112,6 +112,38 @@ export interface ClearanceSnapshot {
   blockers: ClearanceBlocker[];
 }
 
+export type AttachmentSubjectKind = "accession" | "observationPass" | "flag";
+
+export type AttachmentTransferMode = "duplicate" | "merge";
+
+/**
+ * 附件从其他记录复制或合并而来时的溯源信息。
+ * 全部字段在转移时固化，即使来源记录之后被移除，
+ * 溯源标签也不会变成断链。
+ */
+export interface AttachmentOrigin {
+  attachmentId: string;
+  subjectKind: AttachmentSubjectKind;
+  subjectId: string;
+  subjectLabel: string;
+  transferredBy: AttachmentTransferMode;
+  transferredAt: string;
+}
+
+export interface Attachment {
+  id: string;
+  subjectKind: AttachmentSubjectKind;
+  subjectId: string;
+  fileName: string;
+  mediaType: string;
+  sizeBytes: number;
+  checksum: string;
+  /** base64 数据地址；为空字符串表示内容缺失（例如导入数据不完整）。 */
+  dataUrl: string;
+  uploadedAt: string;
+  origin?: AttachmentOrigin;
+}
+
 export interface WorkspaceState {
   trials: Trial[];
   accessions: Accession[];
@@ -119,4 +151,5 @@ export interface WorkspaceState {
   observationPasses: ObservationPass[];
   flags: Flag[];
   clearanceSnapshots: ClearanceSnapshot[];
+  attachments: Attachment[];
 }

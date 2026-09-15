@@ -1,5 +1,6 @@
 import type {
   Accession,
+  Attachment,
   Bench,
   ClearanceSnapshot,
   Flag,
@@ -16,10 +17,22 @@ export type WorkspaceAction =
   | { type: "trial/transitioned"; trialId: string; state: TrialState }
   | { type: "accession/created"; accession: Accession }
   | { type: "accession/updated"; accession: Accession }
+  | {
+      type: "accession/duplicated";
+      accession: Accession;
+      attachments: Attachment[];
+    }
+  | {
+      type: "accession/merged";
+      accession: Accession;
+      attachments: Attachment[];
+    }
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
   | { type: "flag/transitioned"; flag: Flag }
+  | { type: "attachment/added"; attachment: Attachment }
+  | { type: "attachment/removed"; attachmentId: string }
   | {
       type: "clearance/generated";
       snapshot: ClearanceSnapshot;

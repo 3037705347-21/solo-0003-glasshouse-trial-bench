@@ -6,6 +6,7 @@ import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { Flag as DomainFlag } from "../../domain/types";
 import { transitionFlag } from "../../domain/observation";
 import { useWorkspace } from "../../state/store";
+import { AttachmentPanel } from "../attachments/AttachmentPanel";
 
 interface FlagPanelProps {
   flags: DomainFlag[];
@@ -101,6 +102,15 @@ export function FlagPanel({ flags }: FlagPanelProps) {
               <Check size={15} />
               解决
             </Button>
+          </div>
+          <div className="flag-attachments" data-testid="flag-attachments">
+            <AttachmentPanel
+              key={selected.id}
+              subjectKind="flag"
+              subjectId={selected.id}
+              subjectLabel={`标记 ${selected.code}`}
+              compact
+            />
           </div>
         </div>
       ) : null}

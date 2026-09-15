@@ -24,6 +24,26 @@
     {
       "workflow_id": "advance-trial-clearance",
       "command": "node scripts/smoke.mjs advance-trial-clearance"
+    },
+    {
+      "workflow_id": "manage-evidence-attachments",
+      "command": "node scripts/smoke.mjs attach-evidence-records"
+    },
+    {
+      "workflow_id": "manage-evidence-attachments",
+      "command": "node scripts/smoke.mjs observation-repeat-upload"
+    },
+    {
+      "workflow_id": "manage-evidence-attachments",
+      "command": "node scripts/smoke.mjs merge-accession-attachments"
+    },
+    {
+      "workflow_id": "manage-evidence-attachments",
+      "command": "node scripts/smoke.mjs missing-attachment-file"
+    },
+    {
+      "workflow_id": "manage-evidence-attachments",
+      "command": "node scripts/smoke.mjs export-workspace-attachments"
     }
   ]
 }

@@ -10,7 +10,9 @@ import {
   replacementCandidatesForAccession,
   restoreAccession,
   retireAccession,
+  mergeAccessionInto,
 } from "../../domain/accession";
+import { attachmentsForSubject } from "../../domain/attachment";
 import type { FieldError } from "../../domain/result";
 import type { Accession, WorkspaceState } from "../../domain/types";
 import { benchForAccession } from "../../state/selectors";
@@ -122,6 +124,98 @@ export function RetireAccessionDialog({
           </Button>
           <Button type="submit" tone="danger" data-testid="confirm-retire-accession">
             确认停用
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+export function MergeAccessionDialog({
+  accession,
+  state,
+  onCancel,
+  onSaved,
+}: LifecycleDialogProps) {
+  const { dispatch } = useWorkspace();
+  const candidates = useMemo(
+    () => replacementCandidatesForAccession(state, accession),
+    [state, accession],
+  );
+  const [targetId, setTargetId] = useState(candidates[0]?.id ?? "");
+  const [reason, setReason] = useState("");
+  const [errors, setErrors] = useState<FieldError[]>([]);
+  const errorFor = (field: string) =>
+    errors.find((error) => error.field === field)?.message;
+  const attachmentCount = attachmentsForSubject(
+    state,
+    "accession",
+    accession.id,
+  ).length;
+
+  const handleSubmit = () => {
+    const result = mergeAccessionInto(state, accession.id, targetId, reason);
+    if (!result.ok) {
+      setErrors(result.errors);
+      return;
+    }
+    dispatch({
+      type: "accession/merged",
+      accession: result.value.accession,
+      attachments: result.value.attachments,
+    });
+    onSaved(result.value.accession);
+  };
+
+  return (
+    <Dialog open title={`合并 ${accession.accessionNo}`} onClose={onCancel} wide>
+      <form
+        className="editor-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          handleSubmit();
+        }}
+        data-testid="merge-accession-form"
+      >
+        <div className="lifecycle-callout">
+          <strong>{accession.cultivar}</strong>
+          <span>
+            合并后来源材料将停用并指向目标材料；其 {attachmentCount}{" "}
+            个附件会复制到目标材料下，并保留指向来源的溯源标记，原始附件仍保留在来源记录中。
+          </span>
+        </div>
+        <div className="form-grid">
+          <SelectField
+            label="合并目标材料"
+            value={targetId}
+            onChange={(event) => setTargetId(event.target.value)}
+            error={errorFor("replacementId")}
+            hint="目标材料必须属于同一试验且仍在用"
+            data-testid="merge-target-select"
+          >
+            <option value="">请选择目标材料</option>
+            {candidates.map((candidate) => (
+              <option value={candidate.id} key={candidate.id}>
+                {candidate.accessionNo} - {candidate.cultivar}
+              </option>
+            ))}
+          </SelectField>
+          <TextAreaField
+            label="合并原因"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            error={errorFor("reason")}
+            className="field-span-2"
+            rows={4}
+            data-testid="merge-accession-reason"
+          />
+        </div>
+        <div className="editor-actions">
+          <Button tone="secondary" type="button" onClick={onCancel}>
+            取消
+          </Button>
+          <Button type="submit" tone="danger" data-testid="confirm-merge-accession">
+            确认合并
           </Button>
         </div>
       </form>

@@ -24,6 +24,7 @@ interface WorkspaceContextValue {
   resetWorkspace: () => void;
   clearWorkspace: () => void;
   persistenceReady: boolean;
+  persistenceFailed: boolean;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -32,9 +33,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [initialState] = useState<WorkspaceState>(() => loadWorkspaceState());
   const [state, dispatch] = useReducer(workspaceReducer, initialState);
   const [persistenceReady, setPersistenceReady] = useState(false);
+  const [persistenceFailed, setPersistenceFailed] = useState(false);
 
   useEffect(() => {
-    saveWorkspaceState(state);
+    const saved = saveWorkspaceState(state);
+    setPersistenceFailed(!saved);
     setPersistenceReady(true);
   }, [state]);
 
@@ -43,6 +46,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       state,
       dispatch,
       persistenceReady,
+      persistenceFailed,
       resetWorkspace: () =>
         dispatch({ type: "reset", state: createSampleWorkspaceState() }),
       clearWorkspace: () => {
@@ -53,7 +57,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         });
       },
     }),
-    [state, persistenceReady],
+    [state, persistenceReady, persistenceFailed],
   );
 
   return (

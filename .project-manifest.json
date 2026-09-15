@@ -39,6 +39,11 @@
       "responsibility": "放行预览、快照生成和阻止项展示"
     },
     {
+      "id": "attachments",
+      "path": "src/features/attachments",
+      "responsibility": "附件上传、查看、删除确认和缺失提示"
+    },
+    {
       "id": "components",
       "path": "src/components",
       "responsibility": "共享表单、表格、弹窗、标签、指标、toast 和空状态原语"
@@ -108,6 +113,21 @@
       "failure": "被阻止的快照列出每个具体阻止项",
       "verification": "无头浏览器为示例试验生成被阻止的快照",
       "module_ids": ["app", "domain", "state", "clearance"]
+    },
+    {
+      "id": "manage-evidence-attachments",
+      "name": "管理证据附件",
+      "entry": "GET /#/roster",
+      "steps": [
+        "在材料、观测或标记上上传图片或文件",
+        "拒绝重复、损坏或超限的上传",
+        "查看附件并在删除前确认",
+        "复制、合并、停用或解除事件后保持附件可追溯"
+      ],
+      "success": "附件随记录持久化，刷新、合并和导出导入后仍可打开",
+      "failure": "无效上传被明确拒绝，缺失内容显式标注而不留断链",
+      "verification": "无头浏览器验证附件上传、重复拒绝、合并溯源、缺失提示和导出导入",
+      "module_ids": ["app", "domain", "state", "roster", "observations", "attachments"]
     }
   ]
 }

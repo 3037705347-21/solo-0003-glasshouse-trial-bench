@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Ban, History, Plus, RotateCcw, Sprout } from "lucide-react";
+import { Ban, Copy, History, Merge, Paperclip, Plus, RotateCcw, Sprout } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { DataTable, type DataColumn } from "../../components/DataTable";
@@ -11,9 +11,11 @@ import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import {
   accessionMatchesQuery,
+  duplicateAccession,
   isAccessionRetired,
   nextAccessionNumber,
 } from "../../domain/accession";
+import { attachmentsForSubject } from "../../domain/attachment";
 import type { Accession } from "../../domain/types";
 import {
   accessionStatus,
@@ -21,7 +23,9 @@ import {
   replacementForAccession,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { AttachmentDialog } from "../attachments/AttachmentDialog";
 import {
+  MergeAccessionDialog,
   RestoreAccessionDialog,
   RetireAccessionDialog,
 } from "./AccessionLifecycleDialogs";
@@ -30,7 +34,7 @@ import { RosterForm } from "./RosterForm";
 type RosterSegment = "all" | "active" | "assigned" | "unassigned" | "retired";
 
 export function RosterPage() {
-  const { state } = useWorkspace();
+  const { state, dispatch } = useWorkspace();
   const navigate = useNavigate();
   const [trialFilter, setTrialFilter] = useState(() => state.trials[0]?.id ?? "");
   const [query, setQuery] = useState("");
@@ -39,6 +43,8 @@ export function RosterPage() {
   const [editingAccession, setEditingAccession] = useState<Accession | undefined>();
   const [retiringAccession, setRetiringAccession] = useState<Accession | undefined>();
   const [restoringAccession, setRestoringAccession] = useState<Accession | undefined>();
+  const [mergingAccession, setMergingAccession] = useState<Accession | undefined>();
+  const [attachmentAccession, setAttachmentAccession] = useState<Accession | undefined>();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
@@ -47,6 +53,31 @@ export function RosterPage() {
     window.setTimeout(() => {
       setToasts((current) => current.filter((item) => item.id !== id));
     }, 4200);
+  };
+
+  const handleDuplicate = (accession: Accession) => {
+    const result = duplicateAccession(state, accession.id);
+    if (!result.ok) {
+      pushToast({
+        tone: "error",
+        title: "复制失败",
+        message: result.errors[0]?.message,
+      });
+      return;
+    }
+    dispatch({
+      type: "accession/duplicated",
+      accession: result.value.accession,
+      attachments: result.value.attachments,
+    });
+    pushToast({
+      tone: "success",
+      title: "材料已复制",
+      message:
+        result.value.attachments.length > 0
+          ? `${result.value.accession.accessionNo} 已创建，${result.value.attachments.length} 个附件已复制并保留来源标记。`
+          : `${result.value.accession.accessionNo} 已创建。`,
+    });
   };
 
   const filtered = useMemo(() => {
@@ -148,55 +179,89 @@ export function RosterPage() {
     {
       key: "actions",
       header: "",
-      render: (accession) => (
-        <div className="table-actions">
-          <Button
-            tone="ghost"
-            size="sm"
-            onClick={() =>
-              navigate(`/accessions/${accession.id}/history`)
-            }
-            data-testid={`history-accession-${accession.id}`}
-          >
-            <History size={15} />
-            历史
-          </Button>
-          {isAccessionRetired(accession) ? (
+      render: (accession) => {
+        const attachmentCount = attachmentsForSubject(
+          state,
+          "accession",
+          accession.id,
+        ).length;
+        return (
+          <div className="table-actions">
             <Button
               tone="ghost"
               size="sm"
-              onClick={() => setRestoringAccession(accession)}
-              data-testid={`restore-accession-${accession.id}`}
+              onClick={() =>
+                navigate(`/accessions/${accession.id}/history`)
+              }
+              data-testid={`history-accession-${accession.id}`}
             >
-              <RotateCcw size={15} />
-              恢复
+              <History size={15} />
+              历史
             </Button>
-          ) : (
-            <>
+            <Button
+              tone="ghost"
+              size="sm"
+              onClick={() => setAttachmentAccession(accession)}
+              data-testid={`attachments-accession-${accession.id}`}
+            >
+              <Paperclip size={15} />
+              附件{attachmentCount > 0 ? ` ${attachmentCount}` : ""}
+            </Button>
+            {isAccessionRetired(accession) ? (
               <Button
                 tone="ghost"
                 size="sm"
-                onClick={() => {
-                  setEditingAccession(accession);
-                  setEditorOpen(true);
-                }}
-                data-testid={`edit-accession-${accession.id}`}
+                onClick={() => setRestoringAccession(accession)}
+                data-testid={`restore-accession-${accession.id}`}
               >
-                编辑
+                <RotateCcw size={15} />
+                恢复
               </Button>
-              <Button
-                tone="ghost"
-                size="sm"
-                onClick={() => setRetiringAccession(accession)}
-                data-testid={`retire-accession-${accession.id}`}
-              >
-                <Ban size={15} />
-                停用
-              </Button>
-            </>
-          )}
-        </div>
-      ),
+            ) : (
+              <>
+                <Button
+                  tone="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditingAccession(accession);
+                    setEditorOpen(true);
+                  }}
+                  data-testid={`edit-accession-${accession.id}`}
+                >
+                  编辑
+                </Button>
+                <Button
+                  tone="ghost"
+                  size="sm"
+                  onClick={() => handleDuplicate(accession)}
+                  data-testid={`duplicate-accession-${accession.id}`}
+                >
+                  <Copy size={15} />
+                  复制
+                </Button>
+                <Button
+                  tone="ghost"
+                  size="sm"
+                  onClick={() => setMergingAccession(accession)}
+                  data-testid={`merge-accession-${accession.id}`}
+                >
+                  <Merge size={15} />
+                  合并
+                </Button>
+                <Button
+                  tone="ghost"
+                  size="sm"
+                  onClick={() => setRetiringAccession(accession)}
+                  data-testid={`retire-accession-${accession.id}`}
+                >
+                  <Ban size={15} />
+                  停用
+                </Button>
+              </>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -325,6 +390,29 @@ export function RosterPage() {
               message: `${accession.accessionNo} 已重新进入在用范围。`,
             });
           }}
+        />
+      ) : null}
+      {mergingAccession ? (
+        <MergeAccessionDialog
+          accession={mergingAccession}
+          state={state}
+          onCancel={() => setMergingAccession(undefined)}
+          onSaved={(accession) => {
+            setMergingAccession(undefined);
+            pushToast({
+              tone: "success",
+              title: "材料已合并",
+              message: `${accession.accessionNo} 已停用并指向目标材料，附件已复制并保留来源标记。`,
+            });
+          }}
+        />
+      ) : null}
+      {attachmentAccession ? (
+        <AttachmentDialog
+          subjectKind="accession"
+          subjectId={attachmentAccession.id}
+          subjectLabel={`${attachmentAccession.accessionNo} · ${attachmentAccession.cultivar}`}
+          onClose={() => setAttachmentAccession(undefined)}
         />
       ) : null}
       <ToastRegion

@@ -1,10 +1,12 @@
 import type {
   Accession,
   AccessionRetirementRecord,
+  Attachment,
   PreferredLight,
   WorkspaceState,
 } from "./types";
 import { createAccessionNumber, createId } from "./id";
+import { transferAttachments, transferWouldExceedBudget } from "./attachment";
 import {
   GROWTH_BOUNDS,
   BENCH_LIGHT_COMPATIBILITY,
@@ -373,6 +375,105 @@ export function replacementWouldCycle(
     cursor = current ? replacementTargetFor(current) : undefined;
   }
   return false;
+}
+
+export interface AccessionCopyResult {
+  accession: Accession;
+  attachments: Attachment[];
+}
+
+/**
+ * 复制材料：生成新的材料编号并沿用批次信息。
+ * 来源材料的附件会一并复制，并保留指向来源的溯源标记。
+ */
+export function duplicateAccession(
+  state: WorkspaceState,
+  sourceId: string,
+): Result<AccessionCopyResult> {
+  const source = state.accessions.find((item) => item.id === sourceId);
+  if (!source) {
+    return fail([fieldError("accessionId", "unknown", "请选择有效材料")]);
+  }
+  if (transferWouldExceedBudget(state, "accession", source.id)) {
+    return fail([
+      fieldError(
+        "attachments",
+        "quota",
+        "附件总大小超出本地存储预算，无法随材料一并复制",
+      ),
+    ]);
+  }
+  const accession: Accession = {
+    ...source,
+    id: createId("acc"),
+    accessionNo: nextAccessionNumber(state),
+    labels: [...source.labels],
+    lifecycleStatus: "active",
+    retiredAt: undefined,
+    retirementReason: undefined,
+    replacementId: undefined,
+    retirementHistory: [],
+  };
+  const attachments = transferAttachments(
+    state,
+    {
+      kind: "accession",
+      id: source.id,
+      label: `${source.accessionNo} · ${source.cultivar}`,
+    },
+    { kind: "accession", id: accession.id },
+    "duplicate",
+  );
+  return ok({ accession, attachments });
+}
+
+/**
+ * 合并材料：来源材料停用并指向目标材料，
+ * 来源材料的附件复制到目标材料下，同时保留原始附件和溯源标记。
+ */
+export function mergeAccessionInto(
+  state: WorkspaceState,
+  sourceId: string,
+  targetId: string,
+  reason: string,
+): Result<AccessionCopyResult> {
+  const source = state.accessions.find((item) => item.id === sourceId);
+  if (!source) {
+    return fail([fieldError("accessionId", "unknown", "请选择有效材料")]);
+  }
+  if (transferWouldExceedBudget(state, "accession", source.id)) {
+    return fail([
+      fieldError(
+        "attachments",
+        "quota",
+        "附件总大小超出本地存储预算，无法随材料一并转移",
+      ),
+    ]);
+  }
+  const retired = retireAccession(
+    source,
+    {
+      retiredAt: new Date().toISOString(),
+      reason,
+      replacementId: targetId,
+    },
+    state,
+  );
+  if (!retired.ok) {
+    return retired;
+  }
+  const target = state.accessions.find((item) => item.id === targetId);
+  const attachments = transferAttachments(
+    state,
+    {
+      kind: "accession",
+      id: source.id,
+      label: `${source.accessionNo} · ${source.cultivar}`,
+    },
+    { kind: "accession", id: target?.id ?? targetId },
+    "merge",
+  );
+  return ok({ accession: retired.value, attachments });
 }
 
 function normalizeTimestamp(value: string): string | undefined {

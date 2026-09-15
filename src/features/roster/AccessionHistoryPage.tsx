@@ -1,13 +1,15 @@
-import { useMemo } from "react";
-import { ArrowLeft, History, Link2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeft, History, Link2, Paperclip } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { isAccessionRetired } from "../../domain/accession";
+import { attachmentsForSubject } from "../../domain/attachment";
 import type {
   AccessionRetirementRecord,
+  Flag,
   ObservationEntry,
 } from "../../domain/types";
 import {
@@ -17,6 +19,8 @@ import {
   trialById,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { AttachmentDialog } from "../attachments/AttachmentDialog";
+import { AttachmentPanel } from "../attachments/AttachmentPanel";
 
 interface ObservationHistoryRow {
   passId: string;
@@ -39,6 +43,7 @@ export function AccessionHistoryPage() {
   const navigate = useNavigate();
   const { state } = useWorkspace();
   const accession = state.accessions.find((item) => item.id === accessionId);
+  const [attachmentFlag, setAttachmentFlag] = useState<Flag | undefined>();
 
   const observationRows = useMemo<ObservationHistoryRow[]>(() => {
     if (!accession) {
@@ -203,6 +208,23 @@ export function AccessionHistoryPage() {
         )}
       </section>
 
+      <section className="content-panel" data-testid="accession-attachments-section">
+        <div className="panel-heading">
+          <div>
+            <span className="panel-title">材料附件</span>
+            <span className="panel-subtitle">
+              现场照片、检测单据等证据随材料保留，停用后仍可查看
+            </span>
+          </div>
+          <Paperclip size={20} className="panel-icon" aria-hidden="true" />
+        </div>
+        <AttachmentPanel
+          subjectKind="accession"
+          subjectId={accession.id}
+          subjectLabel={`${accession.accessionNo} · ${accession.cultivar}`}
+        />
+      </section>
+
       {replacedBy.length > 0 ? (
         <section className="content-panel">
           <div className="panel-heading">
@@ -278,17 +300,40 @@ export function AccessionHistoryPage() {
             <p className="history-empty">暂无标记或放行引用。</p>
           ) : (
             <div className="history-list">
-              {relatedFlags.map((flag) => (
-                <div className="history-list-row" key={flag.id}>
-                  <div>
-                    <strong>{flag.code}</strong>
-                    <StatusBadge tone={statusTone(flag.severity)}>
-                      {flag.severity}
-                    </StatusBadge>
+              {relatedFlags.map((flag) => {
+                const flagAttachmentCount = attachmentsForSubject(
+                  state,
+                  "flag",
+                  flag.id,
+                ).length;
+                return (
+                  <div className="history-list-row" key={flag.id}>
+                    <div>
+                      <strong>{flag.code}</strong>
+                      <StatusBadge tone={statusTone(flag.severity)}>
+                        {flag.severity}
+                      </StatusBadge>
+                      <StatusBadge tone={statusTone(flag.state)}>
+                        {flag.state === "open"
+                          ? "未处理"
+                          : flag.state === "resolved"
+                            ? "已解决"
+                            : "已豁免"}
+                      </StatusBadge>
+                    </div>
+                    <span>{flag.message}</span>
+                    <Button
+                      tone="ghost"
+                      size="sm"
+                      onClick={() => setAttachmentFlag(flag)}
+                      data-testid={`attachments-flag-${flag.id}`}
+                    >
+                      <Paperclip size={14} />
+                      附件{flagAttachmentCount > 0 ? ` ${flagAttachmentCount}` : ""}
+                    </Button>
                   </div>
-                  <span>{flag.message}</span>
-                </div>
-              ))}
+                );
+              })}
               {relatedSnapshots.map((snapshot) => (
                 <div className="history-list-row" key={snapshot.id}>
                   <div>
@@ -304,6 +349,14 @@ export function AccessionHistoryPage() {
           )}
         </article>
       </section>
+      {attachmentFlag ? (
+        <AttachmentDialog
+          subjectKind="flag"
+          subjectId={attachmentFlag.id}
+          subjectLabel={`标记 ${attachmentFlag.code}`}
+          onClose={() => setAttachmentFlag(undefined)}
+        />
+      ) : null}
     </div>
   );
 }
