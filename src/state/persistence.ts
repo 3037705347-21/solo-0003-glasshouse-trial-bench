@@ -1,8 +1,29 @@
-import type { WorkspaceState } from "../domain/types";
+import type { Accession, WorkspaceState } from "../domain/types";
 import { isWorkspaceState } from "./types";
 import { createSampleWorkspaceState } from "./sampleData";
 
 export const WORKSPACE_STORAGE_KEY = "glasshouse-trial-bench:workspace:v1";
+
+function normalizeAccession(accession: Accession): Accession {
+  return {
+    ...accession,
+    lifecycleStatus:
+      accession.lifecycleStatus ??
+      (accession.retiredAt ? "retired" : "active"),
+    retirementHistory: Array.isArray(accession.retirementHistory)
+      ? accession.retirementHistory
+      : [],
+  };
+}
+
+export function normalizeWorkspaceState(
+  state: WorkspaceState,
+): WorkspaceState {
+  return {
+    ...state,
+    accessions: state.accessions.map(normalizeAccession),
+  };
+}
 
 export interface StoredWorkspace {
   version: 1;
@@ -20,7 +41,7 @@ export function loadWorkspaceState(): WorkspaceState {
     if (!parsed || !isWorkspaceState(parsed.state)) {
       return createSampleWorkspaceState();
     }
-    return parsed.state;
+    return normalizeWorkspaceState(parsed.state);
   } catch {
     return createSampleWorkspaceState();
   }

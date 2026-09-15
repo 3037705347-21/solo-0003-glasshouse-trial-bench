@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Leaf, Plus, Sprout } from "lucide-react";
+import { Ban, History, Plus, RotateCcw, Sprout } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { DataTable, type DataColumn } from "../../components/DataTable";
 import { Dialog } from "../../components/Dialog";
@@ -10,27 +11,34 @@ import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import {
   accessionMatchesQuery,
+  isAccessionRetired,
   nextAccessionNumber,
 } from "../../domain/accession";
 import type { Accession } from "../../domain/types";
 import {
-  accessionById,
-  accessionsForTrial,
   accessionStatus,
   benchForAccession,
+  replacementForAccession,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import {
+  RestoreAccessionDialog,
+  RetireAccessionDialog,
+} from "./AccessionLifecycleDialogs";
 import { RosterForm } from "./RosterForm";
 
-type RosterSegment = "all" | "assigned" | "unassigned";
+type RosterSegment = "all" | "active" | "assigned" | "unassigned" | "retired";
 
 export function RosterPage() {
   const { state } = useWorkspace();
+  const navigate = useNavigate();
   const [trialFilter, setTrialFilter] = useState(() => state.trials[0]?.id ?? "");
   const [query, setQuery] = useState("");
   const [segment, setSegment] = useState<RosterSegment>("all");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingAccession, setEditingAccession] = useState<Accession | undefined>();
+  const [retiringAccession, setRetiringAccession] = useState<Accession | undefined>();
+  const [restoringAccession, setRestoringAccession] = useState<Accession | undefined>();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
@@ -47,6 +55,12 @@ export function RosterPage() {
         accessionMatchesQuery(accession, query, trialFilter),
       )
       .filter((accession) => {
+        if (segment === "active") {
+          return !isAccessionRetired(accession);
+        }
+        if (segment === "retired") {
+          return isAccessionRetired(accession);
+        }
         const status = accessionStatus(state, accession);
         if (segment === "assigned") {
           return status === "assigned";
@@ -107,29 +121,81 @@ export function RosterPage() {
       render: (accession) => {
         const status = accessionStatus(state, accession);
         const label =
-          status === "assigned"
-            ? "已分配"
-            : status === "blocked"
-              ? "受限"
-              : "未分配";
-        return <StatusBadge tone={statusTone(label)}>{label}</StatusBadge>;
+          status === "retired"
+            ? "已停用"
+            : status === "assigned"
+              ? "已分配"
+              : status === "blocked"
+                ? "受限"
+                : "未分配";
+        return (
+          <StatusBadge tone={status === "retired" ? "warning" : statusTone(label)}>
+            {label}
+          </StatusBadge>
+        );
+      },
+    },
+    {
+      key: "replacement",
+      header: "替代材料",
+      render: (accession) => {
+        const replacement = replacementForAccession(state, accession);
+        return replacement
+          ? `${replacement.accessionNo} - ${replacement.cultivar}`
+          : "未指定";
       },
     },
     {
       key: "actions",
       header: "",
       render: (accession) => (
-        <Button
-          tone="ghost"
-          size="sm"
-          onClick={() => {
-            setEditingAccession(accession);
-            setEditorOpen(true);
-          }}
-          data-testid={`edit-accession-${accession.id}`}
-        >
-          编辑
-        </Button>
+        <div className="table-actions">
+          <Button
+            tone="ghost"
+            size="sm"
+            onClick={() =>
+              navigate(`/accessions/${accession.id}/history`)
+            }
+            data-testid={`history-accession-${accession.id}`}
+          >
+            <History size={15} />
+            历史
+          </Button>
+          {isAccessionRetired(accession) ? (
+            <Button
+              tone="ghost"
+              size="sm"
+              onClick={() => setRestoringAccession(accession)}
+              data-testid={`restore-accession-${accession.id}`}
+            >
+              <RotateCcw size={15} />
+              恢复
+            </Button>
+          ) : (
+            <>
+              <Button
+                tone="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditingAccession(accession);
+                  setEditorOpen(true);
+                }}
+                data-testid={`edit-accession-${accession.id}`}
+              >
+                编辑
+              </Button>
+              <Button
+                tone="ghost"
+                size="sm"
+                onClick={() => setRetiringAccession(accession)}
+                data-testid={`retire-accession-${accession.id}`}
+              >
+                <Ban size={15} />
+                停用
+              </Button>
+            </>
+          )}
+        </div>
       ),
     },
   ];
@@ -177,8 +243,10 @@ export function RosterPage() {
           value={segment}
           options={[
             { value: "all", label: "全部" },
+            { value: "active", label: "在用" },
             { value: "assigned", label: "已分配" },
             { value: "unassigned", label: "未分配" },
+            { value: "retired", label: "已停用" },
           ]}
           onChange={setSegment}
         />
@@ -229,6 +297,36 @@ export function RosterPage() {
           <p>请先创建试验，再添加材料。</p>
         )}
       </Dialog>
+      {retiringAccession ? (
+        <RetireAccessionDialog
+          accession={retiringAccession}
+          state={state}
+          onCancel={() => setRetiringAccession(undefined)}
+          onSaved={(accession) => {
+            setRetiringAccession(undefined);
+            pushToast({
+              tone: "success",
+              title: "材料已停用",
+              message: `${accession.accessionNo} 已移出新分配和新观测的可选范围。`,
+            });
+          }}
+        />
+      ) : null}
+      {restoringAccession ? (
+        <RestoreAccessionDialog
+          accession={restoringAccession}
+          state={state}
+          onCancel={() => setRestoringAccession(undefined)}
+          onSaved={(accession) => {
+            setRestoringAccession(undefined);
+            pushToast({
+              tone: "success",
+              title: "材料已恢复",
+              message: `${accession.accessionNo} 已重新进入在用范围。`,
+            });
+          }}
+        />
+      ) : null}
       <ToastRegion
         messages={toasts}
         onDismiss={(id) =>

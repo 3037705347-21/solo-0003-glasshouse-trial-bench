@@ -1,7 +1,13 @@
-import type { Accession, PreferredLight, WorkspaceState } from "./types";
+import type {
+  Accession,
+  AccessionRetirementRecord,
+  PreferredLight,
+  WorkspaceState,
+} from "./types";
 import { createAccessionNumber, createId } from "./id";
 import {
   GROWTH_BOUNDS,
+  BENCH_LIGHT_COMPATIBILITY,
   normalizeLabels,
   parseDateOnly,
   todayDateOnly,
@@ -19,6 +25,22 @@ export interface AccessionDraft {
   preferredLight: PreferredLight;
   genotypeNote: string;
   labels: string[];
+}
+
+export interface AccessionRetirementDraft {
+  retiredAt: string;
+  reason: string;
+  replacementId: string;
+}
+
+export function isAccessionRetired(accession: Accession): boolean {
+  return accession.lifecycleStatus === "retired";
+}
+
+export function latestRetirementRecord(
+  accession: Accession,
+): AccessionRetirementRecord | undefined {
+  return accession.retirementHistory[accession.retirementHistory.length - 1];
 }
 
 export function validateAccessionDraft(
@@ -129,6 +151,8 @@ export function createAccession(
     preferredLight: value.preferredLight,
     genotypeNote: value.genotypeNote,
     labels: value.labels,
+    lifecycleStatus: "active",
+    retirementHistory: [],
   });
 }
 
@@ -154,7 +178,209 @@ export function updateAccession(
     preferredLight: value.preferredLight,
     genotypeNote: value.genotypeNote,
     labels: value.labels,
+    lifecycleStatus: current.lifecycleStatus,
+    retiredAt: current.retiredAt,
+    retirementReason: current.retirementReason,
+    replacementId: current.replacementId,
+    retirementHistory: current.retirementHistory,
   });
+}
+
+export function replacementTargetFor(
+  accession: Accession,
+): string | undefined {
+  if (accession.replacementId) {
+    return accession.replacementId;
+  }
+  return latestRetirementRecord(accession)?.replacementId;
+}
+
+export function replacementCandidatesForAccession(
+  state: WorkspaceState,
+  accession: Accession,
+): Accession[] {
+  return state.accessions.filter(
+    (candidate) =>
+      candidate.id !== accession.id &&
+      candidate.trialId === accession.trialId &&
+      !isAccessionRetired(candidate) &&
+      !replacementWouldCycle(state, accession.id, candidate.id),
+  );
+}
+
+export function retireAccession(
+  accession: Accession,
+  draft: AccessionRetirementDraft,
+  state: WorkspaceState,
+): Result<Accession> {
+  const errors: Array<ReturnType<typeof fieldError>> = [];
+  if (isAccessionRetired(accession)) {
+    errors.push(
+      fieldError("lifecycleStatus", "already_retired", "该材料已经停用"),
+    );
+  }
+  if (draft.reason.trim().length < 4) {
+    errors.push(
+      fieldError("reason", "too_short", "请填写至少四个字符的停用原因"),
+    );
+  }
+  const retiredAt = normalizeTimestamp(draft.retiredAt);
+  if (!retiredAt) {
+    errors.push(fieldError("retiredAt", "invalid_date", "停用时间无效"));
+  }
+
+  const replacement = state.accessions.find(
+    (candidate) => candidate.id === draft.replacementId,
+  );
+  if (!replacement) {
+    errors.push(
+      fieldError("replacementId", "unknown", "请选择有效替代材料"),
+    );
+  } else if (replacement.id === accession.id) {
+    errors.push(
+      fieldError("replacementId", "self", "替代材料不能是当前材料"),
+    );
+  } else if (replacement.trialId !== accession.trialId) {
+    errors.push(
+      fieldError(
+        "replacementId",
+        "cross_trial",
+        "替代材料必须属于同一试验",
+      ),
+    );
+  } else if (isAccessionRetired(replacement)) {
+    errors.push(
+      fieldError(
+        "replacementId",
+        "retired",
+        "替代材料必须处于在用状态",
+      ),
+    );
+  } else if (replacementWouldCycle(state, accession.id, replacement.id)) {
+    errors.push(
+      fieldError(
+        "replacementId",
+        "cycle",
+        "替代关系不能形成循环",
+      ),
+    );
+  }
+
+  if (errors.length > 0 || !retiredAt) {
+    return fail(errors);
+  }
+
+  const record: AccessionRetirementRecord = {
+    id: createId("retire"),
+    retiredAt,
+    reason: draft.reason.trim(),
+    replacementId: replacement?.id,
+  };
+  return ok({
+    ...accession,
+    lifecycleStatus: "retired",
+    retiredAt,
+    retirementReason: record.reason,
+    replacementId: replacement?.id,
+    retirementHistory: [...accession.retirementHistory, record],
+  });
+}
+
+export function restoreAccession(
+  accession: Accession,
+  state: WorkspaceState,
+  benchConditionsConfirmed: boolean,
+): Result<Accession> {
+  const errors: Array<ReturnType<typeof fieldError>> = [];
+  if (!isAccessionRetired(accession)) {
+    errors.push(
+      fieldError("lifecycleStatus", "already_active", "该材料当前不是停用状态"),
+    );
+  }
+  if (!benchConditionsConfirmed) {
+    errors.push(
+      fieldError(
+        "benchConditionsConfirmed",
+        "confirmation_required",
+        "请先确认已重新检查台架和光照条件",
+      ),
+    );
+  }
+
+  const bench = state.benches.find((item) =>
+    item.assignedIds.includes(accession.id),
+  );
+  if (bench) {
+    if (bench.status === "blocked" || bench.status === "quarantine") {
+      errors.push(
+        fieldError(
+          "benchId",
+          "unavailable",
+          `台架 ${bench.code} 当前不可用，请先移出或恢复台架`,
+        ),
+      );
+    } else if (
+      !BENCH_LIGHT_COMPATIBILITY[accession.preferredLight].includes(
+        bench.lightProfile,
+      )
+    ) {
+      errors.push(
+        fieldError(
+          "preferredLight",
+          "light_mismatch",
+          `材料所需光照与台架 ${bench.code} 不兼容，请先调整分配`,
+        ),
+      );
+    }
+  }
+
+  if (errors.length > 0) {
+    return fail(errors);
+  }
+
+  const restoredAt = new Date().toISOString();
+  return ok({
+    ...accession,
+    lifecycleStatus: "active",
+    retiredAt: undefined,
+    retirementReason: undefined,
+    replacementId: undefined,
+    retirementHistory: accession.retirementHistory.map((record, index) =>
+      index === accession.retirementHistory.length - 1 && !record.restoredAt
+        ? { ...record, restoredAt }
+        : record,
+    ),
+  });
+}
+
+export function replacementWouldCycle(
+  state: WorkspaceState,
+  accessionId: string,
+  replacementId: string,
+): boolean {
+  const byId = new Map(state.accessions.map((item) => [item.id, item]));
+  const visited = new Set<string>();
+  let cursor: string | undefined = replacementId;
+  while (cursor) {
+    if (cursor === accessionId) {
+      return true;
+    }
+    if (visited.has(cursor)) {
+      return true;
+    }
+    visited.add(cursor);
+    const current = byId.get(cursor);
+    cursor = current ? replacementTargetFor(current) : undefined;
+  }
+  return false;
+}
+
+function normalizeTimestamp(value: string): string | undefined {
+  if (!value.trim()) {
+    return undefined;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
 
 export function nextAccessionNumber(state: WorkspaceState): string {

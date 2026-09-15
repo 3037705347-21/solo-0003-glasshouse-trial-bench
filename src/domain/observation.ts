@@ -8,6 +8,7 @@ import type {
 import { createId } from "./id";
 import { GROWTH_BOUNDS, parseDateOnly, todayDateOnly } from "./rules";
 import { fail, fieldError, ok, type Result } from "./result";
+import { isAccessionRetired } from "./accession";
 
 export interface ObservationDraft {
   trialId: string;
@@ -54,15 +55,34 @@ export function validateObservationDraft(
       fieldError("entries", "empty", "请至少添加一条测量记录"),
     );
   }
-  const accessionIds = new Set(state.accessions.map((item) => item.id));
+  const accessionsById = new Map(
+    state.accessions.map((item) => [item.id, item]),
+  );
   const seen = new Set<string>();
   draft.entries.forEach((entry, index) => {
-    if (!accessionIds.has(entry.accessionId)) {
+    const accession = accessionsById.get(entry.accessionId);
+    if (!accession) {
       errors.push(
         fieldError(
           `entries.${index}.accessionId`,
           "unknown",
           "请选择有效材料",
+        ),
+      );
+    } else if (isAccessionRetired(accession)) {
+      errors.push(
+        fieldError(
+          `entries.${index}.accessionId`,
+          "retired",
+          `${accession.accessionNo} 已停用，不能进入新观测`,
+        ),
+      );
+    } else if (accession.trialId !== draft.trialId) {
+      errors.push(
+        fieldError(
+          `entries.${index}.accessionId`,
+          "cross_trial",
+          "观测材料必须属于当前试验",
         ),
       );
     } else if (seen.has(entry.accessionId)) {

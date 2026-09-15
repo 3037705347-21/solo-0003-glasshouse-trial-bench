@@ -12,6 +12,15 @@ export interface Trial {
 }
 
 export type PreferredLight = "full-sun" | "partial-shade" | "shade";
+export type AccessionLifecycle = "active" | "retired";
+
+export interface AccessionRetirementRecord {
+  id: string;
+  retiredAt: string;
+  reason: string;
+  replacementId?: string;
+  restoredAt?: string;
+}
 
 export interface Accession {
   id: string;
@@ -25,6 +34,11 @@ export interface Accession {
   preferredLight: PreferredLight;
   genotypeNote: string;
   labels: string[];
+  lifecycleStatus: AccessionLifecycle;
+  retiredAt?: string;
+  retirementReason?: string;
+  replacementId?: string;
+  retirementHistory: AccessionRetirementRecord[];
 }
 
 export type BenchStatus = "available" | "assigned" | "blocked" | "quarantine";

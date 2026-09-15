@@ -4,6 +4,7 @@ import { ProgressBar } from "../../components/ProgressBar";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { Accession, Bench } from "../../domain/types";
 import { canAssignAccession } from "../../domain/bench";
+import { isAccessionRetired } from "../../domain/accession";
 
 interface BenchCardProps {
   bench: Bench;
@@ -81,7 +82,10 @@ export function BenchCard({
             <div className="bench-accession-row" key={accession.id}>
               <div>
                 <strong>{accession.cultivar}</strong>
-                <span>{accession.accessionNo}</span>
+                <span>
+                  {accession.accessionNo}
+                  {isAccessionRetired(accession) ? " · 已停用" : ""}
+                </span>
               </div>
               <Button
                 tone="ghost"

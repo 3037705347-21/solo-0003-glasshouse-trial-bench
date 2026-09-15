@@ -2,7 +2,10 @@ import { ArrowRight, ListPlus } from "lucide-react";
 import { SelectField } from "../../components/fields";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { Accession, Bench } from "../../domain/types";
-import { accessionStatus } from "../../state/selectors";
+import {
+  accessionStatus,
+  activeAccessionsForTrial,
+} from "../../state/selectors";
 import type { WorkspaceState } from "../../domain/types";
 import { canAssignAccession } from "../../domain/bench";
 
@@ -19,9 +22,7 @@ export function AssignmentPanel({
   selectedAccessionId,
   onSelectAccession,
 }: AssignmentPanelProps) {
-  const accessions = state.accessions.filter(
-    (accession) => accession.trialId === trialId,
-  );
+  const accessions = activeAccessionsForTrial(state, trialId);
   const selected = accessions.find(
     (accession) => accession.id === selectedAccessionId,
   );
@@ -58,6 +59,8 @@ export function AssignmentPanel({
                 ? "已分配"
                 : accessionStatus(state, selected) === "blocked"
                   ? "受限"
+                  : accessionStatus(state, selected) === "retired"
+                    ? "已停用"
                   : "未分配"}
             </StatusBadge>
           </div>

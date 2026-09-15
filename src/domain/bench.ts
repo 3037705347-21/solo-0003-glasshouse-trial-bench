@@ -1,8 +1,12 @@
 import type { Accession, Bench, PreferredLight } from "./types";
 import { BENCH_LIGHT_COMPATIBILITY } from "./rules";
 import { fail, fieldError, ok, type Result } from "./result";
+import { isAccessionRetired } from "./accession";
 
 export function canAssignAccession(accession: Accession, bench: Bench): boolean {
+  if (isAccessionRetired(accession)) {
+    return false;
+  }
   if (bench.status === "blocked" || bench.status === "quarantine") {
     return false;
   }
@@ -21,6 +25,15 @@ export function validateBenchAssignment(
   accession: Accession,
   bench: Bench,
 ): Result<{ accessionId: string; benchId: string }> {
+  if (isAccessionRetired(accession)) {
+    return fail([
+      fieldError(
+        "accessionId",
+        "retired",
+        `${accession.accessionNo} 已停用，不能进入新分配`,
+      ),
+    ]);
+  }
   if (bench.status === "blocked") {
     return fail([
       fieldError(

@@ -15,6 +15,7 @@ const scenarios = {
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
+  "retire-accession-replacement": retireAccessionReplacement,
 };
 
 const scenarioPaths = {
@@ -22,6 +23,7 @@ const scenarioPaths = {
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
+  "retire-accession-replacement": "/roster",
 };
 
 async function waitForServer() {
@@ -91,6 +93,150 @@ async function advanceTrialClearance(page) {
     .getByText("阻止", { exact: true })
     .first()
     .waitFor();
+}
+
+async function assertCount(locator, expected, label) {
+  const actual = await locator.count();
+  if (actual !== expected) {
+    throw new Error(`${label}: expected ${expected}, got ${actual}`);
+  }
+}
+
+async function retireAccessionReplacement(page) {
+  await page.goto(`${baseUrl}/#/clearance`, { waitUntil: "networkidle" });
+  await page.getByTestId("generate-clearance").click();
+  await page.getByText("放行被阻止", { exact: true }).waitFor();
+  const savedSnapshot = page
+    .locator(".clearance-preview")
+    .nth(1)
+    .getByTestId("clearance-snapshot");
+  const savedSnapshotBefore = await savedSnapshot.innerText();
+
+  await page.goto(`${baseUrl}/#/roster`, { waitUntil: "networkidle" });
+  await page.getByTestId("retire-accession-acc-tom-03").click();
+  await page.getByTestId("retire-replacement-select").selectOption("acc-tom-02");
+  await page
+    .getByTestId("retire-accession-reason")
+    .fill("批次已完成，剩余苗株不再继续观测。");
+  await page.getByTestId("confirm-retire-accession").click();
+  await page.getByText("材料已停用", { exact: true }).waitFor();
+
+  const unassignedRow = page.locator("tr").filter({ hasText: "ACC-0003" });
+  await unassignedRow.getByText("已停用", { exact: true }).waitFor();
+  await unassignedRow.getByText("ACC-0002 - Micro Tom", { exact: true }).waitFor();
+
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  await assertCount(
+    page.getByTestId("assignment-accession-select").locator('option[value="acc-tom-03"]'),
+    0,
+    "retired unassigned material in assignment selector",
+  );
+
+  await page.goto(`${baseUrl}/#/observations`, { waitUntil: "networkidle" });
+  await page.getByTestId("open-observation-form").click();
+  await assertCount(
+    page.locator(".entry-row").first().locator('option[value="acc-tom-03"]'),
+    0,
+    "retired unassigned material in observation selector",
+  );
+  await page.getByRole("button", { name: "取消" }).click();
+
+  await page.goto(`${baseUrl}/#/roster`, { waitUntil: "networkidle" });
+  await page.getByTestId("retire-accession-acc-tom-01").click();
+  await page.getByTestId("retire-replacement-select").selectOption("acc-tom-02");
+  await page
+    .getByTestId("retire-accession-reason")
+    .fill("本批材料已完成采样，转入历史记录。");
+  await page.getByTestId("confirm-retire-accession").click();
+  await page.getByText("材料已停用", { exact: true }).waitFor();
+
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  const eastOne = page.getByTestId("bench-card-bench-east-1");
+  await eastOne.getByText("Tiny Tim", { exact: true }).waitFor();
+  await eastOne.getByText("ACC-0001 · 已停用", { exact: true }).waitFor();
+  await assertCount(
+    page.getByTestId("assignment-accession-select").locator('option[value="acc-tom-01"]'),
+    0,
+    "retired assigned material in assignment selector",
+  );
+
+  await page.goto(
+    `${baseUrl}/#/accessions/acc-tom-01/history`,
+    { waitUntil: "networkidle" },
+  );
+  await page.getByTestId("accession-history-page").waitFor();
+  await page.getByText("本批材料已完成采样，转入历史记录。", { exact: true }).waitFor();
+  await page.getByText("E-1", { exact: true }).waitFor();
+  await page.getByText("株高 58 mm", { exact: true }).waitFor();
+  await page.getByText("Tiny Tim 低于 60 毫米生长阈值", { exact: true }).waitFor();
+  await page.getByText("放行快照", { exact: true }).waitFor();
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByText("ACC-0001 · Tiny Tim", { exact: true }).waitFor();
+
+  await page.goto(
+    `${baseUrl}/#/accessions/acc-tom-02/history`,
+    { waitUntil: "networkidle" },
+  );
+  await page.getByText("被替代材料", { exact: true }).waitFor();
+  await page.locator(".relation-list").getByText("ACC-0001", { exact: false }).waitFor();
+  await page.locator(".relation-list").getByText("ACC-0003", { exact: false }).waitFor();
+
+  await page.goto(`${baseUrl}/#/roster`, { waitUntil: "networkidle" });
+  await page.getByTestId("restore-accession-acc-tom-01").click();
+  await page.getByTestId("confirm-restore-accession").click();
+  await page
+    .getByText("请先确认已重新检查台架和光照条件", { exact: true })
+    .waitFor();
+  await page.getByTestId("restore-bench-conditions").check();
+  await page.getByTestId("confirm-restore-accession").click();
+  await page.getByText("材料已恢复", { exact: true }).waitFor();
+  const restoredRow = page.locator("tr").filter({ hasText: "ACC-0001" });
+  await restoredRow.getByText("已分配", { exact: true }).waitFor();
+  await page.goto(
+    `${baseUrl}/#/accessions/acc-tom-01/history`,
+    { waitUntil: "networkidle" },
+  );
+  await page.getByText("曾停用后恢复", { exact: true }).waitFor();
+
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  await assertCount(
+    page.getByTestId("assignment-accession-select").locator('option[value="acc-tom-01"]'),
+    1,
+    "restored material in assignment selector",
+  );
+
+  await page.goto(`${baseUrl}/#/observations`, { waitUntil: "networkidle" });
+  await page.getByTestId("open-observation-form").click();
+  await assertCount(
+    page.locator(".entry-row").first().locator('option[value="acc-tom-01"]'),
+    1,
+    "restored material in observation selector",
+  );
+  await page.getByRole("button", { name: "取消" }).click();
+
+  await page.goto(`${baseUrl}/#/roster`, { waitUntil: "networkidle" });
+  await page.getByTestId("retire-accession-acc-tom-02").click();
+  await assertCount(
+    page.getByTestId("retire-replacement-select").locator('option[value="acc-tom-02"]'),
+    0,
+    "self replacement option",
+  );
+  await assertCount(
+    page.getByTestId("retire-replacement-select").locator('option[value="acc-tom-01"]'),
+    0,
+    "cycle-producing replacement option",
+  );
+  await page.getByRole("button", { name: "取消" }).click();
+
+  await page.goto(`${baseUrl}/#/clearance`, { waitUntil: "networkidle" });
+  const savedSnapshotAfter = await page
+    .locator(".clearance-preview")
+    .nth(1)
+    .getByTestId("clearance-snapshot")
+    .innerText();
+  if (savedSnapshotAfter !== savedSnapshotBefore) {
+    throw new Error("saved clearance snapshot changed after material retirement");
+  }
 }
 
 async function runScenario(scenarioName) {

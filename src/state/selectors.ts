@@ -7,6 +7,10 @@ import type {
   Trial,
   WorkspaceState,
 } from "../domain/types";
+import {
+  isAccessionRetired,
+  latestRetirementRecord,
+} from "../domain/accession";
 
 export function trialById(
   state: WorkspaceState,
@@ -22,6 +26,39 @@ export function accessionsForTrial(
   return state.accessions.filter(
     (accession) => accession.trialId === trialId,
   );
+}
+
+export function activeAccessionsForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): Accession[] {
+  return accessionsForTrial(state, trialId).filter(
+    (accession) => !isAccessionRetired(accession),
+  );
+}
+
+export function replacementForAccession(
+  state: WorkspaceState,
+  accession: Accession,
+): Accession | undefined {
+  const replacementId =
+    accession.replacementId ?? latestRetirementRecord(accession)?.replacementId;
+  return replacementId
+    ? state.accessions.find((item) => item.id === replacementId)
+    : undefined;
+}
+
+export function replacedByAccessions(
+  state: WorkspaceState,
+  accessionId: string,
+): Accession[] {
+  return state.accessions.filter((accession) => {
+    const latest = latestRetirementRecord(accession);
+    return (
+      accession.replacementId === accessionId ||
+      latest?.replacementId === accessionId
+    );
+  });
 }
 
 export function accessionById(
@@ -84,7 +121,10 @@ export function benchUtilization(
 export function accessionStatus(
   state: WorkspaceState,
   accession: Accession,
-): "assigned" | "unassigned" | "blocked" {
+): "assigned" | "unassigned" | "blocked" | "retired" {
+  if (isAccessionRetired(accession)) {
+    return "retired";
+  }
   const bench = benchForAccession(state, accession.id);
   if (!bench) {
     return "unassigned";

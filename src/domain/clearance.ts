@@ -6,6 +6,7 @@ import type {
   WorkspaceState,
 } from "./types";
 import { createId } from "./id";
+import { isAccessionRetired } from "./accession";
 
 export function buildClearanceSnapshot(
   state: WorkspaceState,
@@ -15,14 +16,23 @@ export function buildClearanceSnapshot(
   const accessions = state.accessions.filter(
     (accession) => accession.trialId === trialId,
   );
+  const activeAccessions = accessions.filter(
+    (accession) => !isAccessionRetired(accession),
+  );
+  const activeAccessionIds = new Set(
+    activeAccessions.map((accession) => accession.id),
+  );
   const assignedIds = new Set(
     state.benches.flatMap((bench) => bench.assignedIds),
   );
   const openFlags = state.flags.filter(
-    (flag) => flag.trialId === trialId && flag.state === "open",
+    (flag) =>
+      flag.trialId === trialId &&
+      flag.state === "open" &&
+      activeAccessionIds.has(flag.accessionId),
   );
   const blockers: ClearanceBlocker[] = [];
-  accessions.forEach((accession) => {
+  activeAccessions.forEach((accession) => {
     if (!assignedIds.has(accession.id)) {
       blockers.push({
         code: "UNASSIGNED",
@@ -47,7 +57,7 @@ export function buildClearanceSnapshot(
       accessionId: flag.accessionId,
     });
   });
-  if (accessions.length === 0) {
+  if (activeAccessions.length === 0) {
     blockers.push({
       code: "NO_ACCESSIONS",
         message: "该试验没有材料",
@@ -66,9 +76,14 @@ export function buildClearanceSnapshot(
       detail: "该试验中的材料总数",
     },
     {
+      label: "在用材料",
+      value: activeAccessions.length,
+      detail: "仍参与新分配和新观测的材料数",
+    },
+    {
       label: "已分配",
-      value: accessions.filter((item) => assignedIds.has(item.id)).length,
-      detail: "已放置到台架的材料数",
+      value: activeAccessions.filter((item) => assignedIds.has(item.id)).length,
+      detail: "已放置到台架的在用材料数",
     },
     {
       label: "未处理标记",
@@ -77,8 +92,12 @@ export function buildClearanceSnapshot(
     },
     {
       label: "在用台架",
-      value: state.benches.filter((bench) => bench.status === "assigned").length,
-      detail: "至少有一个材料的台架数",
+      value: state.benches.filter(
+        (bench) =>
+          bench.status === "assigned" &&
+          bench.assignedIds.some((id) => activeAccessionIds.has(id)),
+      ).length,
+      detail: "至少有一个在用材料的台架数",
     },
   ];
   return {

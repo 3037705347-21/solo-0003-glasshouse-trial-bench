@@ -54,6 +54,8 @@ const accessions: Accession[] = [
     preferredLight: "full-sun",
     genotypeNote: "有限生长型矮化品系，节间紧凑。",
     labels: ["矮化", "早熟"],
+    lifecycleStatus: "active",
+    retirementHistory: [],
   },
   {
     id: "acc-tom-02",
@@ -67,6 +69,8 @@ const accessions: Accession[] = [
     preferredLight: "full-sun",
     genotypeNote: "矮化品种，单盆果实密度较高。",
     labels: ["矮化", "果实"],
+    lifecycleStatus: "active",
+    retirementHistory: [],
   },
   {
     id: "acc-tom-03",
@@ -80,6 +84,8 @@ const accessions: Accession[] = [
     preferredLight: "full-sun",
     genotypeNote: "无限生长型樱桃番茄品系，用于活力比较。",
     labels: ["樱桃", "活力"],
+    lifecycleStatus: "active",
+    retirementHistory: [],
   },
   {
     id: "acc-bee-01",
@@ -93,6 +99,8 @@ const accessions: Accession[] = [
     preferredLight: "partial-shade",
     genotypeNote: "深红叶用批次，中等耐热性。",
     labels: ["叶用", "颜色"],
+    lifecycleStatus: "active",
+    retirementHistory: [],
   },
   {
     id: "acc-bee-02",
@@ -106,6 +114,8 @@ const accessions: Accession[] = [
     preferredLight: "partial-shade",
     genotypeNote: "金色甜菜品系，用于低草酸筛选。",
     labels: ["金色", "低草酸"],
+    lifecycleStatus: "active",
+    retirementHistory: [],
   },
   {
     id: "acc-bee-03",
@@ -119,6 +129,8 @@ const accessions: Accession[] = [
     preferredLight: "partial-shade",
     genotypeNote: "条纹甜菜，用于质地和储藏性检查。",
     labels: ["条纹", "储藏"],
+    lifecycleStatus: "active",
+    retirementHistory: [],
   },
   {
     id: "acc-kale-01",
@@ -132,6 +144,8 @@ const accessions: Accession[] = [
     preferredLight: "partial-shade",
     genotypeNote: "传统羽衣甘蓝品系，叶片深色且有褶皱。",
     labels: ["传统", "叶用"],
+    lifecycleStatus: "active",
+    retirementHistory: [],
   },
   {
     id: "acc-kale-02",
@@ -145,6 +159,8 @@ const accessions: Accession[] = [
     preferredLight: "partial-shade",
     genotypeNote: "卷叶羽衣甘蓝杂交种，耐寒性较好。",
     labels: ["杂交", "耐寒"],
+    lifecycleStatus: "active",
+    retirementHistory: [],
   },
 ];
 

@@ -6,6 +6,7 @@ import { PageHeader } from "../../components/PageHeader";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import type { ObservationPass } from "../../domain/types";
+import { isAccessionRetired } from "../../domain/accession";
 import {
   openFlagsForTrial,
   passesForTrial,
@@ -99,8 +100,17 @@ export function ObservationPage() {
                         (item) => item.id === entry.accessionId,
                       );
                       return (
-                        <StatusBadge tone="neutral" key={entry.accessionId}>
-                          {accession?.accessionNo ?? entry.accessionId}
+                        <StatusBadge
+                          tone={
+                            accession && isAccessionRetired(accession)
+                              ? "warning"
+                              : "neutral"
+                          }
+                          key={entry.accessionId}
+                        >
+                          {accession
+                            ? `${accession.accessionNo}${isAccessionRetired(accession) ? " 已停用" : ""}`
+                            : entry.accessionId}
                         </StatusBadge>
                       );
                     })}

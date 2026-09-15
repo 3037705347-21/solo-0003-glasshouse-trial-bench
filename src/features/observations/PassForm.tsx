@@ -7,7 +7,7 @@ import type { ObservationDraft } from "../../domain/observation";
 import type { FieldError } from "../../domain/result";
 import { createObservationPass, deriveFlags } from "../../domain/observation";
 import { todayDateOnly } from "../../domain/rules";
-import { accessionsForTrial } from "../../state/selectors";
+import { activeAccessionsForTrial } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 
 interface PassFormProps {
@@ -28,7 +28,7 @@ function emptyEntry(accessionId = ""): ObservationEntry {
 
 export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
   const { state, dispatch } = useWorkspace();
-  const accessions = accessionsForTrial(state, trialId);
+  const accessions = activeAccessionsForTrial(state, trialId);
   const [draft, setDraft] = useState<ObservationDraft>({
     trialId,
     observedOn: todayDateOnly(),
