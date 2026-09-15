@@ -20,7 +20,10 @@ export function loadWorkspaceState(): WorkspaceState {
     if (!parsed || !isWorkspaceState(parsed.state)) {
       return createSampleWorkspaceState();
     }
-    return parsed.state;
+    return {
+      ...parsed.state,
+      closeoutReviews: parsed.state.closeoutReviews ?? [],
+    };
   } catch {
     return createSampleWorkspaceState();
   }

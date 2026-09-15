@@ -59,6 +59,19 @@ export function workspaceReducer(
         clearanceSnapshots: [...state.clearanceSnapshots, action.snapshot],
         trials: action.trials,
       };
+    case "closeout/recorded":
+      return {
+        ...state,
+        closeoutReviews: [...state.closeoutReviews, action.review],
+      };
+    case "closeout/transitioned":
+    case "closeout/action-completed":
+      return {
+        ...state,
+        closeoutReviews: state.closeoutReviews.map((review) =>
+          review.id === action.review.id ? action.review : review,
+        ),
+      };
     default:
       return state;
   }

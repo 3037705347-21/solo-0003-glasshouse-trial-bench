@@ -1,14 +1,20 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Play, ShieldCheck } from "lucide-react";
 import { Button } from "../../components/Button";
 import { PageHeader } from "../../components/PageHeader";
+import { StatusBadge } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import {
   applyClearance,
   buildClearanceSnapshot,
 } from "../../domain/clearance";
+import { describeCloseoutStatus } from "../../domain/closeout";
 import { transitionTrial } from "../../domain/trial";
-import { latestSnapshotForTrial } from "../../state/selectors";
+import {
+  closeoutReviewsForTrial,
+  latestSnapshotForTrial,
+} from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { SnapshotCard } from "./SnapshotCard";
 
@@ -18,6 +24,8 @@ export function ClearancePage() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const latest = latestSnapshotForTrial(state, trialId);
   const trial = state.trials.find((item) => item.id === trialId);
+  const reviews = closeoutReviewsForTrial(state, trialId);
+  const latestReview = reviews[reviews.length - 1];
 
   const liveSnapshot = useMemo(
     () => buildClearanceSnapshot(state, trialId),
@@ -137,6 +145,63 @@ export function ClearancePage() {
           <SnapshotCard snapshot={latest} />
         </section>
       ) : null}
+      <section className="content-panel">
+        <div className="panel-heading">
+          <div>
+            <span className="panel-title">关闭复盘记录</span>
+            <span className="panel-subtitle">
+              {latestReview
+                ? `共 ${reviews.length} 轮复盘，最近为${describeCloseoutStatus(latestReview.status)}`
+                : "该试验还没有复盘记录"}
+            </span>
+          </div>
+          <Link
+            to="/closeout"
+            className="button button-secondary button-sm"
+            data-testid="goto-closeout"
+          >
+            前往关闭复盘
+          </Link>
+        </div>
+        {reviews.length === 0 ? (
+          <p className="muted-copy clearance-review-empty">
+            {trial?.state === "cleared"
+              ? "试验已放行，可以创建关闭复盘来归档结论。"
+              : "试验放行或接近尾声时，可以创建关闭复盘。"}
+          </p>
+        ) : (
+          <ul className="clearance-review-list" data-testid="clearance-review-list">
+            {[...reviews].reverse().map((review) => {
+              const createdOn = new Date(review.createdOn);
+              const dateLabel = Number.isNaN(createdOn.getTime())
+                ? review.createdOn
+                : createdOn.toLocaleString();
+              return (
+                <li key={review.id} data-testid={`clearance-review-${review.id}`}>
+                  <span className="clearance-review-round">
+                    第 {review.round} 轮
+                  </span>
+                  <StatusBadge
+                    tone={
+                      review.status === "completed"
+                        ? "positive"
+                        : review.status === "follow-up"
+                          ? "warning"
+                          : "neutral"
+                    }
+                  >
+                    {describeCloseoutStatus(review.status)}
+                  </StatusBadge>
+                  <span className="clearance-review-date">{dateLabel}</span>
+                  <span className="clearance-review-conclusion">
+                    {review.conclusion}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
       <ToastRegion
         messages={toasts}
         onDismiss={(id) =>

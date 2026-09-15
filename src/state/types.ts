@@ -2,6 +2,7 @@ import type {
   Accession,
   Bench,
   ClearanceSnapshot,
+  CloseoutReview,
   Flag,
   ObservationPass,
   Trial,
@@ -24,7 +25,10 @@ export type WorkspaceAction =
       type: "clearance/generated";
       snapshot: ClearanceSnapshot;
       trials: Trial[];
-    };
+    }
+  | { type: "closeout/recorded"; review: CloseoutReview }
+  | { type: "closeout/transitioned"; review: CloseoutReview }
+  | { type: "closeout/action-completed"; review: CloseoutReview };
 
 export function isWorkspaceState(value: unknown): value is WorkspaceState {
   if (!value || typeof value !== "object") {
@@ -37,6 +41,8 @@ export function isWorkspaceState(value: unknown): value is WorkspaceState {
     Array.isArray(candidate.benches) &&
     Array.isArray(candidate.observationPasses) &&
     Array.isArray(candidate.flags) &&
-    Array.isArray(candidate.clearanceSnapshots)
+    Array.isArray(candidate.clearanceSnapshots) &&
+    (candidate.closeoutReviews === undefined ||
+      Array.isArray(candidate.closeoutReviews))
   );
 }

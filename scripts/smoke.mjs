@@ -15,6 +15,7 @@ const scenarios = {
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
+  "close-trial-review": closeTrialReview,
 };
 
 const scenarioPaths = {
@@ -22,6 +23,7 @@ const scenarioPaths = {
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
+  "close-trial-review": "/closeout",
 };
 
 async function waitForServer() {
@@ -90,6 +92,43 @@ async function advanceTrialClearance(page) {
     .getByTestId("clearance-snapshot")
     .getByText("阻止", { exact: true })
     .first()
+    .waitFor();
+}
+
+async function closeTrialReview(page) {
+  const timeline = page.getByTestId("review-timeline");
+  const firstCard = () =>
+    timeline.locator('[data-testid^="review-card-"]').first();
+
+  await page.getByTestId("open-closeout-form").click();
+  await page.getByTestId("reviewer-input").fill("L. Chen");
+  await page
+    .getByTestId("conclusion-input")
+    .fill("本季番茄品系整体表现稳定，达到预期坐果目标。");
+  await page
+    .getByTestId("advice-input")
+    .fill("下一季增加中期观测频次，并提前安排吊蔓。");
+  await page.getByTestId("action-input").fill("整理 Yellow Pear 节间数据并归档");
+  await page.getByTestId("add-action-item").click();
+  await page.getByTestId("save-closeout-button").click();
+  await page.getByText("复盘已记录", { exact: true }).waitFor();
+
+  // 新一轮复盘追加为连续记录，而不是覆盖第 1 轮。
+  await timeline.getByText("第 2 轮复盘", { exact: true }).waitFor();
+  await timeline.getByText("第 1 轮复盘", { exact: true }).waitFor();
+  await firstCard().getByText("待跟进", { exact: true }).waitFor();
+
+  // 完成行动项后保留时间线，随后关闭复盘。
+  await firstCard().getByTestId("complete-action-item").click();
+  await firstCard().getByText("完成于", { exact: false }).waitFor();
+  await firstCard().getByTestId("close-review").click();
+  await firstCard().getByText("已关闭", { exact: true }).waitFor();
+
+  // 复盘结果可以从试验放行页面找回。
+  await page.goto(`${baseUrl}/#/clearance`, { waitUntil: "networkidle" });
+  await page
+    .getByTestId("clearance-review-list")
+    .getByText("第 2 轮", { exact: true })
     .waitFor();
 }
 

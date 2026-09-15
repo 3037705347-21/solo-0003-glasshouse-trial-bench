@@ -2,6 +2,7 @@ import type {
   Accession,
   Bench,
   ClearanceSnapshot,
+  CloseoutReview,
   Flag,
   ObservationPass,
   Trial,
@@ -300,6 +301,53 @@ const flags: Flag[] = [
 
 const clearanceSnapshots: ClearanceSnapshot[] = [];
 
+const closeoutReviews: CloseoutReview[] = [
+  {
+    id: "rev-sol-01",
+    trialId: "trial-sol-01",
+    round: 1,
+    createdOn: "2026-05-20T09:00:00.000Z",
+    createdBy: "L. Chen",
+    conclusion:
+      "三个番茄品系完成早期坐果评估，Tiny Tim 与 Micro Tom 节间紧凑、表现稳定，Yellow Pear 活力强但节间均匀性不足。",
+    outstandingIssues: "Yellow Pear 节间伸长不均的原因未完全定位，需要结合灌溉记录复核。",
+    nextSeasonAdvice: "下一季对无限生长型品系增加两次中期观测，并提前安排吊蔓与整枝。",
+    status: "closed",
+    statusChangedOn: "2026-05-25T10:00:00.000Z",
+    closedOn: "2026-05-25T10:00:00.000Z",
+    facts: {
+      capturedOn: "2026-05-20T09:00:00.000Z",
+      trialCode: "SOL-01",
+      trialState: "active",
+      accessions: [
+        { accessionNo: "ACC-0001", cultivar: "Tiny Tim", benchCode: "E-1" },
+        { accessionNo: "ACC-0002", cultivar: "Micro Tom", benchCode: "E-1" },
+        { accessionNo: "ACC-0003", cultivar: "Yellow Pear" },
+      ],
+      observationPasses: [
+        { observedOn: "2026-02-26", observer: "M. Ikeda", entryCount: 3 },
+      ],
+      flags: [
+        {
+          code: "HT_UNDER",
+          severity: "warning",
+          state: "open",
+          message: "Tiny Tim 低于 60 毫米生长阈值",
+        },
+      ],
+      benches: [{ code: "E-1", sector: "东翼", usedSlots: 2, capacity: 4 }],
+    },
+    actionItems: [
+      {
+        id: "act-sol-01",
+        text: "复核 Yellow Pear 节间数据并补记一次观测",
+        createdOn: "2026-05-20T09:00:00.000Z",
+        completedOn: "2026-05-22T08:30:00.000Z",
+      },
+    ],
+  },
+];
+
 export function createSampleWorkspaceState(): WorkspaceState {
   return {
     trials,
@@ -308,5 +356,6 @@ export function createSampleWorkspaceState(): WorkspaceState {
     observationPasses,
     flags,
     clearanceSnapshots,
+    closeoutReviews,
   };
 }

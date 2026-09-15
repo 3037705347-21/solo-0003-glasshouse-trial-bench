@@ -2,6 +2,7 @@ import type {
   Accession,
   Bench,
   ClearanceSnapshot,
+  CloseoutReview,
   Flag,
   ObservationPass,
   Trial,
@@ -65,6 +66,23 @@ export function latestSnapshotForTrial(
   return [...state.clearanceSnapshots]
     .filter((snapshot) => snapshot.trialId === trialId)
     .sort((left, right) => right.generatedOn.localeCompare(left.generatedOn))[0];
+}
+
+export function closeoutReviewsForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): CloseoutReview[] {
+  return state.closeoutReviews
+    .filter((review) => review.trialId === trialId)
+    .sort((left, right) => left.round - right.round);
+}
+
+export function latestCloseoutForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): CloseoutReview | undefined {
+  const reviews = closeoutReviewsForTrial(state, trialId);
+  return reviews[reviews.length - 1];
 }
 
 export function benchUtilization(

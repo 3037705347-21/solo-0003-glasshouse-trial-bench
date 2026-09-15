@@ -98,6 +98,75 @@ export interface ClearanceSnapshot {
   blockers: ClearanceBlocker[];
 }
 
+export type CloseoutStatus = "completed" | "follow-up" | "closed";
+
+export interface CloseoutActionItem {
+  id: string;
+  text: string;
+  createdOn: string;
+  completedOn?: string;
+}
+
+export interface CloseoutAccessionFact {
+  accessionNo: string;
+  cultivar: string;
+  benchCode?: string;
+}
+
+export interface CloseoutPassFact {
+  observedOn: string;
+  observer: string;
+  entryCount: number;
+}
+
+export interface CloseoutFlagFact {
+  code: string;
+  severity: FlagSeverity;
+  state: FlagState;
+  message: string;
+}
+
+export interface CloseoutBenchFact {
+  code: string;
+  sector: string;
+  usedSlots: number;
+  capacity: number;
+}
+
+export interface CloseoutClearanceFact {
+  snapshotId: string;
+  generatedOn: string;
+  status: ClearanceStatus;
+  blockerCount: number;
+}
+
+export interface CloseoutFacts {
+  capturedOn: string;
+  trialCode: string;
+  trialState: TrialState;
+  accessions: CloseoutAccessionFact[];
+  observationPasses: CloseoutPassFact[];
+  flags: CloseoutFlagFact[];
+  benches: CloseoutBenchFact[];
+  clearance?: CloseoutClearanceFact;
+}
+
+export interface CloseoutReview {
+  id: string;
+  trialId: string;
+  round: number;
+  createdOn: string;
+  createdBy: string;
+  conclusion: string;
+  outstandingIssues: string;
+  nextSeasonAdvice: string;
+  status: CloseoutStatus;
+  statusChangedOn: string;
+  closedOn?: string;
+  facts: CloseoutFacts;
+  actionItems: CloseoutActionItem[];
+}
+
 export interface WorkspaceState {
   trials: Trial[];
   accessions: Accession[];
@@ -105,4 +174,5 @@ export interface WorkspaceState {
   observationPasses: ObservationPass[];
   flags: Flag[];
   clearanceSnapshots: ClearanceSnapshot[];
+  closeoutReviews: CloseoutReview[];
 }

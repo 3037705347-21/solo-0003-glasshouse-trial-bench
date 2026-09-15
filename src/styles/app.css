@@ -1157,14 +1157,290 @@ button {
   font-size: 14px;
 }
 
+.closeout-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+  align-items: start;
+}
+
+.review-timeline-panel,
+.facts-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 18px;
+}
+
+.review-timeline-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.facts-panel {
+  position: sticky;
+  top: 24px;
+  display: grid;
+  gap: 14px;
+}
+
+.review-timeline {
+  display: grid;
+  gap: 14px;
+}
+
+.review-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fdfefc;
+}
+
+.review-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.review-round {
+  display: block;
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.review-meta {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.facts-digest {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fcfdfb;
+}
+
+.facts-captured {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.facts-group {
+  display: grid;
+  gap: 5px;
+}
+
+.facts-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.facts-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.facts-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.facts-warning {
+  color: var(--amber-700);
+}
+
+.facts-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.review-body {
+  display: grid;
+  gap: 10px;
+}
+
+.review-body h4,
+.review-actions h4 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.review-body p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.review-actions ul {
+  display: grid;
+  gap: 7px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.action-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fcfdfb;
+  font-size: 13px;
+}
+
+.action-item-done {
+  background: var(--green-100);
+}
+
+.action-timeline {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.review-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.review-card-footer .form-level-error {
+  margin: 0;
+}
+
+.review-transitions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.review-closed-note {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.closeout-notices {
+  display: grid;
+  gap: 7px;
+}
+
+.closeout-notice {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.closeout-notice-info {
+  background: var(--blue-100);
+  color: var(--blue-700);
+}
+
+.closeout-notice-warning {
+  background: var(--amber-100);
+  color: var(--amber-700);
+}
+
+.action-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.action-input-grow {
+  flex: 1;
+}
+
+.action-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.action-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fcfdfb;
+  font-size: 12px;
+}
+
+.clearance-review-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clearance-review-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.clearance-review-round {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+.clearance-review-date {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.clearance-review-conclusion {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clearance-review-empty {
+  margin: 0;
+  padding: 16px 18px;
+}
+
 @media (max-width: 1100px) {
   .layout-workspace,
-  .observation-workspace {
+  .observation-workspace,
+  .closeout-workspace {
     grid-template-columns: 1fr;
   }
 
   .assignment-panel,
-  .flag-panel {
+  .flag-panel,
+  .facts-panel {
     position: static;
   }
 
