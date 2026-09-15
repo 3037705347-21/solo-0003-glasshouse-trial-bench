@@ -29,7 +29,7 @@ export function RecoveryScreen() {
 
   return (
     <div className="recovery-screen" role="alert">
-      <section className="recovery-panel">
+      <section className="recovery-panel" data-testid="recovery-screen">
         <header className="recovery-header">
           <AlertTriangle size={28} aria-hidden />
           <div>
@@ -54,18 +54,23 @@ export function RecoveryScreen() {
         </div>
 
         <div className="recovery-actions">
-          <Button tone="primary" onClick={exportRaw}>
+          <Button tone="primary" onClick={exportRaw} data-testid="recovery-export">
             <Download size={16} /> 导出原始数据
           </Button>
           <Button
             tone="secondary"
             onClick={rollbackBackup}
             disabled={!recovery.hasBackup}
+            data-testid="recovery-rollback"
             title={recovery.hasBackup ? "" : "没有可回滚的升级前备份"}
           >
             <RotateCcw size={16} /> 回滚到升级前备份并重试
           </Button>
-          <Button tone="danger" onClick={() => setConfirmReset(true)}>
+          <Button
+            tone="danger"
+            onClick={() => setConfirmReset(true)}
+            data-testid="recovery-reset"
+          >
             <Trash2 size={16} /> 放弃旧数据并重置
           </Button>
         </div>
@@ -85,6 +90,7 @@ export function RecoveryScreen() {
             </Button>
             <Button
               tone="danger"
+              data-testid="recovery-confirm-reset"
               onClick={() => {
                 setConfirmReset(false);
                 confirmResetAfterRecovery();

@@ -133,20 +133,9 @@ export function loadWorkspace(options: LoadWorkspaceOptions): WorkspaceLoadOutco
     };
   }
 
-  // 判断源版本，决定是否真的发生了升级。
-  let upgraded = false;
-  try {
-    const parsed = JSON.parse(raw) as { version?: number; schemaVersion?: number };
-    const sourceVersion =
-      typeof parsed.schemaVersion === "number"
-        ? parsed.schemaVersion
-        : typeof parsed.version === "number"
-          ? parsed.version
-          : CURRENT_SCHEMA_VERSION;
-    upgraded = sourceVersion < result.schemaVersion;
-  } catch {
-    upgraded = false;
-  }
+  // 是否真的发生升级，以实际执行的迁移步骤为准（而非再次解析版本号，
+  // 避免非整数/异常版本被误判）。
+  const upgraded = result.ok && result.history.length > 0;
 
   // 发生升级时：先备份旧载荷，再原子提交新信封。
   if (upgraded) {
@@ -303,8 +292,18 @@ function commitUpgrade(
   // 3. 原子写入 + 读回校验。
   const write = atomicWrite(storage, WORKSPACE_STORAGE_KEY, JSON.stringify(envelope));
   if (!write.ok) {
-    // 主键未被改动或未能确认，旧数据仍是权威。
-    return write;
+    // 写入或读回校验失败：尽力把主键恢复成升级前的逐字旧载荷，
+    // 保证“主键上的旧数据是权威版本”这一不变量。回滚结果无论成败都返回失败，
+    // 绝不让一次不可信的写入被当作升级成功。
+    const rollback = atomicWrite(storage, WORKSPACE_STORAGE_KEY, previousRaw);
+    return {
+      ok: false,
+      message:
+        write.message +
+        (rollback.ok
+          ? " 已回滚到升级前数据。"
+          : " 且回滚失败，请立即导出数据，勿继续写入。"),
+    };
   }
   return { ok: true };
 }

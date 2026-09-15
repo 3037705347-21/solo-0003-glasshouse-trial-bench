@@ -1636,3 +1636,15 @@ button {
   font-size: 12px;
   color: var(--text-muted);
 }
+
+.issue-domain-error {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+}

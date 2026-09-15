@@ -114,6 +114,17 @@ function validateReferenceFieldTypes(state: WorkspaceState): string | undefined 
       return "benches.assignedIds";
     }
   }
+  for (const pass of bag.observationPasses as RecordBag[]) {
+    if (!Array.isArray(pass.entries)) {
+      return "observationPasses.entries";
+    }
+    const badEntry = (pass.entries as unknown[]).findIndex(
+      (entry) => !isRecord(entry) || typeof entry.accessionId !== "string",
+    );
+    if (badEntry >= 0) {
+      return `observationPasses.entries.${badEntry}.accessionId`;
+    }
+  }
   return undefined;
 }
 
@@ -151,14 +162,21 @@ export function migrateWorkspace(rawText: string, now: string): MigrationResult 
     );
   }
 
-  const startVersion = Math.trunc(Number(extracted.version));
-  if (!Number.isInteger(startVersion) || startVersion < 1) {
+  const rawVersion = extracted.version;
+  // 严格校验：只接受正整数版本号。任何非整数（1.7、2.0 字符串、NaN 等）
+  // 都不能被截断后当作某个已知版本改写。
+  if (
+    typeof rawVersion !== "number" ||
+    !Number.isInteger(rawVersion) ||
+    rawVersion < 1
+  ) {
     return failure(
       "invalid_envelope",
-      `无法识别的工作区版本号：${String(extracted.version)}。`,
+      `无法识别的工作区版本号：${String(rawVersion)}（必须是正整数）。`,
       parsed,
     );
   }
+  const startVersion = rawVersion;
   if (startVersion > CURRENT_SCHEMA_VERSION) {
     return failure(
       "unsupported_future_version",

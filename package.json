@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4177",
     "smoke": "node scripts/smoke.mjs",
+    "smoke:migration": "node scripts/migration-smoke.mjs",
     "test:migration": "node scripts/test-migration.mjs"
   },
   "dependencies": {

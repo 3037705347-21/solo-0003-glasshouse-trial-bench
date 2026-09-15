@@ -415,6 +415,49 @@ export function scanIntegrity(
     });
   }
 
+  // 观测条目里的材料引用。旧数据的观测行可能引用已不存在的材料：
+  // 测量记录（株高/叶片数/电导率）是历史事实，必须保留，只登记悬空引用。
+  for (const passRecord of (stateBag.observationPasses as unknown[] | undefined) ??
+    []) {
+    if (!isRecord(passRecord) || typeof passRecord.id !== "string") {
+      continue;
+    }
+    const entries = passRecord.entries;
+    if (!Array.isArray(entries)) {
+      continue; // 结构损坏由 runner 处理
+    }
+    const passLabel = labelFor("observationPasses", passRecord);
+    const passId = passRecord.id;
+    entries.forEach((entry, index) => {
+      if (
+        !isRecord(entry) ||
+        typeof entry.accessionId !== "string" ||
+        entry.accessionId === ""
+      ) {
+        return; // 类型损坏由 runner 处理
+      }
+      if (!idSets.accessions.has(entry.accessionId)) {
+        pushIssue({
+          id: `dangling-ref:observationPasses:${passId}:entries.${index}.accessionId:${entry.accessionId}`,
+          code: "dangling_accession_reference",
+          message: `观测 ${passLabel} 的第 ${index + 1} 条测量记录引用了不存在的材料（${entry.accessionId}）。测量数据已保留，请重新关联或保留现状。`,
+          severity: "critical",
+          status: "open",
+          detectedAt: now,
+          ownerCollection: "observationPasses",
+          ownerId: passId,
+          ownerLabel: passLabel,
+          field: `entries.${index}.accessionId`,
+          missingRef: entry.accessionId,
+          targetCollection: "accessions",
+          // 观测行的材料身份是必填语义，不允许“清空”（那会让测量记录失去归属），
+          // 只能重新关联或原样保留并知悉。
+          clearable: false,
+        });
+      }
+    });
+  }
+
   return dedupeIssues(issues);
 }
 

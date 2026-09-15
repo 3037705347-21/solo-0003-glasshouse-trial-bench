@@ -28,7 +28,9 @@ import {
   resolveDanglingByClear,
   resolveDanglingByRelink,
   resolveUnknownEnum,
+  type ResolutionOutcome,
 } from "./migration/resolution";
+import { firstMessage } from "../domain/result";
 
 export interface RecoveryInfo {
   reasonCode: string;
@@ -47,12 +49,14 @@ interface WorkspaceContextValue {
   /** 升级后仍待人工处理的问题（打开/已知悉）。 */
   issues: MigrationIssue[];
   openIssues: MigrationIssue[];
+  /** 最近一次人工裁决被领域规则拒绝时的错误信息（null 表示无错误）。 */
+  resolutionError: string | null;
   resolveIssue: {
-    relink: (issueId: string, newRef: string) => void;
-    clear: (issueId: string) => void;
-    keep: (issueId: string, note: string) => void;
-    fixEnum: (issueId: string, newValue: string) => void;
-    acknowledgeField: (issueId: string) => void;
+    relink: (issueId: string, newRef: string) => boolean;
+    clear: (issueId: string) => boolean;
+    keep: (issueId: string, note: string) => boolean;
+    fixEnum: (issueId: string, newValue: string) => boolean;
+    acknowledgeField: (issueId: string) => boolean;
   };
 
   /** 恢复模式：升级失败/写入失败，写入被锁定，必须人工介入。 */
@@ -135,6 +139,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [history] = useState<MigrationStepRecord[]>(boot.history);
   const [recovery, setRecovery] = useState<RecoveryInfo | null>(boot.recovery);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [resolutionError, setResolutionError] = useState<string | null>(null);
   const [upgraded] = useState(boot.upgraded);
   const [isSample, setIsSample] = useState(boot.isSample);
   const [persistenceReady, setPersistenceReady] = useState(false);
@@ -153,9 +158,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setSaveError(result.ok ? null : (result.message ?? "保存失败"));
   }, [state, issues, history]);
 
-  const applyResolution = (issueId: string, next: ReturnType<typeof resolveDanglingByRelink>): void => {
-    dispatch({ type: "hydrate", state: next.state });
-    setIssues(next.issues);
+  // 应用一次裁决。被领域规则拒绝时返回 false、保留原状态并暴露错误，
+  // 绝不让非法的人工修复进入状态或落盘。
+  const applyOutcome = (outcome: ResolutionOutcome): boolean => {
+    if (!outcome.ok) {
+      setResolutionError(firstMessage(outcome));
+      return false;
+    }
+    setResolutionError(null);
+    dispatch({ type: "hydrate", state: outcome.value.state });
+    setIssues(outcome.value.issues);
+    return true;
   };
 
   const value = useMemo<WorkspaceContextValue>(() => {
@@ -169,54 +182,42 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       openIssues: issues.filter((issue) => issue.status === "open"),
       persistenceReady,
       saveError,
+      resolutionError,
       recovery,
       upgradedFromVersion: upgraded,
       isSampleWorkspace: isSample,
       resolveIssue: {
         relink: (issueId, newRef) => {
           const issue = findIssue(issueId);
-          if (issue && isDanglingReferenceIssue(issue)) {
-            applyResolution(
-              issueId,
-              resolveDanglingByRelink(state, issues, issue, newRef),
-            );
-          }
+          return issue && isDanglingReferenceIssue(issue)
+            ? applyOutcome(
+                resolveDanglingByRelink(state, issues, issue, newRef),
+              )
+            : false;
         },
         clear: (issueId) => {
           const issue = findIssue(issueId);
-          if (issue && isDanglingReferenceIssue(issue)) {
-            applyResolution(
-              issueId,
-              resolveDanglingByClear(state, issues, issue),
-            );
-          }
+          return issue && isDanglingReferenceIssue(issue)
+            ? applyOutcome(resolveDanglingByClear(state, issues, issue))
+            : false;
         },
         keep: (issueId, note) => {
           const issue = findIssue(issueId);
-          if (issue && isDanglingReferenceIssue(issue)) {
-            applyResolution(
-              issueId,
-              keepDanglingAsIs(state, issues, issue, note),
-            );
-          }
+          return issue && isDanglingReferenceIssue(issue)
+            ? applyOutcome(keepDanglingAsIs(state, issues, issue, note))
+            : false;
         },
         fixEnum: (issueId, newValue) => {
           const issue = findIssue(issueId);
-          if (issue?.code === "unknown_enum_value") {
-            applyResolution(
-              issueId,
-              resolveUnknownEnum(state, issues, issue, newValue),
-            );
-          }
+          return issue?.code === "unknown_enum_value"
+            ? applyOutcome(resolveUnknownEnum(state, issues, issue, newValue))
+            : false;
         },
         acknowledgeField: (issueId) => {
           const issue = findIssue(issueId);
-          if (issue?.code === "unknown_field") {
-            applyResolution(
-              issueId,
-              acknowledgeUnknownField(state, issues, issue),
-            );
-          }
+          return issue?.code === "unknown_field"
+            ? applyOutcome(acknowledgeUnknownField(state, issues, issue))
+            : false;
         },
       },
       exportRaw: () => {
@@ -256,7 +257,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, issues, recovery, saveError, persistenceReady, upgraded, isSample]);
+  }, [state, issues, recovery, saveError, resolutionError, persistenceReady, upgraded, isSample]);
 
   return (
     <WorkspaceContext.Provider value={value}>

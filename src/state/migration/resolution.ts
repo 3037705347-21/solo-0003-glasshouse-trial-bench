@@ -1,29 +1,46 @@
 /**
  * 待人工处理项的裁决动作。这些动作是工作区在“带问题可用”状态下唯一的修复路径，
- * 都是纯函数：接收当前状态与问题，返回新状态与更新后的问题集合，然后重新扫描复检。
+ * 都是纯函数：接收当前状态与问题，返回带校验的 Result，然后重新扫描复检。
+ *
+ * 关键约束：人工修复不能制造新的领域冲突。因此这里不是“盲写引用”，而是复用与
+ * 正常工作流完全相同的领域规则：
+ * - 台架槽位重关联走 validateBenchAssignment（停用、隔离、重复、跨台架、容量、光照）；
+ * - 替代材料重关联走 replacementWouldCycle 及同试验/在用/非自身规则；
+ * - 观测条目重关联要求目标材料属于同一试验且在用。
+ * 任何冲突都返回领域错误、原状态原样返回，绝不落盘一个非法状态。
  *
  * 三种裁决：
- * - relink：把悬空引用改指到一个人工选择的、真实存在的目标；
+ * - relink：把悬空引用改指到一个人工选择的、且通过领域校验的目标；
  * - keep：保留悬空事实不动，仅把问题标记为已知悉（ignored）——事实不丢；
  * - clear：对可空字段清空引用（不可空字段不允许，调用方按 issue.clearable 控制）。
  */
 import type { WorkspaceState } from "../../domain/types";
 import { reconcileIssues, scanIntegrity } from "./integrity";
+import { validateBenchAssignment } from "../../domain/bench";
+import { replacementWouldCycle } from "../../domain/accession";
+import { BENCH_LIGHT_COMPATIBILITY } from "../../domain/rules";
 import type {
   DanglingReferenceIssue,
   MigrationIssue,
   UnknownEnumValueIssue,
 } from "./types";
+import { fail, fieldError, ok, type Result } from "../../domain/result";
 
 export interface IssueResolutionResult {
   state: WorkspaceState;
   issues: MigrationIssue[];
 }
 
+export type ResolutionOutcome = Result<IssueResolutionResult>;
+
 type StateBag = Record<string, unknown>;
 
 function asBag(value: unknown): StateBag {
   return value as StateBag;
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
 }
 
 function updateOwner(
@@ -44,10 +61,6 @@ function updateOwner(
   return { ...state, [collectionKey]: next };
 }
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
 function markIssue(
   issues: MigrationIssue[],
   issueId: string,
@@ -62,16 +75,162 @@ function markIssue(
   );
 }
 
-/** 把一个悬空引用重新关联到现存目标。目标存在性由调用方用候选列表保证。 */
+/**
+ * 在写入前校验重关联不会制造领域冲突。通过则返回需要执行的写入描述，
+ * 否则返回领域错误（原状态不会被改动）。
+ */
+function validateRelink(
+  state: WorkspaceState,
+  issue: DanglingReferenceIssue,
+  newRef: string,
+): Result<true> {
+  if (!newRef) {
+    return fail([
+      fieldError("newRef", "required", "请选择要重新关联的目标"),
+    ]);
+  }
+
+  const target = state.accessions.find((item) => item.id === newRef);
+
+  // 观测条目重关联：材料必须属于同一试验且在用（与新建观测的规则一致）。
+  if (issue.ownerCollection === "observationPasses") {
+    const pass = state.observationPasses.find(
+      (item) => item.id === issue.ownerId,
+    );
+    if (!target) {
+      return fail([fieldError("newRef", "unknown", "目标材料不存在")]);
+    }
+    if (pass && target.trialId !== pass.trialId) {
+      return fail([
+        fieldError("newRef", "cross_trial", "观测材料必须属于同一试验"),
+      ]);
+    }
+    if (target.lifecycleStatus === "retired") {
+      return fail([
+        fieldError("newRef", "retired", "不能把测量记录关联到已停用材料"),
+      ]);
+    }
+    return ok(true);
+  }
+
+  // 台架槽位重关联：完整复用正常分配规则。
+  if (issue.ownerCollection === "benches") {
+    const bench = state.benches.find((item) => item.id === issue.ownerId);
+    if (!bench) {
+      return fail([fieldError("bench", "unknown", "目标台架不存在")]);
+    }
+    if (!target) {
+      return fail([fieldError("newRef", "unknown", "目标材料不存在")]);
+    }
+    // 历史数据可能缺少有效光照字段；不能让领域规则在 undefined 上崩溃，
+    // 而是明确拒绝并要求先修正材料。
+    if (!(target.preferredLight in BENCH_LIGHT_COMPATIBILITY)) {
+      return fail([
+        fieldError(
+          "newRef",
+          "invalid_light",
+          "该材料缺少有效的光照类型，无法校验台架兼容性，请先修正材料",
+        ),
+      ]);
+    }
+    const assignment = validateBenchAssignment(target, bench);
+    if (!assignment.ok) {
+      return assignment;
+    }
+    return ok(true);
+  }
+
+  // 材料替代重关联（顶层 replacementId 或停用历史中的 replacementId）：
+  // 非自身、在用、同试验、不形成循环——与 retireAccession 的规则一致。
+  if (
+    issue.ownerCollection === "accessions" &&
+    issue.field === "replacementId"
+  ) {
+    const owner = state.accessions.find((item) => item.id === issue.ownerId);
+    if (!owner) {
+      return fail([fieldError("owner", "unknown", "被替代材料不存在")]);
+    }
+    if (!target) {
+      return fail([fieldError("newRef", "unknown", "替代材料不存在")]);
+    }
+    if (target.id === owner.id) {
+      return fail([
+        fieldError("newRef", "self", "替代材料不能是当前材料"),
+      ]);
+    }
+    if (target.trialId !== owner.trialId) {
+      return fail([
+        fieldError("newRef", "cross_trial", "替代材料必须属于同一试验"),
+      ]);
+    }
+    if (target.lifecycleStatus === "retired") {
+      return fail([
+        fieldError("newRef", "retired", "替代材料必须处于在用状态"),
+      ]);
+    }
+    if (replacementWouldCycle(state, owner.id, target.id)) {
+      return fail([
+        fieldError("newRef", "cycle", "替代关系不能形成循环"),
+      ]);
+    }
+    return ok(true);
+  }
+
+  // 停用历史中的替代引用：同样校验自身/在用/同试验/循环，避免修复历史时
+  // 引入与顶层关系矛盾的指向。
+  if (
+    issue.ownerCollection === "accessions" &&
+    issue.field.startsWith("retirementHistory.")
+  ) {
+    const owner = state.accessions.find((item) => item.id === issue.ownerId);
+    if (!owner || !target) {
+      return fail([fieldError("newRef", "unknown", "目标材料不存在")]);
+    }
+    if (target.id === owner.id) {
+      return fail([
+        fieldError("newRef", "self", "替代材料不能是当前材料"),
+      ]);
+    }
+    if (target.trialId !== owner.trialId) {
+      return fail([
+        fieldError("newRef", "cross_trial", "替代材料必须属于同一试验"),
+      ]);
+    }
+    if (target.lifecycleStatus === "retired") {
+      return fail([
+        fieldError("newRef", "retired", "替代材料必须处于在用状态"),
+      ]);
+    }
+    if (replacementWouldCycle(state, owner.id, target.id)) {
+      return fail([
+        fieldError("newRef", "cycle", "替代关系不能形成循环"),
+      ]);
+    }
+    return ok(true);
+  }
+
+  // 其它直接外键（flags/trials 等）：只要求目标存在。
+  const targetCollection = state[
+    issue.targetCollection as keyof WorkspaceState
+  ] as Array<{ id: string }> | undefined;
+  if (!targetCollection?.some((item) => item.id === newRef)) {
+    return fail([fieldError("newRef", "unknown", "目标记录不存在")]);
+  }
+  return ok(true);
+}
+
+/** 把一个悬空引用重新关联到现存且通过领域校验的目标。 */
 export function resolveDanglingByRelink(
   state: WorkspaceState,
   issues: MigrationIssue[],
   issue: DanglingReferenceIssue,
   newRef: string,
-): IssueResolutionResult {
-  if (!newRef) {
-    return { state, issues };
+): ResolutionOutcome {
+  const validation = validateRelink(state, issue, newRef);
+  if (!validation.ok) {
+    return validation;
   }
+
   const nextState = updateOwner(state, issue, (record) => {
     if (issue.field === "assignedIds") {
       record.assignedIds = (Array.isArray(record.assignedIds)
@@ -94,6 +253,15 @@ export function resolveDanglingByRelink(
       record.retirementHistory = history;
       return;
     }
+    if (issue.field.startsWith("entries.")) {
+      const index = Number(issue.field.split(".")[1]);
+      const entries = Array.isArray(record.entries) ? [...record.entries] : [];
+      if (entries[index] && typeof entries[index] === "object") {
+        entries[index] = { ...asBag(entries[index]), accessionId: newRef };
+      }
+      record.entries = entries;
+      return;
+    }
     record[issue.field] = newRef;
   });
 
@@ -103,10 +271,10 @@ export function resolveDanglingByRelink(
     "resolved",
     `已重新关联到 ${newRef}`,
   );
-  return {
+  return ok({
     state: nextState,
     issues: reconcileIssues(marked, scanIntegrity(nextState, nowIso())),
-  };
+  });
 }
 
 /** 清空一个可空的悬空引用（不可空字段返回原状，UI 不应暴露此动作）。 */
@@ -114,9 +282,11 @@ export function resolveDanglingByClear(
   state: WorkspaceState,
   issues: MigrationIssue[],
   issue: DanglingReferenceIssue,
-): IssueResolutionResult {
+): ResolutionOutcome {
   if (!issue.clearable) {
-    return { state, issues };
+    return fail([
+      fieldError(issue.field, "not_clearable", "该引用不允许清空，只能重新关联或保留"),
+    ]);
   }
   const nextState = updateOwner(state, issue, (record) => {
     if (issue.field === "assignedIds") {
@@ -143,10 +313,10 @@ export function resolveDanglingByClear(
   });
 
   const marked = markIssue(issues, issue.id, "resolved", "已清空悬空引用");
-  return {
+  return ok({
     state: nextState,
     issues: reconcileIssues(marked, scanIntegrity(nextState, nowIso())),
-  };
+  });
 }
 
 /** 保留悬空事实不动，仅确认知悉。历史事实完整保留，问题不再提示。 */
@@ -155,8 +325,11 @@ export function keepDanglingAsIs(
   issues: MigrationIssue[],
   issue: DanglingReferenceIssue,
   note: string,
-): IssueResolutionResult {
-  return { state, issues: markIssue(issues, issue.id, "ignored", note) };
+): ResolutionOutcome {
+  return ok({
+    state,
+    issues: markIssue(issues, issue.id, "ignored", note),
+  });
 }
 
 /** 把未知枚举值人工修正为一个受支持取值。 */
@@ -165,9 +338,11 @@ export function resolveUnknownEnum(
   issues: MigrationIssue[],
   issue: UnknownEnumValueIssue,
   newValue: string,
-): IssueResolutionResult {
+): ResolutionOutcome {
   if (!issue.supportedValues.includes(newValue)) {
-    return { state, issues };
+    return fail([
+      fieldError(issue.field, "invalid", `「${newValue}」不是受支持的取值`),
+    ]);
   }
   const nextState = updateOwner(state, issue, (record) => {
     record[issue.field] = newValue;
@@ -178,10 +353,10 @@ export function resolveUnknownEnum(
     "resolved",
     `已将「${issue.unknownValue}」修正为「${newValue}」`,
   );
-  return {
+  return ok({
     state: nextState,
     issues: reconcileIssues(marked, scanIntegrity(nextState, nowIso())),
-  };
+  });
 }
 
 /** 知悉一个未知字段：值继续原样保留，仅关闭提示。 */
@@ -189,11 +364,14 @@ export function acknowledgeUnknownField(
   state: WorkspaceState,
   issues: MigrationIssue[],
   issue: Extract<MigrationIssue, { code: "unknown_field" }>,
-): IssueResolutionResult {
-  return { state, issues: markIssue(issues, issue.id, "ignored", "已知悉，字段继续保留") };
+): ResolutionOutcome {
+  return ok({
+    state,
+    issues: markIssue(issues, issue.id, "ignored", "已知悉，字段继续保留"),
+  });
 }
 
-/** 可作为某问题重新关联目标的现存实体候选。 */
+/** 可作为某问题重新关联目标的现存实体候选（id + 展示标签）。 */
 export function relinkCandidates(
   state: WorkspaceState,
   issue: DanglingReferenceIssue,
