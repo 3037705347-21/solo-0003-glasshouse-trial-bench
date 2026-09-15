@@ -7,6 +7,12 @@ import type { ObservationDraft } from "../../domain/observation";
 import type { FieldError } from "../../domain/result";
 import { createObservationPass, deriveFlags } from "../../domain/observation";
 import { todayDateOnly } from "../../domain/rules";
+import {
+  resolveRuleVersion,
+  RULE_METRIC_LABELS,
+  RULE_METRICS,
+  ruleVersionLabel,
+} from "../../domain/ruleVersion";
 import { accessionsForTrial } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 
@@ -29,10 +35,14 @@ function emptyEntry(accessionId = ""): ObservationEntry {
 export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
   const { state, dispatch } = useWorkspace();
   const accessions = accessionsForTrial(state, trialId);
+  const resolution = resolveRuleVersion(state, trialId);
+  const ruleVersion =
+    resolution.kind === "resolved" ? resolution.version : undefined;
   const [draft, setDraft] = useState<ObservationDraft>({
     trialId,
     observedOn: todayDateOnly(),
     observer: "",
+    ruleVersionId: ruleVersion?.id ?? "",
     entries: [emptyEntry(accessions[0]?.id ?? "")],
   });
   const [errors, setErrors] = useState<FieldError[]>([]);
@@ -76,7 +86,9 @@ export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
       setErrors(result.errors);
       return;
     }
-    const flags = deriveFlags(result.value, state.accessions);
+    const flags = ruleVersion
+      ? deriveFlags(result.value, state.accessions, ruleVersion)
+      : [];
     dispatch({ type: "observation/recorded", pass: result.value, flags });
     onSaved();
   };
@@ -86,6 +98,13 @@ export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
       state.trials.find((trial) => trial.id === trialId)?.code ?? "当前试验",
     [state.trials, trialId],
   );
+
+  const rangeHint = ruleVersion
+    ? RULE_METRICS.map(
+        (metric) =>
+          `${RULE_METRIC_LABELS[metric]} ${ruleVersion.ranges[metric].min}-${ruleVersion.ranges[metric].max}`,
+      ).join(" · ")
+    : "";
 
   return (
     <form
@@ -117,6 +136,31 @@ export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
           data-testid="observer-input"
         />
       </div>
+      {ruleVersion ? (
+        <p className="rule-source-line" data-testid="pass-form-rule-version">
+          <span>
+            本次观测使用规则：
+            <strong>{ruleVersionLabel(ruleVersion, state.trials)}</strong>
+            <em className="rule-source-kind">
+              {resolution.kind === "resolved" && resolution.source === "trial"
+                ? "试验级规则"
+                : "科属规则"}
+            </em>
+          </span>
+          <span className="rule-source-ranges">{rangeHint}</span>
+        </p>
+      ) : (
+        <p className="rule-source-line rule-source-none" data-testid="pass-form-rule-version">
+          <span>
+            该试验没有启用的规则版本，无法记录观测。请先在规则版本页为
+            {state.trials.find((trial) => trial.id === trialId)?.cropFamily ?? "该科属"}
+            或本试验启用一个版本。
+          </span>
+        </p>
+      )}
+      {errorFor("ruleVersionId") ? (
+        <p className="form-level-error">{errorFor("ruleVersionId")}</p>
+      ) : null}
       <div className="entry-editor">
         <div className="entry-editor-heading">
           <h3>测量记录</h3>
@@ -198,7 +242,11 @@ export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
         <Button tone="secondary" onClick={onCancel}>
           取消
         </Button>
-        <Button type="submit" data-testid="save-observation-button">
+        <Button
+          type="submit"
+          disabled={!ruleVersion}
+          data-testid="save-observation-button"
+        >
           记录观测
         </Button>
       </div>

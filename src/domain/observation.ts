@@ -3,16 +3,23 @@ import type {
   Flag,
   ObservationEntry,
   ObservationPass,
+  RuleVersion,
   WorkspaceState,
 } from "./types";
 import { createId } from "./id";
-import { GROWTH_BOUNDS, parseDateOnly, todayDateOnly } from "./rules";
+import { parseDateOnly, todayDateOnly } from "./rules";
+import {
+  resolveRuleVersion,
+  RULE_METRIC_LABELS,
+  ruleVersionLabel,
+} from "./ruleVersion";
 import { fail, fieldError, ok, type Result } from "./result";
 
 export interface ObservationDraft {
   trialId: string;
   observedOn: string;
   observer: string;
+  ruleVersionId: string;
   entries: ObservationEntry[];
 }
 
@@ -32,6 +39,30 @@ export function validateObservationDraft(
         "只能对进行中或草稿状态的试验添加观测",
       ),
     );
+  }
+  const resolution = trial
+    ? resolveRuleVersion(state, trial.id)
+    : { kind: "none" as const };
+  const ruleVersion =
+    resolution.kind === "resolved" ? resolution.version : undefined;
+  if (trial) {
+    if (!ruleVersion) {
+      errors.push(
+        fieldError(
+          "ruleVersionId",
+          "no_rule_version",
+          "该试验没有启用的规则版本，请先在规则版本页启用后再记录观测",
+        ),
+      );
+    } else if (draft.ruleVersionId !== ruleVersion.id) {
+      errors.push(
+        fieldError(
+          "ruleVersionId",
+          "stale_rule_version",
+          `当前启用的规则版本是 ${ruleVersionLabel(ruleVersion, state.trials)}，请刷新表单后重新提交`,
+        ),
+      );
+    }
   }
   if (!parseDateOnly(draft.observedOn)) {
     errors.push(
@@ -75,42 +106,46 @@ export function validateObservationDraft(
       );
     }
     seen.add(entry.accessionId);
+    if (!ruleVersion) {
+      return;
+    }
+    const ranges = ruleVersion.ranges;
     if (
       Number.isNaN(entry.heightMm) ||
-      entry.heightMm < GROWTH_BOUNDS.heightMm.min ||
-      entry.heightMm > GROWTH_BOUNDS.heightMm.max
+      entry.heightMm < ranges.heightMm.min ||
+      entry.heightMm > ranges.heightMm.max
     ) {
       errors.push(
         fieldError(
           `entries.${index}.heightMm`,
           "range",
-          `株高必须在 ${GROWTH_BOUNDS.heightMm.min}-${GROWTH_BOUNDS.heightMm.max} 毫米之间`,
+          `${RULE_METRIC_LABELS.heightMm}必须在 ${ranges.heightMm.min}-${ranges.heightMm.max} 之间`,
         ),
       );
     }
     if (
       Number.isNaN(entry.leafCount) ||
-      entry.leafCount < GROWTH_BOUNDS.leafCount.min ||
-      entry.leafCount > GROWTH_BOUNDS.leafCount.max
+      entry.leafCount < ranges.leafCount.min ||
+      entry.leafCount > ranges.leafCount.max
     ) {
       errors.push(
         fieldError(
           `entries.${index}.leafCount`,
           "range",
-          `叶片数必须在 ${GROWTH_BOUNDS.leafCount.min}-${GROWTH_BOUNDS.leafCount.max} 之间`,
+          `${RULE_METRIC_LABELS.leafCount}必须在 ${ranges.leafCount.min}-${ranges.leafCount.max} 之间`,
         ),
       );
     }
     if (
       Number.isNaN(entry.ecMs) ||
-      entry.ecMs < GROWTH_BOUNDS.ecMs.min ||
-      entry.ecMs > GROWTH_BOUNDS.ecMs.max
+      entry.ecMs < ranges.ecMs.min ||
+      entry.ecMs > ranges.ecMs.max
     ) {
       errors.push(
         fieldError(
           `entries.${index}.ecMs`,
           "range",
-          `电导率必须在 ${GROWTH_BOUNDS.ecMs.min}-${GROWTH_BOUNDS.ecMs.max} mS/cm 之间`,
+          `${RULE_METRIC_LABELS.ecMs}必须在 ${ranges.ecMs.min}-${ranges.ecMs.max} 之间`,
         ),
       );
     }
@@ -144,6 +179,7 @@ export function createObservationPass(
     trialId: value.trialId,
     observedOn: value.observedOn,
     observer: value.observer,
+    ruleVersionId: value.ruleVersionId,
     entries: value.entries.map((entry) => ({ ...entry })),
   });
 }
@@ -155,11 +191,13 @@ export interface FlagSeed {
   code: string;
   message: string;
   severity: "info" | "warning" | "critical";
+  ruleVersionId?: string;
 }
 
 export function deriveFlags(
   pass: ObservationPass,
   accessions: Accession[],
+  ruleVersion: RuleVersion,
 ): Flag[] {
   const accessionById = new Map(
     accessions.map((accession) => [accession.id, accession]),
@@ -171,68 +209,46 @@ export function deriveFlags(
     if (!accession) {
       return;
     }
-    if (entry.heightMm < 60) {
+    ruleVersion.flagConditions.forEach((condition) => {
+      const value = entry[condition.metric];
+      const triggered =
+        condition.comparator === "lt"
+          ? value < condition.threshold
+          : value >= condition.threshold;
+      if (!triggered) {
+        return;
+      }
       flags.push(
         makeFlag(
           {
             trialId: pass.trialId,
             accessionId: entry.accessionId,
             observationPassId: pass.id,
-            code: "HT_UNDER",
-            message: `${accession.cultivar} 低于 60 毫米生长阈值`,
-            severity: "warning",
+            code: condition.code,
+            message: interpolateTemplate(condition.messageTemplate, {
+              cultivar: accession.cultivar,
+              threshold: condition.threshold,
+              value,
+            }),
+            severity: condition.severity,
+            ruleVersionId: ruleVersion.id,
           },
           createdOn,
         ),
       );
-    }
-    if (entry.heightMm >= 420) {
-      flags.push(
-        makeFlag(
-          {
-            trialId: pass.trialId,
-            accessionId: entry.accessionId,
-            observationPassId: pass.id,
-            code: "HT_OVER",
-            message: `${accession.cultivar} 高于 420 毫米生长阈值`,
-            severity: "critical",
-          },
-          createdOn,
-        ),
-      );
-    }
-    if (entry.leafCount < 5) {
-      flags.push(
-        makeFlag(
-          {
-            trialId: pass.trialId,
-            accessionId: entry.accessionId,
-            observationPassId: pass.id,
-            code: "LEAF_LOW",
-            message: `${accession.cultivar} 的真叶数少于 5 片`,
-            severity: "warning",
-          },
-          createdOn,
-        ),
-      );
-    }
-    if (entry.ecMs >= 3.5) {
-      flags.push(
-        makeFlag(
-          {
-            trialId: pass.trialId,
-            accessionId: entry.accessionId,
-            observationPassId: pass.id,
-            code: "EC_HIGH",
-            message: `${accession.cultivar} 的基质电导率偏高`,
-            severity: "critical",
-          },
-          createdOn,
-        ),
-      );
-    }
+    });
   });
   return flags;
+}
+
+function interpolateTemplate(
+  template: string,
+  vars: Record<string, string | number>,
+): string {
+  return template.replace(
+    /\{(cultivar|threshold|value)\}/g,
+    (match, key: string) => String(vars[key] ?? match),
+  );
 }
 
 function makeFlag(seed: FlagSeed, createdOn: string): Flag {

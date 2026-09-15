@@ -1,5 +1,13 @@
-import type { WorkspaceState } from "../domain/types";
-import { isWorkspaceState } from "./types";
+import type { RuleVersion, WorkspaceState } from "../domain/types";
+import {
+  LEGACY_FLAG_CONDITIONS,
+  legacyRanges,
+} from "../domain/ruleVersion";
+import {
+  isLegacyWorkspaceState,
+  isWorkspaceState,
+  type LegacyWorkspaceState,
+} from "./types";
 import { createSampleWorkspaceState } from "./sampleData";
 
 export const WORKSPACE_STORAGE_KEY = "glasshouse-trial-bench:workspace:v1";
@@ -10,6 +18,26 @@ export interface StoredWorkspace {
   state: WorkspaceState;
 }
 
+function migrateLegacyState(state: LegacyWorkspaceState): WorkspaceState {
+  const families = Array.from(
+    new Set(state.trials.map((trial) => trial.cropFamily)),
+  );
+  const migratedAt = new Date().toISOString();
+  const ruleVersions: RuleVersion[] = families.map((cropFamily, index) => ({
+    id: `rule-legacy-${index + 1}`,
+    scope: { kind: "cropFamily", cropFamily },
+    version: 1,
+    ranges: legacyRanges(),
+    flagConditions: LEGACY_FLAG_CONDITIONS.map((condition) => ({
+      ...condition,
+    })),
+    changeReason: "系统迁移：继承旧版内置测量边界与标记条件",
+    createdAt: migratedAt,
+    status: "active",
+  }));
+  return { ...state, ruleVersions };
+}
+
 export function loadWorkspaceState(): WorkspaceState {
   try {
     const raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
@@ -17,10 +45,13 @@ export function loadWorkspaceState(): WorkspaceState {
       return createSampleWorkspaceState();
     }
     const parsed = JSON.parse(raw) as Partial<StoredWorkspace>;
-    if (!parsed || !isWorkspaceState(parsed.state)) {
-      return createSampleWorkspaceState();
+    if (parsed && isWorkspaceState(parsed.state)) {
+      return parsed.state;
     }
-    return parsed.state;
+    if (parsed && isLegacyWorkspaceState(parsed.state)) {
+      return migrateLegacyState(parsed.state);
+    }
+    return createSampleWorkspaceState();
   } catch {
     return createSampleWorkspaceState();
   }

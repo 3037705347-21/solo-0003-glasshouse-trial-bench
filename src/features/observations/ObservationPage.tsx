@@ -1,23 +1,27 @@
 import { useMemo, useState } from "react";
-import { NotebookPen, Plus } from "lucide-react";
+import { GitCompareArrows, NotebookPen, Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
 import { PageHeader } from "../../components/PageHeader";
-import { StatusBadge, statusTone } from "../../components/StatusBadge";
+import { StatusBadge } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import type { ObservationPass } from "../../domain/types";
 import {
   openFlagsForTrial,
   passesForTrial,
+  ruleVersionLabelFor,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { RuleSourceLine } from "../rules/RuleSourceLine";
 import { FlagPanel } from "./FlagPanel";
 import { PassForm } from "./PassForm";
+import { RecalcPreviewDialog } from "./RecalcPreviewDialog";
 
 export function ObservationPage() {
   const { state } = useWorkspace();
   const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [previewPass, setPreviewPass] = useState<ObservationPass | undefined>();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const passes = passesForTrial(state, trialId);
   const flags = openFlagsForTrial(state, trialId);
@@ -74,6 +78,7 @@ export function ObservationPage() {
             </option>
           ))}
         </select>
+        {trialId ? <RuleSourceLine trialId={trialId} /> : null}
       </section>
       <div className="observation-workspace">
         <section className="pass-list">
@@ -105,12 +110,26 @@ export function ObservationPage() {
                       );
                     })}
                   </div>
+                  <div className="pass-card-footer">
+                    <span className="pass-card-version">
+                      {ruleVersionLabelFor(state, pass.ruleVersionId)}
+                    </span>
+                    <Button
+                      tone="ghost"
+                      size="sm"
+                      onClick={() => setPreviewPass(pass)}
+                      data-testid={`recalc-preview-${pass.id}`}
+                    >
+                      <GitCompareArrows size={14} />
+                      重算预览
+                    </Button>
+                  </div>
                 </article>
               ))}
             </div>
           )}
         </section>
-        <FlagPanel flags={flags} />
+        <FlagPanel flags={flags} trialId={trialId} />
       </div>
       <Dialog
         open={dialogOpen}
@@ -127,7 +146,7 @@ export function ObservationPage() {
               pushToast({
                 tone: "success",
                 title: "观测已记录",
-                message: "已根据测量数据生成生长标记。",
+                message: "已根据当前启用的规则版本生成生长标记。",
               });
             }}
           />
@@ -135,6 +154,12 @@ export function ObservationPage() {
           <p>请先创建试验，再录入观测。</p>
         )}
       </Dialog>
+      {previewPass ? (
+        <RecalcPreviewDialog
+          pass={previewPass}
+          onClose={() => setPreviewPass(undefined)}
+        />
+      ) : null}
       <ToastRegion
         messages={toasts}
         onDismiss={(id) =>

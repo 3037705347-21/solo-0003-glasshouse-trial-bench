@@ -4,9 +4,11 @@ import type {
   ClearanceSnapshot,
   Flag,
   ObservationPass,
+  RuleVersion,
   Trial,
   WorkspaceState,
 } from "../domain/types";
+import { ruleVersionLabel } from "../domain/ruleVersion";
 
 export function trialById(
   state: WorkspaceState,
@@ -65,6 +67,28 @@ export function latestSnapshotForTrial(
   return [...state.clearanceSnapshots]
     .filter((snapshot) => snapshot.trialId === trialId)
     .sort((left, right) => right.generatedOn.localeCompare(left.generatedOn))[0];
+}
+
+export function ruleVersionById(
+  state: WorkspaceState,
+  versionId: string,
+): RuleVersion | undefined {
+  return state.ruleVersions.find((version) => version.id === versionId);
+}
+
+export function ruleVersionLabelFor(
+  state: WorkspaceState,
+  versionId: string | undefined,
+): string {
+  if (!versionId) {
+    return "内置规则（旧版）";
+  }
+  const version = ruleVersionById(state, versionId);
+  return version ? ruleVersionLabel(version, state.trials) : "未知规则版本";
+}
+
+export function flagsForPass(state: WorkspaceState, passId: string): Flag[] {
+  return state.flags.filter((flag) => flag.observationPassId === passId);
 }
 
 export function benchUtilization(

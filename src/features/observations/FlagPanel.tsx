@@ -5,14 +5,17 @@ import { TextAreaField } from "../../components/fields";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { Flag as DomainFlag } from "../../domain/types";
 import { transitionFlag } from "../../domain/observation";
+import { ruleVersionLabelFor } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { RuleSourceLine } from "../rules/RuleSourceLine";
 
 interface FlagPanelProps {
   flags: DomainFlag[];
+  trialId: string;
 }
 
-export function FlagPanel({ flags }: FlagPanelProps) {
-  const { dispatch } = useWorkspace();
+export function FlagPanel({ flags, trialId }: FlagPanelProps) {
+  const { state, dispatch } = useWorkspace();
   const [selectedId, setSelectedId] = useState(() => flags[0]?.id ?? "");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | undefined>();
@@ -37,6 +40,7 @@ export function FlagPanel({ flags }: FlagPanelProps) {
       <div className="flag-panel-empty">
         <Flag size={22} aria-hidden="true" />
         <p>该试验没有未处理的标记。</p>
+        <RuleSourceLine trialId={trialId} />
       </div>
     );
   }
@@ -48,6 +52,7 @@ export function FlagPanel({ flags }: FlagPanelProps) {
         <h3>未处理标记</h3>
         <span>{flags.length}</span>
       </div>
+      <RuleSourceLine trialId={trialId} />
       <div className="flag-list">
         {flags.map((flag) => (
           <button
@@ -75,6 +80,9 @@ export function FlagPanel({ flags }: FlagPanelProps) {
         <div className="flag-editor">
           <strong>{selected.code}</strong>
           <p>{selected.message}</p>
+          <p className="flag-version-note">
+            产生时规则版本：{ruleVersionLabelFor(state, selected.ruleVersionId)}
+          </p>
           <TextAreaField
             label="处理说明"
             rows={3}

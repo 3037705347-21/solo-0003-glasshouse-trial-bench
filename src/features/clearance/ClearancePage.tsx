@@ -8,8 +8,12 @@ import {
   buildClearanceSnapshot,
 } from "../../domain/clearance";
 import { transitionTrial } from "../../domain/trial";
-import { latestSnapshotForTrial } from "../../state/selectors";
+import {
+  latestSnapshotForTrial,
+  ruleVersionLabelFor,
+} from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { RuleSourceLine } from "../rules/RuleSourceLine";
 import { SnapshotCard } from "./SnapshotCard";
 
 export function ClearancePage() {
@@ -124,7 +128,16 @@ export function ClearancePage() {
           </div>
           <ShieldCheck size={20} className="panel-icon" aria-hidden="true" />
         </div>
-        <SnapshotCard snapshot={liveSnapshot} />
+        <div className="clearance-rule-source">
+          {trialId ? <RuleSourceLine trialId={trialId} /> : null}
+        </div>
+        <SnapshotCard
+          snapshot={liveSnapshot}
+          ruleVersionLabel={ruleVersionLabelFor(
+            state,
+            liveSnapshot.ruleVersionId,
+          )}
+        />
       </section>
       {latest ? (
         <section className="clearance-preview">
@@ -134,7 +147,13 @@ export function ClearancePage() {
               <span className="panel-subtitle">最近生成的放行快照</span>
             </div>
           </div>
-          <SnapshotCard snapshot={latest} />
+          <SnapshotCard
+            snapshot={latest}
+            ruleVersionLabel={ruleVersionLabelFor(
+              state,
+              latest.ruleVersionId,
+            )}
+          />
         </section>
       ) : null}
       <ToastRegion

@@ -55,6 +55,7 @@ export interface ObservationPass {
   observedOn: string;
   observer: string;
   entries: ObservationEntry[];
+  ruleVersionId?: string;
 }
 
 export type FlagSeverity = "info" | "warning" | "critical";
@@ -72,6 +73,7 @@ export interface Flag {
   createdOn: string;
   resolvedOn?: string;
   resolutionNote?: string;
+  ruleVersionId?: string;
 }
 
 export type ClearanceStatus = "ready" | "blocked";
@@ -96,6 +98,44 @@ export interface ClearanceSnapshot {
   status: ClearanceStatus;
   metrics: ClearanceMetric[];
   blockers: ClearanceBlocker[];
+  ruleVersionId?: string;
+}
+
+export type RuleScope =
+  | { kind: "trial"; trialId: string }
+  | { kind: "cropFamily"; cropFamily: string };
+
+export type RuleMetric = "heightMm" | "leafCount" | "ecMs";
+
+export type RuleComparator = "lt" | "gte";
+
+export interface MeasurementRange {
+  min: number;
+  max: number;
+}
+
+export type MeasurementRanges = Record<RuleMetric, MeasurementRange>;
+
+export interface FlagCondition {
+  code: string;
+  metric: RuleMetric;
+  comparator: RuleComparator;
+  threshold: number;
+  severity: FlagSeverity;
+  messageTemplate: string;
+}
+
+export type RuleVersionStatus = "inactive" | "active" | "archived";
+
+export interface RuleVersion {
+  id: string;
+  scope: RuleScope;
+  version: number;
+  ranges: MeasurementRanges;
+  flagConditions: FlagCondition[];
+  changeReason: string;
+  createdAt: string;
+  status: RuleVersionStatus;
 }
 
 export interface WorkspaceState {
@@ -105,4 +145,5 @@ export interface WorkspaceState {
   observationPasses: ObservationPass[];
   flags: Flag[];
   clearanceSnapshots: ClearanceSnapshot[];
+  ruleVersions: RuleVersion[];
 }

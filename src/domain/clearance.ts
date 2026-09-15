@@ -6,12 +6,14 @@ import type {
   WorkspaceState,
 } from "./types";
 import { createId } from "./id";
+import { resolveRuleVersion } from "./ruleVersion";
 
 export function buildClearanceSnapshot(
   state: WorkspaceState,
   trialId: string,
 ): ClearanceSnapshot {
   const trial = state.trials.find((item) => item.id === trialId);
+  const resolution = resolveRuleVersion(state, trialId);
   const accessions = state.accessions.filter(
     (accession) => accession.trialId === trialId,
   );
@@ -88,6 +90,8 @@ export function buildClearanceSnapshot(
     status: blockers.length === 0 ? "ready" : "blocked",
     metrics,
     blockers,
+    ruleVersionId:
+      resolution.kind === "resolved" ? resolution.version.id : undefined,
   };
 }
 

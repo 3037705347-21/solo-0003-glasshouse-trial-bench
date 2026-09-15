@@ -14,6 +14,7 @@ const scenarios = {
   "curate-accession-roster": curateAccessionRoster,
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
+  "manage-rule-versions": manageRuleVersions,
   "advance-trial-clearance": advanceTrialClearance,
 };
 
@@ -21,6 +22,7 @@ const scenarioPaths = {
   "curate-accession-roster": "/roster",
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
+  "manage-rule-versions": "/rules",
   "advance-trial-clearance": "/clearance",
 };
 
@@ -81,6 +83,29 @@ async function recordObservationPass(page) {
     (count) => document.querySelectorAll('[data-testid^="pass-"]').length > count,
     before,
   );
+}
+
+async function manageRuleVersions(page) {
+  await page.getByTestId("rules-trial-select").selectOption("trial-sol-01");
+  await page
+    .getByTestId("rule-source-line")
+    .getByText("科属 茄科 · v1")
+    .waitFor();
+  await page.getByTestId("copy-rule-rule-sol-v1").click();
+  await page
+    .getByTestId("rule-change-reason")
+    .fill("提高茄科电导率告警阈值以匹配灌溉调整");
+  await page.getByTestId("save-rule-version-button").click();
+  await page.getByText("规则版本已保存", { exact: true }).waitFor();
+  const newRow = page.getByRole("row", { name: /茄科 · v2|v2/ });
+  await newRow.getByRole("button", { name: "启用" }).click();
+  await page.getByText("规则版本已启用", { exact: true }).waitFor();
+  await page.getByTestId("activate-rule-rule-sol-trial-v1").click();
+  await page.getByText("存在作用域冲突").waitFor();
+  await page.goto(`${baseUrl}/#/observations`, { waitUntil: "networkidle" });
+  const sourceLine = page.getByTestId("rule-source-line").first();
+  await sourceLine.getByText("试验 SOL-01 · v1").waitFor();
+  await sourceLine.getByText(/被试验级规则覆盖/).waitFor();
 }
 
 async function advanceTrialClearance(page) {

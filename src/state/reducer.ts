@@ -53,6 +53,16 @@ export function workspaceReducer(
           flag.id === action.flag.id ? action.flag : flag,
         ),
       };
+    case "ruleVersion/created":
+      return {
+        ...state,
+        ruleVersions: [...state.ruleVersions, action.version],
+      };
+    case "ruleVersion/activated":
+      return {
+        ...state,
+        ruleVersions: action.versions,
+      };
     case "clearance/generated":
       return {
         ...state,

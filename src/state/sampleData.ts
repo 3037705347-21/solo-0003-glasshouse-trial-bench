@@ -4,9 +4,14 @@ import type {
   ClearanceSnapshot,
   Flag,
   ObservationPass,
+  RuleVersion,
   Trial,
   WorkspaceState,
 } from "../domain/types";
+import {
+  LEGACY_FLAG_CONDITIONS,
+  legacyRanges,
+} from "../domain/ruleVersion";
 
 const trials: Trial[] = [
   {
@@ -218,6 +223,7 @@ const observationPasses: ObservationPass[] = [
     trialId: "trial-sol-01",
     observedOn: "2026-02-26",
     observer: "M. Ikeda",
+    ruleVersionId: "rule-sol-v1",
     entries: [
       {
         accessionId: "acc-tom-01",
@@ -247,6 +253,7 @@ const observationPasses: ObservationPass[] = [
     trialId: "trial-ama-02",
     observedOn: "2026-04-08",
     observer: "R. Ono",
+    ruleVersionId: "rule-ama-v1",
     entries: [
       {
         accessionId: "acc-bee-01",
@@ -280,10 +287,11 @@ const flags: Flag[] = [
     accessionId: "acc-tom-01",
     observationPassId: "obs-tom-01",
     code: "HT_UNDER",
-    message: "Tiny Tim 低于 60 毫米生长阈值",
+    message: "Tiny Tim 株高低于 60 毫米生长阈值",
     severity: "warning",
     state: "open",
     createdOn: "2026-02-26T09:00:00.000Z",
+    ruleVersionId: "rule-sol-v1",
   },
   {
     id: "flag-bee-01",
@@ -291,10 +299,116 @@ const flags: Flag[] = [
     accessionId: "acc-bee-03",
     observationPassId: "obs-bee-01",
     code: "HT_UNDER",
-    message: "Chioggia 低于 60 毫米生长阈值",
+    message: "Chioggia 株高低于 55 毫米生长阈值",
     severity: "warning",
     state: "open",
     createdOn: "2026-04-08T09:00:00.000Z",
+    ruleVersionId: "rule-ama-v1",
+  },
+];
+
+const ruleVersions: RuleVersion[] = [
+  {
+    id: "rule-sol-v1",
+    scope: { kind: "cropFamily", cropFamily: "茄科" },
+    version: 1,
+    ranges: legacyRanges(),
+    flagConditions: LEGACY_FLAG_CONDITIONS.map((condition) => ({
+      ...condition,
+    })),
+    changeReason: "初始规则：沿用通用温室测量边界与标记阈值",
+    createdAt: "2026-02-16T08:00:00.000Z",
+    status: "active",
+  },
+  {
+    id: "rule-ama-v1",
+    scope: { kind: "cropFamily", cropFamily: "苋科" },
+    version: 1,
+    ranges: legacyRanges(),
+    flagConditions: [
+      {
+        code: "HT_UNDER",
+        metric: "heightMm",
+        comparator: "lt",
+        threshold: 55,
+        severity: "warning",
+        messageTemplate: "{cultivar} 株高低于 {threshold} 毫米生长阈值",
+      },
+      {
+        code: "LEAF_LOW",
+        metric: "leafCount",
+        comparator: "lt",
+        threshold: 5,
+        severity: "warning",
+        messageTemplate: "{cultivar} 的真叶数少于 {threshold} 片",
+      },
+      {
+        code: "EC_HIGH",
+        metric: "ecMs",
+        comparator: "gte",
+        threshold: 4,
+        severity: "critical",
+        messageTemplate: "{cultivar} 的基质电导率达到 {threshold} mS/cm",
+      },
+    ],
+    changeReason: "初始规则：苋科批次耐盐性较高，电导率告警线上调至 4.0",
+    createdAt: "2026-04-01T08:00:00.000Z",
+    status: "active",
+  },
+  {
+    id: "rule-bra-v1",
+    scope: { kind: "cropFamily", cropFamily: "十字花科" },
+    version: 1,
+    ranges: legacyRanges(),
+    flagConditions: LEGACY_FLAG_CONDITIONS.map((condition) => ({
+      ...condition,
+    })),
+    changeReason: "初始规则：沿用通用温室测量边界与标记阈值",
+    createdAt: "2026-07-20T08:00:00.000Z",
+    status: "active",
+  },
+  {
+    id: "rule-sol-trial-v1",
+    scope: { kind: "trial", trialId: "trial-sol-01" },
+    version: 1,
+    ranges: legacyRanges(),
+    flagConditions: [
+      {
+        code: "HT_UNDER",
+        metric: "heightMm",
+        comparator: "lt",
+        threshold: 70,
+        severity: "warning",
+        messageTemplate: "{cultivar} 株高低于 {threshold} 毫米生长阈值",
+      },
+      {
+        code: "HT_OVER",
+        metric: "heightMm",
+        comparator: "gte",
+        threshold: 380,
+        severity: "critical",
+        messageTemplate: "{cultivar} 株高高于 {threshold} 毫米生长阈值",
+      },
+      {
+        code: "LEAF_LOW",
+        metric: "leafCount",
+        comparator: "lt",
+        threshold: 6,
+        severity: "warning",
+        messageTemplate: "{cultivar} 的真叶数少于 {threshold} 片",
+      },
+      {
+        code: "EC_HIGH",
+        metric: "ecMs",
+        comparator: "gte",
+        threshold: 3.5,
+        severity: "critical",
+        messageTemplate: "{cultivar} 的基质电导率达到 {threshold} mS/cm",
+      },
+    ],
+    changeReason: "育苗期矮化品系需要更严格的株高与叶龄监控",
+    createdAt: "2026-03-02T08:00:00.000Z",
+    status: "inactive",
   },
 ];
 
@@ -308,5 +422,6 @@ export function createSampleWorkspaceState(): WorkspaceState {
     observationPasses,
     flags,
     clearanceSnapshots,
+    ruleVersions,
   };
 }

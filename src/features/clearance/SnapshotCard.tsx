@@ -1,13 +1,14 @@
-import { CalendarDays, CircleCheck, CircleX } from "lucide-react";
+import { CalendarDays, CircleCheck, CircleX, ScrollText } from "lucide-react";
 import { MetricCard } from "../../components/MetricCard";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { ClearanceSnapshot } from "../../domain/types";
 
 interface SnapshotCardProps {
   snapshot: ClearanceSnapshot;
+  ruleVersionLabel?: string;
 }
 
-export function SnapshotCard({ snapshot }: SnapshotCardProps) {
+export function SnapshotCard({ snapshot, ruleVersionLabel }: SnapshotCardProps) {
   const date = new Date(snapshot.generatedOn);
   const dateLabel = Number.isNaN(date.getTime())
     ? snapshot.generatedOn
@@ -28,6 +29,12 @@ export function SnapshotCard({ snapshot }: SnapshotCardProps) {
             <CalendarDays size={14} aria-hidden="true" />
             {dateLabel}
           </span>
+          {ruleVersionLabel ? (
+            <span>
+              <ScrollText size={14} aria-hidden="true" />
+              {ruleVersionLabel}
+            </span>
+          ) : null}
         </div>
         <StatusBadge tone={statusTone(snapshot.status)}>
           {snapshot.status === "ready" ? "就绪" : "阻止"}
