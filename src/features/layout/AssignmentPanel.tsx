@@ -59,9 +59,11 @@ export function AssignmentPanel({
                 ? "已分配"
                 : accessionStatus(state, selected) === "blocked"
                   ? "受限"
-                  : accessionStatus(state, selected) === "retired"
-                    ? "已停用"
-                  : "未分配"}
+                  : accessionStatus(state, selected) === "maintenance"
+                    ? "台架维护"
+                    : accessionStatus(state, selected) === "retired"
+                      ? "已停用"
+                    : "未分配"}
             </StatusBadge>
           </div>
           <p>{selected.genotypeNote}</p>

@@ -3,15 +3,22 @@ import { Grid3X3 } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import { assignAccession, releaseAccession } from "../../domain/bench";
+import type { Bench } from "../../domain/types";
 import { accessionById, accessionsForTrial } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { AssignmentPanel } from "./AssignmentPanel";
 import { BenchCard } from "./BenchCard";
+import {
+  MaintenanceConsoleDialog,
+  RequestMaintenanceDialog,
+} from "./BenchMaintenanceDialogs";
 
 export function LayoutPage() {
   const { state, dispatch } = useWorkspace();
   const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
   const [selectedAccessionId, setSelectedAccessionId] = useState("");
+  const [requestingBench, setRequestingBench] = useState<Bench | undefined>();
+  const [managingBench, setManagingBench] = useState<Bench | undefined>();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
@@ -51,8 +58,8 @@ export function LayoutPage() {
     dispatch({ type: "bench/assigned", bench: result.value });
     pushToast({
       tone: "success",
-        title: "台架分配成功",
-        message: `${accession.cultivar} 已分配到 ${bench.code}`,
+      title: "台架分配成功",
+      message: `${accession.cultivar} 已分配到 ${bench.code}`,
     });
   };
 
@@ -73,8 +80,8 @@ export function LayoutPage() {
     dispatch({ type: "bench/released", bench: result.value });
     pushToast({
       tone: "success",
-        title: "材料已移出",
-        message: "该台架空位已恢复可用。",
+      title: "材料已移出",
+      message: "该台架空位已恢复可用。",
     });
   };
 
@@ -83,7 +90,7 @@ export function LayoutPage() {
       <PageHeader
         eyebrow="台架规划"
         title="台架布局"
-        description="根据光照、容量和隔离约束，将材料分配到可用台架。"
+        description="根据光照、容量和隔离约束，将材料分配到可用台架；临时维护时先疏散材料再开工。"
       />
       <section className="control-strip">
         <select
@@ -125,11 +132,43 @@ export function LayoutPage() {
                 selectedAccession={selectedAccession}
                 onAssign={handleAssign}
                 onRelease={handleRelease}
+                onRequestMaintenance={setRequestingBench}
+                onManageMaintenance={setManagingBench}
               />
             ))}
           </div>
         </section>
       </div>
+      {requestingBench ? (
+        <RequestMaintenanceDialog
+          bench={requestingBench}
+          onClose={() => setRequestingBench(undefined)}
+          onSaved={(bench, message) => {
+            setRequestingBench(undefined);
+            setManagingBench(bench);
+            pushToast({ tone: "warning", title: "已申请维护", message });
+          }}
+        />
+      ) : null}
+      {managingBench ? (
+        <MaintenanceConsoleDialog
+          bench={managingBench}
+          onClose={() => setManagingBench(undefined)}
+          onSaved={(bench, message) => {
+            const stillInFlow =
+              bench.status === "maintenance-pending" ||
+              bench.status === "maintenance";
+            if (!stillInFlow) {
+              setManagingBench(undefined);
+            }
+            pushToast({
+              tone: "success",
+              title: "维护流程已更新",
+              message,
+            });
+          }}
+        />
+      ) : null}
       <ToastRegion
         messages={toasts}
         onDismiss={(id) =>

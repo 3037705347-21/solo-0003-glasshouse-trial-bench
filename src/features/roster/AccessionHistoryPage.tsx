@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ArrowLeft, History, Link2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, History, Link2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
@@ -13,6 +13,7 @@ import type {
 import {
   benchForAccession,
   replacedByAccessions,
+  relocationsForAccession,
   replacementForAccession,
   trialById,
 } from "../../state/selectors";
@@ -77,6 +78,12 @@ export function AccessionHistoryPage() {
           )
         : [],
     [accession, state.clearanceSnapshots],
+  );
+
+  const relocations = useMemo(
+    () =>
+      accession ? relocationsForAccession(state, accession.id) : [],
+    [accession, state],
   );
 
   if (!accession) {
@@ -202,6 +209,50 @@ export function AccessionHistoryPage() {
           </div>
         )}
       </section>
+
+      {relocations.length > 0 ? (
+        <section className="content-panel">
+          <div className="panel-heading">
+            <div>
+              <span className="panel-title">台架维护迁移记录</span>
+              <span className="panel-subtitle">
+                维护疏散时的台架去向；观测、标记和放行结论仍归属本材料，不被改写
+              </span>
+            </div>
+            <ArrowRight size={20} className="panel-icon" aria-hidden="true" />
+          </div>
+          <div className="lifecycle-timeline">
+            {relocations.map(({ record, bench }) => {
+              const target = state.benches.find(
+                (item) => item.id === record.toBenchId,
+              );
+              return (
+                <article className="lifecycle-entry" key={record.id}>
+                  <StatusBadge tone="neutral">已迁移</StatusBadge>
+                  <dl>
+                    <div>
+                      <dt>迁移时间</dt>
+                      <dd>{displayDateTime(record.relocatedAt)}</dd>
+                    </div>
+                    <div>
+                      <dt>台架去向</dt>
+                      <dd>
+                        {bench.code}
+                        <ArrowRight
+                          size={13}
+                          style={{ margin: "0 4px", display: "inline" }}
+                        />
+                        {target?.code ?? record.toBenchId}
+                      </dd>
+                    </div>
+                  </dl>
+                  <p>{record.note || "因台架临时维护疏散到新台架。"}</p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       {replacedBy.length > 0 ? (
         <section className="content-panel">

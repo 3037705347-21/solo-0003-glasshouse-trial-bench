@@ -1411,3 +1411,66 @@ button {
     justify-content: flex-start;
   }
 }
+
+/* 台架维护流程 */
+.bench-card-maintenance {
+  border-color: var(--warning, #c98a1b);
+  box-shadow: 0 0 0 1px rgba(201, 138, 27, 0.35);
+}
+
+.bench-code-link {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.bench-code-link:hover {
+  text-decoration: underline;
+}
+
+.evacuation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.evacuation-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.2fr) minmax(220px, 1.4fr) minmax(140px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: #fcfaf6;
+}
+
+.evacuation-accession {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.evacuation-accession span {
+  font-size: 0.82rem;
+  color: #6b665c;
+}
+
+.evacuation-note {
+  padding: 7px 10px;
+}
+
+.evacuation-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.maintenance-console .content-panel {
+  margin-bottom: 14px;
+}
+
+@media (max-width: 980px) {
+  .evacuation-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+}

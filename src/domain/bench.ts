@@ -2,12 +2,17 @@ import type { Accession, Bench, PreferredLight } from "./types";
 import { BENCH_LIGHT_COMPATIBILITY } from "./rules";
 import { fail, fieldError, ok, type Result } from "./result";
 import { isAccessionRetired } from "./accession";
+import { isBenchInMaintenanceFlow } from "./benchMaintenance";
 
 export function canAssignAccession(accession: Accession, bench: Bench): boolean {
   if (isAccessionRetired(accession)) {
     return false;
   }
-  if (bench.status === "blocked" || bench.status === "quarantine") {
+  if (
+    bench.status === "blocked" ||
+    bench.status === "quarantine" ||
+    isBenchInMaintenanceFlow(bench)
+  ) {
     return false;
   }
   if (bench.assignedIds.includes(accession.id)) {
@@ -49,6 +54,24 @@ export function validateBenchAssignment(
         "benchId",
         "quarantine",
         `台架 ${bench.code} 正在隔离`,
+      ),
+    ]);
+  }
+  if (bench.status === "maintenance-pending") {
+    return fail([
+      fieldError(
+        "benchId",
+        "maintenance_pending",
+        `台架 ${bench.code} 已申请维护，请先在维护面板中疏散或取消`,
+      ),
+    ]);
+  }
+  if (bench.status === "maintenance") {
+    return fail([
+      fieldError(
+        "benchId",
+        "in_maintenance",
+        `台架 ${bench.code} 正在维护中，不能分配材料`,
       ),
     ]);
   }
@@ -105,6 +128,17 @@ export function releaseAccession(
   accessionId: string,
   bench: Bench,
 ): Result<Bench> {
+  if (isBenchInMaintenanceFlow(bench)) {
+    return fail([
+      fieldError(
+        "benchId",
+        "maintenance_pending",
+        bench.status === "maintenance"
+          ? `台架 ${bench.code} 正在维护中`
+          : `台架 ${bench.code} 已申请维护：请通过“迁移到其他台架”为材料指定去处，不能直接移出`,
+      ),
+    ]);
+  }
   if (!bench.assignedIds.includes(accessionId)) {
     return fail([
       fieldError(
@@ -125,6 +159,15 @@ export function updateBenchLight(
   bench: Bench,
   lightProfile: PreferredLight,
 ): Result<Bench> {
+  if (isBenchInMaintenanceFlow(bench)) {
+    return fail([
+      fieldError(
+        "lightProfile",
+        "in_maintenance",
+        `台架 ${bench.code} 处于维护流程中，请在维护结束后再修改光照类型`,
+      ),
+    ]);
+  }
   if (bench.assignedIds.length > 0) {
     return fail([
       fieldError(

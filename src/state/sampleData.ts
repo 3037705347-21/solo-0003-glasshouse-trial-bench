@@ -174,6 +174,7 @@ const benches: Bench[] = [
     lightProfile: "full-sun",
     irrigationLine: "IR-1",
     status: "assigned",
+    maintenanceHistory: [],
   },
   {
     id: "bench-east-2",
@@ -184,6 +185,7 @@ const benches: Bench[] = [
     lightProfile: "full-sun",
     irrigationLine: "IR-1",
     status: "available",
+    maintenanceHistory: [],
   },
   {
     id: "bench-west-1",
@@ -194,6 +196,7 @@ const benches: Bench[] = [
     lightProfile: "partial-shade",
     irrigationLine: "IR-2",
     status: "assigned",
+    maintenanceHistory: [],
   },
   {
     id: "bench-west-2",
@@ -204,6 +207,7 @@ const benches: Bench[] = [
     lightProfile: "partial-shade",
     irrigationLine: "IR-2",
     status: "assigned",
+    maintenanceHistory: [],
   },
   {
     id: "bench-north-1",
@@ -214,6 +218,7 @@ const benches: Bench[] = [
     lightProfile: "shade",
     irrigationLine: "IR-3",
     status: "available",
+    maintenanceHistory: [],
   },
   {
     id: "bench-north-2",
@@ -225,6 +230,7 @@ const benches: Bench[] = [
     irrigationLine: "IR-3",
     status: "blocked",
     blockedReason: "滴灌管路维修中",
+    maintenanceHistory: [],
   },
 ];
 

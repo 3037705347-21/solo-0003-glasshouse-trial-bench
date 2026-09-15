@@ -34,11 +34,28 @@ export function workspaceReducer(
       };
     case "bench/assigned":
     case "bench/released":
+    case "bench/maintenance-requested":
+    case "bench/maintenance-started":
+    case "bench/maintenance-completed":
+    case "bench/maintenance-cancelled":
       return {
         ...state,
         benches: state.benches.map((bench) =>
           bench.id === action.bench.id ? action.bench : bench,
         ),
+      };
+    case "bench/maintenance-relocated":
+      return {
+        ...state,
+        benches: state.benches.map((bench) => {
+          if (bench.id === action.sourceBench.id) {
+            return action.sourceBench;
+          }
+          if (bench.id === action.targetBench.id) {
+            return action.targetBench;
+          }
+          return bench;
+        }),
       };
     case "observation/recorded":
       return {

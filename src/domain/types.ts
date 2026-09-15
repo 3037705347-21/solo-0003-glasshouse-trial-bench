@@ -41,7 +41,37 @@ export interface Accession {
   retirementHistory: AccessionRetirementRecord[];
 }
 
-export type BenchStatus = "available" | "assigned" | "blocked" | "quarantine";
+export type BenchStatus =
+  | "available"
+  | "assigned"
+  | "blocked"
+  | "quarantine"
+  | "maintenance-pending"
+  | "maintenance";
+
+export interface BenchRelocationRecord {
+  id: string;
+  accessionId: string;
+  fromBenchId: string;
+  toBenchId: string;
+  relocatedAt: string;
+  note: string;
+}
+
+export type BenchMaintenanceOutcome = "completed" | "cancelled";
+
+export interface BenchMaintenanceRecord {
+  id: string;
+  benchId: string;
+  requestedAt: string;
+  reason: string;
+  previousStatus: BenchStatus;
+  startedAt?: string;
+  endedAt?: string;
+  outcome?: BenchMaintenanceOutcome;
+  endNote?: string;
+  relocations: BenchRelocationRecord[];
+}
 
 export interface Bench {
   id: string;
@@ -53,6 +83,7 @@ export interface Bench {
   irrigationLine: string;
   status: BenchStatus;
   blockedReason?: string;
+  maintenanceHistory: BenchMaintenanceRecord[];
 }
 
 export interface ObservationEntry {

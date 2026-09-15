@@ -18,6 +18,15 @@ export type WorkspaceAction =
   | { type: "accession/updated"; accession: Accession }
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
+  | { type: "bench/maintenance-requested"; bench: Bench }
+  | {
+      type: "bench/maintenance-relocated";
+      sourceBench: Bench;
+      targetBench: Bench;
+    }
+  | { type: "bench/maintenance-started"; bench: Bench }
+  | { type: "bench/maintenance-completed"; bench: Bench }
+  | { type: "bench/maintenance-cancelled"; bench: Bench }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
   | { type: "flag/transitioned"; flag: Flag }
   | {

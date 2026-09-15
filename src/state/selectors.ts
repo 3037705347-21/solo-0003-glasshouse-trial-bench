@@ -1,6 +1,7 @@
 import type {
   Accession,
   Bench,
+  BenchMaintenanceRecord,
   ClearanceSnapshot,
   Flag,
   ObservationPass,
@@ -11,6 +12,10 @@ import {
   isAccessionRetired,
   latestRetirementRecord,
 } from "../domain/accession";
+import {
+  isBenchInMaintenanceFlow,
+  latestMaintenanceRecord,
+} from "../domain/benchMaintenance";
 
 export function trialById(
   state: WorkspaceState,
@@ -118,10 +123,37 @@ export function benchUtilization(
   };
 }
 
+export function benchMaintenanceRecord(
+  bench: Bench,
+): BenchMaintenanceRecord | undefined {
+  if (!isBenchInMaintenanceFlow(bench)) {
+    return undefined;
+  }
+  return latestMaintenanceRecord(bench);
+}
+
+/** 跨所有台架的维护迁移记录（用于材料历史页展示材料去向轨迹）。 */
+export function relocationsForAccession(
+  state: WorkspaceState,
+  accessionId: string,
+): Array<{ record: BenchMaintenanceRecord["relocations"][number]; bench: Bench }> {
+  return state.benches
+    .flatMap((bench) =>
+      bench.maintenanceHistory.flatMap((maintenance) =>
+        maintenance.relocations
+          .filter((relocation) => relocation.accessionId === accessionId)
+          .map((record) => ({ record, bench })),
+      ),
+    )
+    .sort((left, right) =>
+      right.record.relocatedAt.localeCompare(left.record.relocatedAt),
+    );
+}
+
 export function accessionStatus(
   state: WorkspaceState,
   accession: Accession,
-): "assigned" | "unassigned" | "blocked" | "retired" {
+): "assigned" | "unassigned" | "blocked" | "maintenance" | "retired" {
   if (isAccessionRetired(accession)) {
     return "retired";
   }
@@ -129,7 +161,11 @@ export function accessionStatus(
   if (!bench) {
     return "unassigned";
   }
-  return bench.status === "blocked" || bench.status === "quarantine"
-    ? "blocked"
-    : "assigned";
+  if (bench.status === "blocked" || bench.status === "quarantine") {
+    return "blocked";
+  }
+  if (isBenchInMaintenanceFlow(bench)) {
+    return "maintenance";
+  }
+  return "assigned";
 }

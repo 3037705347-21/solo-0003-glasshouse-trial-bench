@@ -25,14 +25,14 @@ export function statusTone(
     return "info";
   }
   if (
-    ["blocked", "quarantine", "open", "受限", "隔离", "未处理", "严重"].includes(
+    ["blocked", "quarantine", "open", "maintenance", "受限", "隔离", "未处理", "严重", "维护中"].includes(
       value,
     )
   ) {
     return "critical";
   }
   if (
-    ["draft", "unassigned", "warning", "草稿", "未分配", "警告"].includes(value)
+    ["draft", "unassigned", "warning", "maintenance-pending", "草稿", "未分配", "警告", "待维护", "待疏散"].includes(value)
   ) {
     return "warning";
   }

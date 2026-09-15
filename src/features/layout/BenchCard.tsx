@@ -1,10 +1,12 @@
-import { Check, X } from "lucide-react";
+import { Check, History, Wrench, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { ProgressBar } from "../../components/ProgressBar";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { Accession, Bench } from "../../domain/types";
 import { canAssignAccession } from "../../domain/bench";
 import { isAccessionRetired } from "../../domain/accession";
+import { isBenchInMaintenanceFlow } from "../../domain/benchMaintenance";
 
 interface BenchCardProps {
   bench: Bench;
@@ -12,6 +14,25 @@ interface BenchCardProps {
   selectedAccession?: Accession;
   onAssign: (accessionId: string, benchId: string) => void;
   onRelease: (accessionId: string, benchId: string) => void;
+  onManageMaintenance: (bench: Bench) => void;
+  onRequestMaintenance: (bench: Bench) => void;
+}
+
+function benchStatusLabel(bench: Bench): string {
+  switch (bench.status) {
+    case "assigned":
+      return "已分配";
+    case "blocked":
+      return "受限";
+    case "quarantine":
+      return "隔离";
+    case "maintenance-pending":
+      return "待疏散";
+    case "maintenance":
+      return "维护中";
+    default:
+      return "可用";
+  }
 }
 
 export function BenchCard({
@@ -20,6 +41,8 @@ export function BenchCard({
   selectedAccession,
   onAssign,
   onRelease,
+  onManageMaintenance,
+  onRequestMaintenance,
 }: BenchCardProps) {
   const assigned = accessions.filter((accession) =>
     bench.assignedIds.includes(accession.id),
@@ -28,25 +51,28 @@ export function BenchCard({
   const compatible = Boolean(
     selectedAccession && canAssignAccession(selectedAccession, bench),
   );
+  const inMaintenanceFlow = isBenchInMaintenanceFlow(bench);
 
   return (
     <article
-      className={`bench-card ${compatible ? "bench-card-compatible" : ""}`}
+      className={`bench-card ${compatible ? "bench-card-compatible" : ""} ${
+        inMaintenanceFlow ? "bench-card-maintenance" : ""
+      }`}
       data-testid={`bench-card-${bench.id}`}
     >
       <header className="bench-card-header">
         <div>
-          <span className="bench-code">{bench.code}</span>
+          <Link
+            className="bench-code bench-code-link"
+            to={`/benches/${bench.id}/history`}
+            data-testid={`bench-history-link-${bench.id}`}
+          >
+            {bench.code}
+          </Link>
           <h3>{bench.sector}</h3>
         </div>
         <StatusBadge tone={statusTone(bench.status)}>
-          {bench.status === "assigned"
-            ? "已分配"
-            : bench.status === "blocked"
-              ? "受限"
-              : bench.status === "quarantine"
-                ? "隔离"
-                : "可用"}
+          {benchStatusLabel(bench)}
         </StatusBadge>
       </header>
       <dl className="bench-meta">
@@ -76,7 +102,9 @@ export function BenchCard({
       />
       <div className="bench-assignments">
         {assigned.length === 0 ? (
-          <p className="muted-copy">暂无分配材料。</p>
+          <p className="muted-copy">
+            {inMaintenanceFlow ? "台架已清空。" : "暂无分配材料。"}
+          </p>
         ) : (
           assigned.map((accession) => (
             <div className="bench-accession-row" key={accession.id}>
@@ -87,15 +115,17 @@ export function BenchCard({
                   {isAccessionRetired(accession) ? " · 已停用" : ""}
                 </span>
               </div>
-              <Button
-                tone="ghost"
-                size="sm"
-                className="icon-button"
-                onClick={() => onRelease(accession.id, bench.id)}
-                aria-label={`将 ${accession.cultivar} 从台架 ${bench.code} 移出`}
-              >
-                <X size={16} />
-              </Button>
+              {inMaintenanceFlow ? null : (
+                <Button
+                  tone="ghost"
+                  size="sm"
+                  className="icon-button"
+                  onClick={() => onRelease(accession.id, bench.id)}
+                  aria-label={`将 ${accession.cultivar} 从台架 ${bench.code} 移出`}
+                >
+                  <X size={16} />
+                </Button>
+              )}
             </div>
           ))
         )}
@@ -104,16 +134,45 @@ export function BenchCard({
         {bench.status === "blocked" ? (
           <p className="bench-reason">{bench.blockedReason}</p>
         ) : null}
-        <Button
-          tone="secondary"
-          size="sm"
-          disabled={!selectedAccession || !compatible}
-          onClick={() => selectedAccession && onAssign(selectedAccession.id, bench.id)}
-          data-testid={`assign-bench-${bench.id}`}
-        >
-          <Check size={15} />
-          分配
-        </Button>
+        {bench.status === "maintenance-pending" ? (
+          <p className="bench-reason">
+            维护申请中：请先将 {assigned.length} 个材料疏散到其他台架
+          </p>
+        ) : null}
+        {inMaintenanceFlow ? (
+          <Button
+            tone={bench.status === "maintenance" ? "secondary" : "danger"}
+            size="sm"
+            onClick={() => onManageMaintenance(bench)}
+            data-testid={`manage-maintenance-${bench.id}`}
+          >
+            <Wrench size={15} />
+            {bench.status === "maintenance" ? "结束维护" : "疏散与维护"}
+          </Button>
+        ) : (
+          <>
+            <Button
+              tone="ghost"
+              size="sm"
+              onClick={() => onRequestMaintenance(bench)}
+              disabled={bench.status === "blocked" || bench.status === "quarantine"}
+              data-testid={`request-maintenance-${bench.id}`}
+            >
+              <Wrench size={15} />
+              维护
+            </Button>
+            <Button
+              tone="secondary"
+              size="sm"
+              disabled={!selectedAccession || !compatible}
+              onClick={() => selectedAccession && onAssign(selectedAccession.id, bench.id)}
+              data-testid={`assign-bench-${bench.id}`}
+            >
+              <Check size={15} />
+              分配
+            </Button>
+          </>
+        )}
       </footer>
     </article>
   );

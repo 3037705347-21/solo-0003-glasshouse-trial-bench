@@ -50,6 +50,24 @@ export function buildClearanceSnapshot(
         benchId: bench.id,
       });
     });
+  state.benches
+    .filter(
+      (bench) =>
+        bench.status === "maintenance-pending" || bench.status === "maintenance",
+    )
+    .forEach((bench) => {
+      blockers.push({
+        code:
+          bench.status === "maintenance"
+            ? "BENCH_MAINTENANCE"
+            : "BENCH_MAINTENANCE_PENDING",
+        message:
+          bench.status === "maintenance"
+            ? `Bench ${bench.code} is under maintenance`
+            : `Bench ${bench.code} has a pending maintenance request with ${bench.assignedIds.length} material(s) still on it`,
+        benchId: bench.id,
+      });
+    });
   openFlags.forEach((flag) => {
     blockers.push({
       code: `FLAG_${flag.code}`,

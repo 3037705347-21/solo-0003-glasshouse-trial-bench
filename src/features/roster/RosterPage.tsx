@@ -127,9 +127,17 @@ export function RosterPage() {
               ? "已分配"
               : status === "blocked"
                 ? "受限"
-                : "未分配";
+                : status === "maintenance"
+                  ? "台架维护"
+                  : "未分配";
         return (
-          <StatusBadge tone={status === "retired" ? "warning" : statusTone(label)}>
+          <StatusBadge
+            tone={
+              status === "retired" || status === "maintenance"
+                ? "warning"
+                : statusTone(label)
+            }
+          >
             {label}
           </StatusBadge>
         );
