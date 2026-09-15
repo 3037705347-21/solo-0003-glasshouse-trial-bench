@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
+    "history": "node scripts/history-regression.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 4177",
     "smoke": "node scripts/smoke.mjs"
   },

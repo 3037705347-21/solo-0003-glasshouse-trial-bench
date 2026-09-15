@@ -37,7 +37,10 @@ node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
 node scripts/smoke.mjs advance-trial-clearance
 node scripts/smoke.mjs retire-accession-replacement
+npm run history
 ```
+
+`npm run history` 是纯状态回归检查：构造“撤销放行后的命令 → 走新分支 → 撤销新分支 → 再撤销更早放行”的分支序列，并验证失败时业务状态与历史栈都保持不变。
 
 每条命令都会启动并关闭一个本地 Vite 预览服务，端口为 `4177`。检查过程不调用外部服务，也不依赖在线数据库。
 

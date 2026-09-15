@@ -91,12 +91,15 @@ export type HistoryCommand =
   | FlagTransitionedCommand
   | ClearanceGeneratedCommand;
 
+export type HistoryEnvelopeStatus = "active" | "undone" | "discarded";
+
 export interface HistoryEnvelope {
   id: string;
   at: string;
   label: string;
   reversible: boolean;
   command: HistoryCommand;
+  status: HistoryEnvelopeStatus;
 }
 
 export interface HistoryState {
@@ -115,6 +118,10 @@ export const emptyHistory: HistoryState = {
   undoStack: [],
   redoStack: [],
 };
+
+const ACTIVE_STATUS: HistoryEnvelopeStatus = "active";
+const UNDONE_STATUS: HistoryEnvelopeStatus = "undone";
+const DISCARDED_STATUS: HistoryEnvelopeStatus = "discarded";
 
 function fail(message: string): CommandResult {
   return { ok: false, error: message };
@@ -161,6 +168,7 @@ export function createEnvelope(
     label: describeCommand(command),
     reversible: isReversibleCommand(command, state),
     command,
+    status: ACTIVE_STATUS,
   };
 }
 
@@ -371,10 +379,9 @@ function commandsAfterEnvelope(
   if (index < 0) {
     return [];
   }
-  const undone = new Set(history.redoStack);
   return history.entries
     .slice(index + 1)
-    .filter((item) => !undone.has(item.id));
+    .filter((item) => item.status === ACTIVE_STATUS);
 }
 
 function hasLaterTrialCommand(
@@ -435,7 +442,6 @@ function hasPermanentCommandAfterEnvelope(
   history: HistoryState,
   envelope: HistoryEnvelope,
 ): boolean {
-  const undone = new Set(history.redoStack);
   const affectedTrialIds = commandTrialIds(state, envelope.command);
   return commandsAfterEnvelope(history, envelope).some(
     (item) =>
@@ -1131,6 +1137,31 @@ export function undoCommand(
         : state;
     }
   }
+}
+
+export function normalizeHistoryState(history: HistoryState): HistoryState {
+  const undoIds = new Set(history.undoStack);
+  const redoIds = new Set(history.redoStack);
+  return {
+    ...history,
+    entries: history.entries.map((entry) => {
+      if (
+        entry.status === ACTIVE_STATUS ||
+        entry.status === UNDONE_STATUS ||
+        entry.status === DISCARDED_STATUS
+      ) {
+        return entry;
+      }
+      const status = redoIds.has(entry.id)
+        ? UNDONE_STATUS
+        : undoIds.has(entry.id)
+          ? ACTIVE_STATUS
+          : entry.reversible
+            ? DISCARDED_STATUS
+            : ACTIVE_STATUS;
+      return { ...entry, status };
+    }),
+  };
 }
 
 export function isValidHistory(value: unknown): value is HistoryState {
