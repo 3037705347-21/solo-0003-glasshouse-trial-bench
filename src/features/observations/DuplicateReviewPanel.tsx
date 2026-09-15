@@ -69,23 +69,22 @@ function ReviewCard({ review }: { review: DuplicateReview }) {
       result.value.withdrawnFlagKeys,
       `来源观测已在去重裁决 ${result.value.audit.id} 中收敛`,
     );
-    const withdrawnKeySet = new Set(
-      result.value.withdrawnFlagKeys.map(
-        (key) => `${key.passId} ${key.accessionId}`,
-      ),
+    // withdraw 函数对未变更标记原样返回同一对象引用：按引用差集取真正改变的标记，
+    // 不依赖字符串拼接键，避免分隔符不一致导致撤回标记被空过滤丢弃、无法持久化。
+    const previousFlagById = new Map(
+      state.flags.map((flag) => [flag.id, flag]),
+    );
+    const withdrawnFlags = allFlags.filter(
+      (flag) =>
+        flag.state === "withdrawn" &&
+        previousFlagById.get(flag.id)?.state === "open",
     );
     dispatch({
       type: "duplicate/resolved",
       review: result.value.review,
       audit: result.value.audit,
       updatedPasses: result.value.updatedPasses,
-      withdrawnFlags: allFlags.filter(
-        (flag) =>
-          flag.state === "withdrawn" &&
-          withdrawnKeySet.has(
-            `${flag.observationPassId}::${flag.accessionId}`,
-          ),
-      ),
+      withdrawnFlags,
     });
   };
 

@@ -22,6 +22,22 @@ export const RETAKE_TOLERANCE = {
   ecMs: 0.3,
 };
 
+/**
+ * 测量值的业务录入精度（小数位数）。株高与叶片数为整数，EC 以 0.1 mS/cm 为步长。
+ * 差值必须先按业务精度取整再与容差比较，否则二进制浮点误差
+ * （例如 |3.9-3.6| = 0.30000000000000004）会把恰好等于容差的记录误判为合理重测。
+ */
+export const MEASUREMENT_PRECISION = {
+  heightMm: 0,
+  leafCount: 0,
+  ecMs: 1,
+} as const;
+
+function businessDelta(left: number, right: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return Math.round(Math.abs(left - right) * factor) / factor;
+}
+
 /** 不同录入窗口（毫秒）。超过该间隔即使内容相同也不自动收敛，必须人工确认。 */
 export const AUTO_CONVERGE_WINDOW_MS = 60 * 1000;
 
@@ -109,9 +125,23 @@ function entryDifference(
   candidate: ObservationEntry,
   existing: ObservationEntry,
 ): ReviewEntryDifference {
-  const heightDeltaMm = Math.abs(candidate.heightMm - existing.heightMm);
-  const leafDelta = Math.abs(candidate.leafCount - existing.leafCount);
-  const ecDelta = Math.abs(candidate.ecMs - existing.ecMs);
+  // 差值先按业务精度取整（株高/叶片为整数，EC 精确到 0.1），再做容差判定，
+  // 保证业务上恰好等于 ±0.3 的差异不会因浮点表示误差落到容差外。
+  const heightDeltaMm = businessDelta(
+    candidate.heightMm,
+    existing.heightMm,
+    MEASUREMENT_PRECISION.heightMm,
+  );
+  const leafDelta = businessDelta(
+    candidate.leafCount,
+    existing.leafCount,
+    MEASUREMENT_PRECISION.leafCount,
+  );
+  const ecDelta = businessDelta(
+    candidate.ecMs,
+    existing.ecMs,
+    MEASUREMENT_PRECISION.ecMs,
+  );
   const withinTolerance =
     heightDeltaMm <= RETAKE_TOLERANCE.heightMm &&
     leafDelta <= RETAKE_TOLERANCE.leafCount &&
@@ -120,7 +150,7 @@ function entryDifference(
     accessionId: candidate.accessionId,
     heightDeltaMm,
     leafDelta,
-    ecDelta: Math.round(ecDelta * 100) / 100,
+    ecDelta,
     withinTolerance,
   };
 }
