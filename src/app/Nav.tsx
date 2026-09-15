@@ -1,5 +1,6 @@
 import {
   ClipboardCheck,
+  Columns3,
   LayoutGrid,
   ListTree,
   NotebookPen,
@@ -11,6 +12,7 @@ const navItems = [
   { to: "/layout", label: "台架布局", icon: LayoutGrid },
   { to: "/observations", label: "生长观测", icon: NotebookPen },
   { to: "/clearance", label: "试验放行", icon: ClipboardCheck },
+  { to: "/compare", label: "试验对比", icon: Columns3 },
 ];
 
 export function Nav() {

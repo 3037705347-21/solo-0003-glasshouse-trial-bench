@@ -10,11 +10,12 @@ import {
 import { transitionTrial } from "../../domain/trial";
 import { latestSnapshotForTrial } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { useDeepLinkedTrialId } from "../../app/trialParam";
 import { SnapshotCard } from "./SnapshotCard";
 
 export function ClearancePage() {
   const { state, dispatch } = useWorkspace();
-  const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
+  const [trialId, setTrialId] = useState(useDeepLinkedTrialId(state.trials));
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const latest = latestSnapshotForTrial(state, trialId);
   const trial = state.trials.find((item) => item.id === trialId);

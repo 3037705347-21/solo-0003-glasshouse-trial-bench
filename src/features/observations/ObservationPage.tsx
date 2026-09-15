@@ -11,12 +11,13 @@ import {
   passesForTrial,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { useDeepLinkedTrialId } from "../../app/trialParam";
 import { FlagPanel } from "./FlagPanel";
 import { PassForm } from "./PassForm";
 
 export function ObservationPage() {
   const { state } = useWorkspace();
-  const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
+  const [trialId, setTrialId] = useState(useDeepLinkedTrialId(state.trials));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const passes = passesForTrial(state, trialId);

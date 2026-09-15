@@ -1157,6 +1157,153 @@ button {
   font-size: 14px;
 }
 
+.compare-picker {
+  row-gap: 10px;
+}
+
+.compare-picker-label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.compare-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 650;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.compare-chip:hover {
+  border-color: var(--green-600);
+  color: var(--green-700);
+}
+
+.compare-chip-active {
+  border-color: var(--green-600);
+  background: var(--green-100);
+  color: var(--green-700);
+}
+
+.compare-table th,
+.compare-table td {
+  white-space: normal;
+  vertical-align: top;
+}
+
+.compare-table td {
+  min-width: 230px;
+}
+
+.compare-table th:first-child,
+.compare-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 190px;
+  background: var(--surface);
+  box-shadow: 1px 0 0 var(--line);
+}
+
+.compare-table th:first-child {
+  background: #fcfdfb;
+}
+
+.compare-trial-head {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.compare-trial-head strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.compare-trial-head span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+}
+
+.compare-metric-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.compare-scope {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.compare-cell-main {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.compare-cell-sub {
+  margin-top: 5px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.compare-cell-warn {
+  margin-top: 5px;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.compare-cell-meta {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.compare-gap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px dashed var(--amber-700);
+  border-radius: 7px;
+  background: var(--amber-100);
+  color: var(--amber-700);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.compare-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 9px;
+  color: var(--green-700);
+  font-size: 12px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.compare-link:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 1100px) {
   .layout-workspace,
   .observation-workspace {

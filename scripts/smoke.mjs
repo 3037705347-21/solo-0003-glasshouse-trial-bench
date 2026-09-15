@@ -15,6 +15,7 @@ const scenarios = {
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
+  "compare-trials": compareTrialsSideBySide,
 };
 
 const scenarioPaths = {
@@ -22,6 +23,7 @@ const scenarioPaths = {
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
+  "compare-trials": "/compare",
 };
 
 async function waitForServer() {
@@ -90,6 +92,43 @@ async function advanceTrialClearance(page) {
     .getByTestId("clearance-snapshot")
     .getByText("阻止", { exact: true })
     .first()
+    .waitFor();
+}
+
+async function compareTrialsSideBySide(page) {
+  // 默认选中前两个试验，并列表格直接出现
+  await page.getByTestId("compare-table").waitFor();
+  await page.getByTestId("compare-cell-schedule-trial-sol-01").waitFor();
+  // 加入草稿试验 BRA-03：无观测、无台架、无放行，必须显示缺口而不是零值
+  await page.getByTestId("compare-trial-toggle-trial-bra-03").click();
+  await page
+    .getByTestId("compare-cell-observations-trial-bra-03")
+    .getByText("尚无观测记录", { exact: true })
+    .waitFor();
+  await page
+    .getByTestId("compare-cell-benches-trial-bra-03")
+    .getByText("未占用台架", { exact: true })
+    .waitFor();
+  await page
+    .getByTestId("compare-cell-clearance-trial-bra-03")
+    .getByText("尚未生成放行快照", { exact: true })
+    .waitFor();
+  // 从对比结果回到原对象：单元格链接跳到观测页并预选 BRA-03
+  await page.getByTestId("compare-link-observations-trial-bra-03").click();
+  await page.getByTestId("open-observation-form").click();
+  await page.getByTestId("observer-input").fill("A. Linden");
+  await page.getByTestId("save-observation-button").click();
+  await page.getByText("观测已记录", { exact: true }).waitFor();
+  // 新增数据后回到对比页：结果确定更新，缺口被真实值取代
+  await page.locator(".side-nav a", { hasText: "试验对比" }).click();
+  await page.getByTestId("compare-trial-toggle-trial-bra-03").click();
+  await page
+    .getByTestId("compare-cell-observations-trial-bra-03")
+    .getByText("1 次观测")
+    .waitFor();
+  await page
+    .getByTestId("compare-cell-flags-trial-bra-03")
+    .getByText("0 个未处理", { exact: true })
     .waitFor();
 }
 

@@ -5,12 +5,13 @@ import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import { assignAccession, releaseAccession } from "../../domain/bench";
 import { accessionById, accessionsForTrial } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { useDeepLinkedTrialId } from "../../app/trialParam";
 import { AssignmentPanel } from "./AssignmentPanel";
 import { BenchCard } from "./BenchCard";
 
 export function LayoutPage() {
   const { state, dispatch } = useWorkspace();
-  const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
+  const [trialId, setTrialId] = useState(useDeepLinkedTrialId(state.trials));
   const [selectedAccessionId, setSelectedAccessionId] = useState("");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 

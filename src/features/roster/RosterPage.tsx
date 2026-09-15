@@ -20,13 +20,16 @@ import {
   benchForAccession,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { useDeepLinkedTrialId } from "../../app/trialParam";
 import { RosterForm } from "./RosterForm";
 
 type RosterSegment = "all" | "assigned" | "unassigned";
 
 export function RosterPage() {
   const { state } = useWorkspace();
-  const [trialFilter, setTrialFilter] = useState(() => state.trials[0]?.id ?? "");
+  const [trialFilter, setTrialFilter] = useState(
+    useDeepLinkedTrialId(state.trials),
+  );
   const [query, setQuery] = useState("");
   const [segment, setSegment] = useState<RosterSegment>("all");
   const [editorOpen, setEditorOpen] = useState(false);
