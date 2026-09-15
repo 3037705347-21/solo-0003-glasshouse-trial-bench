@@ -5,6 +5,7 @@ import {
   NotebookPen,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { HistoryControls } from "./HistoryControls";
 
 const navItems = [
   { to: "/roster", label: "材料登记", icon: ListTree },
@@ -41,6 +42,7 @@ export function Nav() {
           );
         })}
       </ul>
+      <HistoryControls />
     </nav>
   );
 }

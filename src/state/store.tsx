@@ -6,21 +6,38 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
 } from "react";
 import type { WorkspaceState } from "../domain/types";
 import { createSampleWorkspaceState } from "./sampleData";
 import {
-  loadWorkspaceState,
-  saveWorkspaceState,
   clearWorkspaceStorage,
+  loadHistoryState,
+  loadWorkspaceState,
+  saveHistoryState,
+  saveWorkspaceState,
 } from "./persistence";
-import { workspaceReducer } from "./reducer";
-import type { WorkspaceAction } from "./types";
+import { createEnvelope } from "./history";
+import { rootReducer, type RootState } from "./rootReducer";
+import {
+  historyCommandFromAction,
+  type RootAction,
+  type WorkspaceAction,
+  type WorkspaceMutationAction,
+} from "./types";
 
 interface WorkspaceContextValue {
   state: WorkspaceState;
   dispatch: Dispatch<WorkspaceAction>;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  undoLabel?: string;
+  redoLabel?: string;
+  historyError?: string;
+  clearHistoryError: () => void;
   resetWorkspace: () => void;
   clearWorkspace: () => void;
   persistenceReady: boolean;
@@ -28,33 +45,98 @@ interface WorkspaceContextValue {
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
+function isMutationAction(
+  action: WorkspaceAction,
+): action is WorkspaceMutationAction {
+  return action.type !== "hydrate" && action.type !== "reset";
+}
+
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [initialState] = useState<WorkspaceState>(() => loadWorkspaceState());
-  const [state, dispatch] = useReducer(workspaceReducer, initialState);
+  const [root, dispatchRoot] = useReducer(
+    rootReducer,
+    null,
+    (): RootState => ({
+      workspace: loadWorkspaceState(),
+      history: loadHistoryState(),
+    }),
+  );
+  const stateRef = useRef(root.workspace);
+  stateRef.current = root.workspace;
   const [persistenceReady, setPersistenceReady] = useState(false);
 
   useEffect(() => {
-    saveWorkspaceState(state);
+    saveWorkspaceState(root.workspace);
+    saveHistoryState(root.history);
     setPersistenceReady(true);
-  }, [state]);
+  }, [root.workspace, root.history]);
 
-  const value = useMemo<WorkspaceContextValue>(
-    () => ({
-      state,
+  const dispatch: Dispatch<WorkspaceAction> = (action) => {
+    if (action.type === "hydrate") {
+      dispatchRoot({ type: "workspace/hydrate", workspace: action.state });
+      return;
+    }
+    if (action.type === "reset") {
+      dispatchRoot({ type: "workspace/reset", workspace: action.state });
+      return;
+    }
+    if (!isMutationAction(action)) {
+      return;
+    }
+    const command = historyCommandFromAction(action, stateRef.current);
+    const envelope = createEnvelope(command, stateRef.current);
+    const rootAction: RootAction = {
+      type: "workspace/command",
+      envelopeId: envelope.id,
+      at: envelope.at,
+      label: envelope.label,
+      reversible: envelope.reversible,
+      command,
+    };
+    dispatchRoot(rootAction);
+  };
+
+  const value = useMemo<WorkspaceContextValue>(() => {
+    const undoEnvelopeId =
+      root.history.undoStack[root.history.undoStack.length - 1];
+    const redoEnvelopeId =
+      root.history.redoStack[root.history.redoStack.length - 1];
+    const undoEnvelope = root.history.entries.find(
+      (item) => item.id === undoEnvelopeId,
+    );
+    const redoEnvelope = root.history.entries.find(
+      (item) => item.id === redoEnvelopeId,
+    );
+    return {
+      state: root.workspace,
       dispatch,
+      undo: () =>
+        undoEnvelopeId &&
+        dispatchRoot({ type: "history/undo", envelopeId: undoEnvelopeId }),
+      redo: () =>
+        redoEnvelopeId &&
+        dispatchRoot({ type: "history/redo", envelopeId: redoEnvelopeId }),
+      canUndo: Boolean(undoEnvelope),
+      canRedo: Boolean(redoEnvelope),
+      undoLabel: undoEnvelope?.label,
+      redoLabel: redoEnvelope?.label,
+      historyError: root.lastError,
+      clearHistoryError: () =>
+        dispatchRoot({ type: "history/clear-error" }),
       persistenceReady,
       resetWorkspace: () =>
-        dispatch({ type: "reset", state: createSampleWorkspaceState() }),
+        dispatchRoot({
+          type: "workspace/reset",
+          workspace: createSampleWorkspaceState(),
+        }),
       clearWorkspace: () => {
         clearWorkspaceStorage();
-        dispatch({
-          type: "reset",
-          state: createSampleWorkspaceState(),
+        dispatchRoot({
+          type: "workspace/reset",
+          workspace: createSampleWorkspaceState(),
         });
       },
-    }),
-    [state, persistenceReady],
-  );
+    };
+  }, [root, persistenceReady]);
 
   return (
     <WorkspaceContext.Provider value={value}>

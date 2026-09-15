@@ -134,6 +134,54 @@ button {
   color: #ffffff;
 }
 
+.history-controls {
+  margin-top: auto;
+  display: grid;
+  gap: 10px;
+}
+
+.history-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.history-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid #465640;
+  border-radius: 7px;
+  background: #273526;
+  color: #dce6d7;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.history-button:hover:not(:disabled) {
+  background: #344731;
+  color: #ffffff;
+}
+
+.history-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.history-error {
+  padding: 9px 10px;
+  border: 1px solid rgba(242, 192, 145, 0.5);
+  border-radius: 7px;
+  background: rgba(180, 92, 47, 0.22);
+  color: #f7d9c4;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+}
+
 .app-main {
   min-width: 0;
   padding: 38px 42px 56px;
