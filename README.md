@@ -27,6 +27,7 @@ npm run build
 node scripts/smoke.mjs curate-accession-roster
 node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
+node scripts/smoke.mjs track-quality-incident
 node scripts/smoke.mjs advance-trial-clearance
 ```
 
@@ -43,6 +44,7 @@ src/
     roster/               材料登记和编辑
     layout/               台架分配工作区
     observations/         观测记录和标记处理
+    incidents/            材料质量事件跟踪
     clearance/            放行快照工作区
   components/             共享 UI 原语
   styles/                 应用样式
@@ -52,7 +54,7 @@ scripts/
 
 ## 输入与输出
 
-- 输入：试验信息、材料信息、台架约束、观测测量、标记处理和放行请求。
-- 输出：本地持久化工作区、更新的台架布局、派生生长标记和放行快照。
+- 输入：试验信息、材料信息、台架约束、观测测量、标记处理、质量事件和放行请求。
+- 输出：本地持久化工作区、更新的台架布局、派生生长标记、质量事件处理轨迹和放行快照。
 
 本地使用不需要环境变量。

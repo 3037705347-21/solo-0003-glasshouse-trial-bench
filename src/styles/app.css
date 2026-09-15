@@ -1037,7 +1037,7 @@ button {
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
   padding: 18px 0;
 }
@@ -1128,6 +1128,142 @@ button {
   margin: 0;
   color: var(--green-700);
   font-size: 14px;
+}
+
+.risk-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--amber-700);
+  border-radius: 8px;
+  background: var(--amber-100);
+  color: var(--amber-700);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.risk-banner svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.risk-banner strong {
+  display: block;
+  font-size: 13px;
+}
+
+.risk-banner p {
+  margin: 3px 0 0;
+}
+
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fcfdfb;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.checkbox-option:hover {
+  background: var(--surface-soft);
+}
+
+.incident-detail {
+  display: grid;
+  gap: 18px;
+}
+
+.incident-detail-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.incident-section {
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.incident-section h3 {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.incident-section p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.clue-list {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.action-trail {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.action-trail li {
+  padding: 8px 10px;
+  border-left: 3px solid var(--green-600);
+  border-radius: 6px;
+  background: var(--surface-soft);
+  font-size: 13px;
+}
+
+.action-trail time {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.incident-resolution {
+  padding: 12px 14px;
+  border: 1px solid var(--green-600);
+  border-radius: 8px;
+  background: var(--green-100);
+}
+
+.incident-resolution p {
+  color: var(--green-700);
+}
+
+.cell-truncate {
+  display: inline-block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .empty-state {

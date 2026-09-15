@@ -4,6 +4,7 @@ import type {
   ClearanceSnapshot,
   Flag,
   ObservationPass,
+  QualityIncident,
   Trial,
   WorkspaceState,
 } from "../domain/types";
@@ -47,6 +48,44 @@ export function openFlagsForTrial(
   return state.flags.filter(
     (flag) => flag.trialId === trialId && flag.state === "open",
   );
+}
+
+export function incidentById(
+  state: WorkspaceState,
+  incidentId: string,
+): QualityIncident | undefined {
+  return state.incidents.find((incident) => incident.id === incidentId);
+}
+
+export function activeIncidentsForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): QualityIncident[] {
+  const accessionIds = new Set(
+    state.accessions
+      .filter((accession) => accession.trialId === trialId)
+      .map((accession) => accession.id),
+  );
+  return state.incidents.filter(
+    (incident) =>
+      incident.status === "active" &&
+      incident.accessionIds.some((id) => accessionIds.has(id)),
+  );
+}
+
+export function activeIncidentsByAccession(
+  state: WorkspaceState,
+): Map<string, QualityIncident[]> {
+  const map = new Map<string, QualityIncident[]>();
+  state.incidents
+    .filter((incident) => incident.status === "active")
+    .forEach((incident) => {
+      incident.accessionIds.forEach((accessionId) => {
+        const list = map.get(accessionId) ?? [];
+        map.set(accessionId, [...list, incident]);
+      });
+    });
+  return map;
 }
 
 export function passesForTrial(

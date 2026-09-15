@@ -74,6 +74,30 @@ export interface Flag {
   resolutionNote?: string;
 }
 
+export type IncidentKind = "contamination" | "quality" | "loss";
+export type IncidentStatus = "active" | "lifted";
+
+export interface IncidentAction {
+  recordedOn: string;
+  note: string;
+}
+
+export interface QualityIncident {
+  id: string;
+  kind: IncidentKind;
+  accessionIds: string[];
+  observationPassId?: string;
+  flagId?: string;
+  discoveredOn: string;
+  cause: string;
+  scope: string;
+  actions: IncidentAction[];
+  status: IncidentStatus;
+  createdOn: string;
+  liftedOn?: string;
+  resolution?: string;
+}
+
 export type ClearanceStatus = "ready" | "blocked";
 
 export interface ClearanceMetric {
@@ -104,5 +128,6 @@ export interface WorkspaceState {
   benches: Bench[];
   observationPasses: ObservationPass[];
   flags: Flag[];
+  incidents: QualityIncident[];
   clearanceSnapshots: ClearanceSnapshot[];
 }

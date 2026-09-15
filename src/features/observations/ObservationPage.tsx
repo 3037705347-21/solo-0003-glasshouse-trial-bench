@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
-import { NotebookPen, Plus } from "lucide-react";
+import { NotebookPen, Plus, TriangleAlert } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
 import { PageHeader } from "../../components/PageHeader";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
+import { incidentKindLabel } from "../../domain/incident";
 import type { ObservationPass } from "../../domain/types";
 import {
+  activeIncidentsForTrial,
   openFlagsForTrial,
   passesForTrial,
 } from "../../state/selectors";
@@ -21,6 +23,7 @@ export function ObservationPage() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const passes = passesForTrial(state, trialId);
   const flags = openFlagsForTrial(state, trialId);
+  const activeIncidents = activeIncidentsForTrial(state, trialId);
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -75,6 +78,26 @@ export function ObservationPage() {
           ))}
         </select>
       </section>
+      {activeIncidents.length > 0 ? (
+        <div className="risk-banner" data-testid="observation-incident-banner">
+          <TriangleAlert size={16} aria-hidden="true" />
+          <div>
+            <strong>该试验有 {activeIncidents.length} 个进行中的质量事件</strong>
+            {activeIncidents.map((incident) => (
+              <p key={incident.id}>
+                {incident.accessionIds
+                  .map(
+                    (accessionId) =>
+                      state.accessions.find((item) => item.id === accessionId)
+                        ?.accessionNo ?? accessionId,
+                  )
+                  .join("、")}
+                ：{incidentKindLabel(incident.kind)}，发现于 {incident.discoveredOn}
+              </p>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="observation-workspace">
         <section className="pass-list">
           <div className="pass-list-heading">

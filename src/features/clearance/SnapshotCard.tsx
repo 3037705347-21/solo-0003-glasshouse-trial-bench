@@ -41,7 +41,9 @@ export function SnapshotCard({ snapshot }: SnapshotCardProps) {
             value={metric.value}
             detail={metric.detail}
             accent={
-              metric.label === "未处理标记" && metric.value > 0
+              (metric.label === "未处理标记" ||
+                metric.label === "活动质量事件") &&
+              metric.value > 0
                 ? "critical"
                 : metric.label === "已分配" && metric.value > 0
                   ? "positive"

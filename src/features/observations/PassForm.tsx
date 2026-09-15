@@ -1,13 +1,17 @@
 import { useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, TriangleAlert } from "lucide-react";
 import { Button } from "../../components/Button";
 import { SelectField, TextField } from "../../components/fields";
 import type { ObservationEntry } from "../../domain/types";
 import type { ObservationDraft } from "../../domain/observation";
 import type { FieldError } from "../../domain/result";
 import { createObservationPass, deriveFlags } from "../../domain/observation";
+import { incidentKindLabel } from "../../domain/incident";
 import { todayDateOnly } from "../../domain/rules";
-import { accessionsForTrial } from "../../state/selectors";
+import {
+  accessionsForTrial,
+  activeIncidentsByAccession,
+} from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 
 interface PassFormProps {
@@ -87,6 +91,31 @@ export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
     [state.trials, trialId],
   );
 
+  const incidentMap = useMemo(() => activeIncidentsByAccession(state), [state]);
+
+  const selectedRisks = useMemo(() => {
+    const seen = new Set<string>();
+    return draft.entries.flatMap((entry) => {
+      if (seen.has(entry.accessionId)) {
+        return [];
+      }
+      seen.add(entry.accessionId);
+      const accession = accessions.find(
+        (item) => item.id === entry.accessionId,
+      );
+      const incidents = incidentMap.get(entry.accessionId) ?? [];
+      return incidents.map((incident) => ({
+        key: `${entry.accessionId}-${incident.id}`,
+        label: `${accession?.accessionNo ?? entry.accessionId}：${incidentKindLabel(incident.kind)}，发现于 ${incident.discoveredOn} — ${incident.cause}`,
+      }));
+    });
+  }, [draft.entries, accessions, incidentMap]);
+
+  const riskHintFor = (accessionId: string): string | undefined => {
+    const count = incidentMap.get(accessionId)?.length ?? 0;
+    return count > 0 ? `该材料有 ${count} 个进行中的质量事件` : undefined;
+  };
+
   return (
     <form
       className="editor-form"
@@ -125,6 +154,17 @@ export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
             添加行
           </Button>
         </div>
+        {selectedRisks.length > 0 ? (
+          <div className="risk-banner" data-testid="observation-incident-risk">
+            <TriangleAlert size={16} aria-hidden="true" />
+            <div>
+              <strong>质量事件风险</strong>
+              {selectedRisks.map((risk) => (
+                <p key={risk.key}>{risk.label}</p>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {draft.entries.map((entry, index) => (
           <div className="entry-row" key={`${index}-${entry.accessionId}`}>
             <SelectField
@@ -134,6 +174,7 @@ export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
                 updateEntry(index, "accessionId", event.target.value)
               }
               error={errorFor(`entries.${index}.accessionId`)}
+              hint={riskHintFor(entry.accessionId)}
             >
               <option value="">请选择材料</option>
               {accessions.map((accession) => (

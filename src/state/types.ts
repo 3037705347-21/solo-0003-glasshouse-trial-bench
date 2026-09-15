@@ -4,6 +4,7 @@ import type {
   ClearanceSnapshot,
   Flag,
   ObservationPass,
+  QualityIncident,
   Trial,
   TrialState,
   WorkspaceState,
@@ -20,6 +21,8 @@ export type WorkspaceAction =
   | { type: "bench/released"; bench: Bench }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
   | { type: "flag/transitioned"; flag: Flag }
+  | { type: "incident/recorded"; incident: QualityIncident }
+  | { type: "incident/updated"; incident: QualityIncident }
   | {
       type: "clearance/generated";
       snapshot: ClearanceSnapshot;
@@ -37,6 +40,8 @@ export function isWorkspaceState(value: unknown): value is WorkspaceState {
     Array.isArray(candidate.benches) &&
     Array.isArray(candidate.observationPasses) &&
     Array.isArray(candidate.flags) &&
+    (candidate.incidents === undefined ||
+      Array.isArray(candidate.incidents)) &&
     Array.isArray(candidate.clearanceSnapshots)
   );
 }

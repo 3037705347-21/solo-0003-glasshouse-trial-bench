@@ -6,6 +6,7 @@ import type {
   WorkspaceState,
 } from "./types";
 import { createId } from "./id";
+import { incidentKindLabel } from "./incident";
 
 export function buildClearanceSnapshot(
   state: WorkspaceState,
@@ -15,11 +16,19 @@ export function buildClearanceSnapshot(
   const accessions = state.accessions.filter(
     (accession) => accession.trialId === trialId,
   );
+  const accessionById = new Map(
+    accessions.map((accession) => [accession.id, accession]),
+  );
   const assignedIds = new Set(
     state.benches.flatMap((bench) => bench.assignedIds),
   );
   const openFlags = state.flags.filter(
     (flag) => flag.trialId === trialId && flag.state === "open",
+  );
+  const activeIncidents = state.incidents.filter(
+    (incident) =>
+      incident.status === "active" &&
+      incident.accessionIds.some((id) => accessionById.has(id)),
   );
   const blockers: ClearanceBlocker[] = [];
   accessions.forEach((accession) => {
@@ -45,6 +54,18 @@ export function buildClearanceSnapshot(
       code: `FLAG_${flag.code}`,
       message: flag.message,
       accessionId: flag.accessionId,
+    });
+  });
+  activeIncidents.forEach((incident) => {
+    const affected = incident.accessionIds
+      .map((id) => accessionById.get(id))
+      .filter((accession) => accession !== undefined);
+    blockers.push({
+      code: "INCIDENT_ACTIVE",
+      message: `质量事件（${incidentKindLabel(incident.kind)}）影响 ${affected
+        .map((accession) => accession.accessionNo)
+        .join("、")}：${incident.cause}`,
+      accessionId: affected[0]?.id,
     });
   });
   if (accessions.length === 0) {
@@ -74,6 +95,11 @@ export function buildClearanceSnapshot(
       label: "未处理标记",
       value: openFlags.length,
       detail: "未解决的观测标记",
+    },
+    {
+      label: "活动质量事件",
+      value: activeIncidents.length,
+      detail: "影响本试验材料的进行中质量事件",
     },
     {
       label: "在用台架",

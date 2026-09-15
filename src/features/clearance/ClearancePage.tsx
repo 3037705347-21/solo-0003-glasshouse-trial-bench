@@ -119,7 +119,7 @@ export function ClearancePage() {
           <div>
             <span className="panel-title">实时约束视图</span>
             <span className="panel-subtitle">
-              根据当前材料、台架和标记重新计算
+              根据当前材料、台架、标记和质量事件重新计算
             </span>
           </div>
           <ShieldCheck size={20} className="panel-icon" aria-hidden="true" />

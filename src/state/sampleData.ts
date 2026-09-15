@@ -4,6 +4,7 @@ import type {
   ClearanceSnapshot,
   Flag,
   ObservationPass,
+  QualityIncident,
   Trial,
   WorkspaceState,
 } from "../domain/types";
@@ -298,6 +299,50 @@ const flags: Flag[] = [
   },
 ];
 
+const incidents: QualityIncident[] = [
+  {
+    id: "inc-tom-01",
+    kind: "contamination",
+    accessionIds: ["acc-tom-01"],
+    observationPassId: "obs-tom-01",
+    flagId: "flag-tom-01",
+    discoveredOn: "2026-09-12",
+    cause: "穴盘角落发现白色霉斑，疑似真菌性污染。",
+    scope: "涉及 ACC-0001 的 12 穴幼苗，已与其他穴盘物理隔离。",
+    actions: [
+      {
+        recordedOn: "2026-09-12T10:30:00.000Z",
+        note: "将受影响穴盘移至隔离区，暂停该批次浇水。",
+      },
+    ],
+    status: "active",
+    createdOn: "2026-09-12T10:30:00.000Z",
+  },
+  {
+    id: "inc-bee-01",
+    kind: "loss",
+    accessionIds: ["acc-bee-02"],
+    observationPassId: "obs-bee-01",
+    discoveredOn: "2026-04-09",
+    cause: "搬运过程中整盘跌落，部分幼苗折损。",
+    scope: "ACC-0005 约 20 株受损，同批其余植株状态正常。",
+    actions: [
+      {
+        recordedOn: "2026-04-09T08:15:00.000Z",
+        note: "清点折损数量，并使用同批种子补播。",
+      },
+      {
+        recordedOn: "2026-04-15T09:00:00.000Z",
+        note: "补播幼苗出苗整齐，恢复正常观测计划。",
+      },
+    ],
+    status: "lifted",
+    createdOn: "2026-04-09T08:15:00.000Z",
+    liftedOn: "2026-04-20T09:00:00.000Z",
+    resolution: "补播批次已追上正常生长进度，损耗影响消除，事件解除。",
+  },
+];
+
 const clearanceSnapshots: ClearanceSnapshot[] = [];
 
 export function createSampleWorkspaceState(): WorkspaceState {
@@ -307,6 +352,7 @@ export function createSampleWorkspaceState(): WorkspaceState {
     benches,
     observationPasses,
     flags,
+    incidents,
     clearanceSnapshots,
   };
 }

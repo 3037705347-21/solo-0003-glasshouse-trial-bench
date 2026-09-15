@@ -14,6 +14,7 @@ const scenarios = {
   "curate-accession-roster": curateAccessionRoster,
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
+  "track-quality-incident": trackQualityIncident,
   "advance-trial-clearance": advanceTrialClearance,
 };
 
@@ -21,6 +22,7 @@ const scenarioPaths = {
   "curate-accession-roster": "/roster",
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
+  "track-quality-incident": "/incidents",
   "advance-trial-clearance": "/clearance",
 };
 
@@ -81,6 +83,76 @@ async function recordObservationPass(page) {
     (count) => document.querySelectorAll('[data-testid^="pass-"]').length > count,
     before,
   );
+}
+
+async function trackQualityIncident(page) {
+  await page.getByTestId("open-incident-form").click();
+  await page.getByTestId("incident-accession-acc-tom-02").check();
+  await page.getByTestId("incident-kind-select").selectOption("quality");
+  await page
+    .getByTestId("incident-cause-input")
+    .fill("部分幼苗叶色发黄，疑似批次营养异常。");
+  await page
+    .getByTestId("incident-scope-input")
+    .fill("仅 ACC-0002 的 8 穴幼苗，同批其他材料正常。");
+  await page
+    .getByTestId("incident-action-input")
+    .fill("已单独标记该穴盘并暂停施肥。");
+  await page.getByTestId("save-incident-button").click();
+  await page.getByText("质量事件已记录", { exact: true }).waitFor();
+  const createdRow = page.locator("tr", { hasText: "部分幼苗叶色发黄" });
+  await createdRow.getByText("活动中", { exact: true }).waitFor();
+
+  await page.goto(`${baseUrl}/#/clearance`);
+  const liveSnapshot = page.getByTestId("clearance-snapshot").first();
+  await liveSnapshot.getByText("INCIDENT_ACTIVE").first().waitFor();
+  await liveSnapshot.getByText(/ACC-0002/).first().waitFor();
+
+  await page.goto(`${baseUrl}/#/observations`);
+  await page.getByTestId("open-observation-form").click();
+  await page
+    .locator(".entry-row")
+    .first()
+    .locator("select")
+    .first()
+    .selectOption("acc-tom-02");
+  await page
+    .getByTestId("observation-incident-risk")
+    .getByText(/ACC-0002/)
+    .waitFor();
+  await page.getByRole("button", { name: "取消" }).click();
+
+  await page.goto(`${baseUrl}/#/incidents`);
+  await createdRow.getByRole("button", { name: "详情" }).click();
+  await page
+    .getByTestId("incident-action-note")
+    .fill("已喷施螯合铁并调整灌溉配方。");
+  await page.getByTestId("append-incident-action").click();
+  await page.getByText("处置已追加", { exact: true }).waitFor();
+  await page
+    .getByTestId("incident-resolution-input")
+    .fill("复查叶色恢复正常，无新增损耗，事件解除。");
+  await page.getByTestId("lift-incident-button").click();
+  await page
+    .getByTestId("incident-resolution")
+    .getByText(/复查叶色恢复正常/)
+    .waitFor();
+  await page.getByLabel("关闭对话框").click();
+  await page
+    .locator("tr", { hasText: "部分幼苗叶色发黄" })
+    .getByText("已解除", { exact: true })
+    .waitFor();
+
+  await page.goto(`${baseUrl}/#/clearance`);
+  await page.getByTestId("clearance-snapshot").first().waitFor();
+  const lingering = await page
+    .getByTestId("clearance-snapshot")
+    .first()
+    .getByText(/ACC-0002/)
+    .count();
+  if (lingering !== 0) {
+    throw new Error("已解除事件仍在放行视图中提示 ACC-0002");
+  }
 }
 
 async function advanceTrialClearance(page) {

@@ -53,6 +53,18 @@ export function workspaceReducer(
           flag.id === action.flag.id ? action.flag : flag,
         ),
       };
+    case "incident/recorded":
+      return {
+        ...state,
+        incidents: [...state.incidents, action.incident],
+      };
+    case "incident/updated":
+      return {
+        ...state,
+        incidents: state.incidents.map((incident) =>
+          incident.id === action.incident.id ? action.incident : incident,
+        ),
+      };
     case "clearance/generated":
       return {
         ...state,

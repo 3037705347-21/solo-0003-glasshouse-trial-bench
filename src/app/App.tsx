@@ -3,6 +3,7 @@ import { AppShell } from "./AppShell";
 import { RosterPage } from "../features/roster/RosterPage";
 import { LayoutPage } from "../features/layout/LayoutPage";
 import { ObservationPage } from "../features/observations/ObservationPage";
+import { IncidentsPage } from "../features/incidents/IncidentsPage";
 import { ClearancePage } from "../features/clearance/ClearancePage";
 
 export function App() {
@@ -13,6 +14,7 @@ export function App() {
         <Route path="/roster" element={<RosterPage />} />
         <Route path="/layout" element={<LayoutPage />} />
         <Route path="/observations" element={<ObservationPage />} />
+        <Route path="/incidents" element={<IncidentsPage />} />
         <Route path="/clearance" element={<ClearancePage />} />
         <Route path="*" element={<Navigate to="/roster" replace />} />
       </Routes>
