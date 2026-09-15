@@ -1411,3 +1411,217 @@ button {
     justify-content: flex-start;
   }
 }
+
+/* 规则版本与重新解释 */
+
+.ruleset-hint {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 7px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.pass-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.pass-card-footer .button {
+  margin-left: auto;
+}
+
+.pass-card-reinterpreted {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.reinterpret-dialog {
+  display: grid;
+  gap: 16px;
+}
+
+.reinterpret-intro {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.reinterpret-preview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reinterpret-stat {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.reinterpret-stat strong {
+  font-size: 20px;
+}
+
+.reinterpret-stat span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.reinterpret-diff {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reinterpret-diff li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.flag-history {
+  margin-top: 20px;
+}
+
+.flag-history-meta {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.ruleset-list {
+  display: grid;
+  gap: 12px;
+}
+
+.ruleset-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.ruleset-card-retired {
+  opacity: 0.72;
+  background: var(--surface-muted, transparent);
+}
+
+.ruleset-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ruleset-card-header strong {
+  font-size: 15px;
+}
+
+.ruleset-card-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.ruleset-card-meta div {
+  display: grid;
+  gap: 2px;
+}
+
+.ruleset-card-meta dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.ruleset-card-meta dd {
+  margin: 0;
+  font-size: 13px;
+}
+
+.ruleset-card-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.ruleset-card-retire {
+  margin: 0;
+  color: var(--rust-700);
+  font-size: 12px;
+}
+
+.ruleset-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ruleset-fieldset {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.ruleset-fieldset legend {
+  padding: 0 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.bounds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.threshold-row {
+  display: grid;
+  grid-template-columns: 110px 110px 130px 100px 100px 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.threshold-remove {
+  margin-bottom: 4px;
+}
+
+.blocking-options {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.blocking-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .threshold-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reinterpret-preview {
+    grid-template-columns: 1fr;
+  }
+}

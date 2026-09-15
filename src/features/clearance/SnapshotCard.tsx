@@ -5,9 +5,10 @@ import type { ClearanceSnapshot } from "../../domain/types";
 
 interface SnapshotCardProps {
   snapshot: ClearanceSnapshot;
+  ruleSetText?: string;
 }
 
-export function SnapshotCard({ snapshot }: SnapshotCardProps) {
+export function SnapshotCard({ snapshot, ruleSetText }: SnapshotCardProps) {
   const date = new Date(snapshot.generatedOn);
   const dateLabel = Number.isNaN(date.getTime())
     ? snapshot.generatedOn
@@ -32,6 +33,9 @@ export function SnapshotCard({ snapshot }: SnapshotCardProps) {
         <StatusBadge tone={statusTone(snapshot.status)}>
           {snapshot.status === "ready" ? "就绪" : "阻止"}
         </StatusBadge>
+        {ruleSetText ? (
+          <StatusBadge tone="info">{`判定依据：${ruleSetText}`}</StatusBadge>
+        ) : null}
       </header>
       <div className="metric-grid">
         {snapshot.metrics.map((metric) => (

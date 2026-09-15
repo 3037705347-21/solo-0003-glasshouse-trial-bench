@@ -46,6 +46,28 @@ export function workspaceReducer(
         observationPasses: [...state.observationPasses, action.pass],
         flags: [...state.flags, ...action.flags],
       };
+    case "observation/reinterpreted": {
+      const updatedById = new Map(
+        action.updatedFlags.map((flag) => [flag.id, flag]),
+      );
+      return {
+        ...state,
+        flags: [
+          ...state.flags.map((flag) => updatedById.get(flag.id) ?? flag),
+          ...action.createdFlags,
+        ],
+        reinterpretations: [...state.reinterpretations, action.record],
+      };
+    }
+    case "ruleset/published":
+      return { ...state, ruleSets: [...state.ruleSets, action.ruleSet] };
+    case "ruleset/updated":
+      return {
+        ...state,
+        ruleSets: state.ruleSets.map((ruleSet) =>
+          ruleSet.id === action.ruleSet.id ? action.ruleSet : ruleSet,
+        ),
+      };
     case "flag/transitioned":
       return {
         ...state,

@@ -4,6 +4,8 @@ import type {
   ClearanceSnapshot,
   Flag,
   ObservationPass,
+  ReinterpretationRecord,
+  RuleSet,
   Trial,
   TrialState,
   WorkspaceState,
@@ -20,6 +22,14 @@ export type WorkspaceAction =
   | { type: "bench/released"; bench: Bench }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
   | { type: "flag/transitioned"; flag: Flag }
+  | {
+      type: "observation/reinterpreted";
+      updatedFlags: Flag[];
+      createdFlags: Flag[];
+      record: ReinterpretationRecord;
+    }
+  | { type: "ruleset/published"; ruleSet: RuleSet }
+  | { type: "ruleset/updated"; ruleSet: RuleSet }
   | {
       type: "clearance/generated";
       snapshot: ClearanceSnapshot;

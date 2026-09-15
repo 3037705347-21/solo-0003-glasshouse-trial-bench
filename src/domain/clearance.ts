@@ -2,6 +2,7 @@ import type {
   ClearanceBlocker,
   ClearanceMetric,
   ClearanceSnapshot,
+  RuleSet,
   Trial,
   WorkspaceState,
 } from "./types";
@@ -11,6 +12,7 @@ import { isAccessionRetired } from "./accession";
 export function buildClearanceSnapshot(
   state: WorkspaceState,
   trialId: string,
+  ruleSet: RuleSet,
 ): ClearanceSnapshot {
   const trial = state.trials.find((item) => item.id === trialId);
   const accessions = state.accessions.filter(
@@ -31,6 +33,9 @@ export function buildClearanceSnapshot(
       flag.state === "open" &&
       activeAccessionIds.has(flag.accessionId),
   );
+  const blockingFlags = openFlags.filter((flag) =>
+    ruleSet.clearance.blockingSeverities.includes(flag.severity),
+  );
   const blockers: ClearanceBlocker[] = [];
   activeAccessions.forEach((accession) => {
     if (!assignedIds.has(accession.id)) {
@@ -50,7 +55,7 @@ export function buildClearanceSnapshot(
         benchId: bench.id,
       });
     });
-  openFlags.forEach((flag) => {
+  blockingFlags.forEach((flag) => {
     blockers.push({
       code: `FLAG_${flag.code}`,
       message: flag.message,
@@ -107,14 +112,16 @@ export function buildClearanceSnapshot(
     status: blockers.length === 0 ? "ready" : "blocked",
     metrics,
     blockers,
+    ruleSetId: ruleSet.id,
   };
 }
 
 export function canClearTrial(
   state: WorkspaceState,
   trialId: string,
+  ruleSet: RuleSet,
 ): { ready: boolean; snapshot: ClearanceSnapshot } {
-  const snapshot = buildClearanceSnapshot(state, trialId);
+  const snapshot = buildClearanceSnapshot(state, trialId, ruleSet);
   return { ready: snapshot.status === "ready", snapshot };
 }
 

@@ -7,7 +7,11 @@ import type { ObservationDraft } from "../../domain/observation";
 import type { FieldError } from "../../domain/result";
 import { createObservationPass, deriveFlags } from "../../domain/observation";
 import { todayDateOnly } from "../../domain/rules";
-import { activeAccessionsForTrial } from "../../state/selectors";
+import {
+  activeAccessionsForTrial,
+  ruleSetForTrialOnDate,
+  ruleSetLabel,
+} from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 
 interface PassFormProps {
@@ -71,15 +75,22 @@ export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
   };
 
   const handleSubmit = () => {
-    const result = createObservationPass(draft, state);
+    const ruleSet = ruleSetForTrialOnDate(state, trialId, draft.observedOn);
+    const result = createObservationPass(draft, state, ruleSet);
     if (!result.ok) {
       setErrors(result.errors);
       return;
     }
-    const flags = deriveFlags(result.value, state.accessions);
+    const flags = deriveFlags(result.value, state.accessions, ruleSet);
     dispatch({ type: "observation/recorded", pass: result.value, flags });
     onSaved();
   };
+
+  const applicableRuleSet = ruleSetForTrialOnDate(
+    state,
+    trialId,
+    draft.observedOn,
+  );
 
   const trialLabel = useMemo(
     () =>
@@ -117,6 +128,10 @@ export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
           data-testid="observer-input"
         />
       </div>
+      <p className="ruleset-hint" data-testid="pass-form-ruleset">
+        将按{ruleSetLabel(state, applicableRuleSet.id)}
+        校验测量边界并派生生长标记（规则版本随观测日期解析）。
+      </p>
       <div className="entry-editor">
         <div className="entry-editor-heading">
           <h3>测量记录</h3>

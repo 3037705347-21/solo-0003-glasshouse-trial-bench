@@ -69,10 +69,19 @@ export interface ObservationPass {
   observedOn: string;
   observer: string;
   entries: ObservationEntry[];
+  ruleSetId: string;
 }
 
 export type FlagSeverity = "info" | "warning" | "critical";
-export type FlagState = "open" | "resolved" | "waived";
+export type FlagState = "open" | "resolved" | "waived" | "superseded";
+
+export interface FlagRevision {
+  id: string;
+  changedOn: string;
+  fromState: FlagState;
+  toState: FlagState;
+  note: string;
+}
 
 export interface Flag {
   id: string;
@@ -86,6 +95,11 @@ export interface Flag {
   createdOn: string;
   resolvedOn?: string;
   resolutionNote?: string;
+  ruleSetId: string;
+  supersededOn?: string;
+  supersededReason?: string;
+  supersededByRuleSetId?: string;
+  revisionHistory: FlagRevision[];
 }
 
 export type ClearanceStatus = "ready" | "blocked";
@@ -110,6 +124,70 @@ export interface ClearanceSnapshot {
   status: ClearanceStatus;
   metrics: ClearanceMetric[];
   blockers: ClearanceBlocker[];
+  ruleSetId: string;
+}
+
+export type RuleSetScope =
+  | { kind: "workspace" }
+  | { kind: "season"; season: string }
+  | { kind: "trial"; trialId: string };
+
+export type RuleSetStatus = "published" | "retired";
+
+export interface GrowthBound {
+  min: number;
+  max: number;
+}
+
+export interface GrowthBounds {
+  heightMm: GrowthBound;
+  leafCount: GrowthBound;
+  ecMs: GrowthBound;
+}
+
+export type FlagMetric = "heightMm" | "leafCount" | "ecMs";
+export type FlagComparator = "lt" | "gte";
+
+export interface FlagThreshold {
+  code: string;
+  metric: FlagMetric;
+  comparator: FlagComparator;
+  value: number;
+  severity: FlagSeverity;
+  messageTemplate: string;
+}
+
+export interface ClearancePolicy {
+  blockingSeverities: FlagSeverity[];
+}
+
+export interface RuleSet {
+  id: string;
+  version: number;
+  name: string;
+  scope: RuleSetScope;
+  effectiveFrom: string;
+  status: RuleSetStatus;
+  note: string;
+  createdOn: string;
+  growthBounds: GrowthBounds;
+  flagThresholds: FlagThreshold[];
+  clearance: ClearancePolicy;
+  retiredOn?: string;
+  retireNote?: string;
+}
+
+export interface ReinterpretationRecord {
+  id: string;
+  passId: string;
+  trialId: string;
+  fromRuleSetId: string;
+  toRuleSetId: string;
+  createdFlagIds: string[];
+  supersededFlagIds: string[];
+  carriedFlagIds: string[];
+  note: string;
+  createdOn: string;
 }
 
 export interface WorkspaceState {
@@ -119,4 +197,6 @@ export interface WorkspaceState {
   observationPasses: ObservationPass[];
   flags: Flag[];
   clearanceSnapshots: ClearanceSnapshot[];
+  ruleSets: RuleSet[];
+  reinterpretations: ReinterpretationRecord[];
 }

@@ -4,9 +4,12 @@ import type {
   ClearanceSnapshot,
   Flag,
   ObservationPass,
+  ReinterpretationRecord,
+  RuleSet,
   Trial,
   WorkspaceState,
 } from "../domain/types";
+import { BASELINE_RULESET_ID, createBaselineRuleSet } from "../domain/ruleset";
 
 const trials: Trial[] = [
   {
@@ -234,6 +237,7 @@ const observationPasses: ObservationPass[] = [
     trialId: "trial-sol-01",
     observedOn: "2026-02-26",
     observer: "M. Ikeda",
+    ruleSetId: BASELINE_RULESET_ID,
     entries: [
       {
         accessionId: "acc-tom-01",
@@ -263,6 +267,7 @@ const observationPasses: ObservationPass[] = [
     trialId: "trial-ama-02",
     observedOn: "2026-04-08",
     observer: "R. Ono",
+    ruleSetId: BASELINE_RULESET_ID,
     entries: [
       {
         accessionId: "acc-bee-01",
@@ -300,6 +305,8 @@ const flags: Flag[] = [
     severity: "warning",
     state: "open",
     createdOn: "2026-02-26T09:00:00.000Z",
+    ruleSetId: BASELINE_RULESET_ID,
+    revisionHistory: [],
   },
   {
     id: "flag-bee-01",
@@ -311,10 +318,16 @@ const flags: Flag[] = [
     severity: "warning",
     state: "open",
     createdOn: "2026-04-08T09:00:00.000Z",
+    ruleSetId: BASELINE_RULESET_ID,
+    revisionHistory: [],
   },
 ];
 
 const clearanceSnapshots: ClearanceSnapshot[] = [];
+
+const ruleSets: RuleSet[] = [createBaselineRuleSet()];
+
+const reinterpretations: ReinterpretationRecord[] = [];
 
 export function createSampleWorkspaceState(): WorkspaceState {
   return {
@@ -324,5 +337,7 @@ export function createSampleWorkspaceState(): WorkspaceState {
     observationPasses,
     flags,
     clearanceSnapshots,
+    ruleSets,
+    reinterpretations,
   };
 }

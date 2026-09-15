@@ -285,8 +285,30 @@ export function AccessionHistoryPage() {
                     <StatusBadge tone={statusTone(flag.severity)}>
                       {flag.severity}
                     </StatusBadge>
+                    <StatusBadge
+                      tone={
+                        flag.state === "open"
+                          ? "critical"
+                          : flag.state === "superseded"
+                            ? "neutral"
+                            : "positive"
+                      }
+                    >
+                      {flag.state === "open"
+                        ? "未处理"
+                        : flag.state === "resolved"
+                          ? "已解决"
+                          : flag.state === "waived"
+                            ? "已豁免"
+                            : "已被规则取代"}
+                    </StatusBadge>
                   </div>
-                  <span>{flag.message}</span>
+                  <span>
+                    {flag.message}
+                    {flag.state === "superseded" && flag.supersededReason
+                      ? `（取代原因：${flag.supersededReason}）`
+                      : ""}
+                  </span>
                 </div>
               ))}
               {relatedSnapshots.map((snapshot) => (

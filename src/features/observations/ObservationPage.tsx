@@ -1,27 +1,36 @@
 import { useMemo, useState } from "react";
-import { NotebookPen, Plus } from "lucide-react";
+import { GitBranch, NotebookPen, Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
 import { PageHeader } from "../../components/PageHeader";
-import { StatusBadge, statusTone } from "../../components/StatusBadge";
+import { StatusBadge } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import type { ObservationPass } from "../../domain/types";
 import { isAccessionRetired } from "../../domain/accession";
 import {
+  closedFlagsForTrial,
+  currentRuleSetForTrial,
   openFlagsForTrial,
   passesForTrial,
+  reinterpretationsForPass,
+  ruleSetLabel,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { FlagHistoryPanel } from "./FlagHistoryPanel";
 import { FlagPanel } from "./FlagPanel";
 import { PassForm } from "./PassForm";
+import { ReinterpretDialog } from "./ReinterpretDialog";
 
 export function ObservationPage() {
   const { state } = useWorkspace();
   const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [reinterpreting, setReinterpreting] = useState<ObservationPass | undefined>();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const passes = passesForTrial(state, trialId);
   const flags = openFlagsForTrial(state, trialId);
+  const closedFlags = closedFlagsForTrial(state, trialId);
+  const currentRuleSet = currentRuleSetForTrial(state, trialId);
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -75,6 +84,9 @@ export function ObservationPage() {
             </option>
           ))}
         </select>
+        <StatusBadge tone="info">
+          {`当前判定规则：${ruleSetLabel(state, currentRuleSet.id)}`}
+        </StatusBadge>
       </section>
       <div className="observation-workspace">
         <section className="pass-list">
@@ -87,41 +99,67 @@ export function ObservationPage() {
             <p className="muted-copy">该试验还没有观测记录。</p>
           ) : (
             <div className="pass-cards">
-              {passes.map((pass) => (
-                <article className="pass-card" key={pass.id} data-testid={`pass-${pass.id}`}>
-                  <div className="pass-card-top">
-                    <strong>{pass.observedOn}</strong>
-                    <span>{pass.observer}</span>
-                  </div>
-                  <p>{pass.entries.length} 条测量记录</p>
-                  <div className="pass-card-tags">
-                    {pass.entries.map((entry) => {
-                      const accession = state.accessions.find(
-                        (item) => item.id === entry.accessionId,
-                      );
-                      return (
-                        <StatusBadge
-                          tone={
-                            accession && isAccessionRetired(accession)
-                              ? "warning"
-                              : "neutral"
-                          }
-                          key={entry.accessionId}
-                        >
-                          {accession
-                            ? `${accession.accessionNo}${isAccessionRetired(accession) ? " 已停用" : ""}`
-                            : entry.accessionId}
-                        </StatusBadge>
-                      );
-                    })}
-                  </div>
-                </article>
-              ))}
+              {passes.map((pass) => {
+                const reinterpretCount = reinterpretationsForPass(
+                  state,
+                  pass.id,
+                ).length;
+                return (
+                  <article className="pass-card" key={pass.id} data-testid={`pass-${pass.id}`}>
+                    <div className="pass-card-top">
+                      <strong>{pass.observedOn}</strong>
+                      <span>{pass.observer}</span>
+                    </div>
+                    <p>{pass.entries.length} 条测量记录</p>
+                    <div className="pass-card-tags">
+                      {pass.entries.map((entry) => {
+                        const accession = state.accessions.find(
+                          (item) => item.id === entry.accessionId,
+                        );
+                        return (
+                          <StatusBadge
+                            tone={
+                              accession && isAccessionRetired(accession)
+                                ? "warning"
+                                : "neutral"
+                            }
+                            key={entry.accessionId}
+                          >
+                            {accession
+                              ? `${accession.accessionNo}${isAccessionRetired(accession) ? " 已停用" : ""}`
+                              : entry.accessionId}
+                          </StatusBadge>
+                        );
+                      })}
+                    </div>
+                    <div className="pass-card-footer">
+                      <StatusBadge tone="info">
+                        {ruleSetLabel(state, pass.ruleSetId)}
+                      </StatusBadge>
+                      {reinterpretCount > 0 ? (
+                        <span className="pass-card-reinterpreted">
+                          已重新解释 {reinterpretCount} 次
+                        </span>
+                      ) : null}
+                      <Button
+                        tone="ghost"
+                        size="sm"
+                        onClick={() => setReinterpreting(pass)}
+                        data-testid={`reinterpret-${pass.id}`}
+                      >
+                        <GitBranch size={14} />
+                        重新解释
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>
         <FlagPanel flags={flags} />
       </div>
+      <FlagHistoryPanel flags={closedFlags} />
       <Dialog
         open={dialogOpen}
         title="记录观测"
@@ -145,6 +183,20 @@ export function ObservationPage() {
           <p>请先创建试验，再录入观测。</p>
         )}
       </Dialog>
+      {reinterpreting ? (
+        <ReinterpretDialog
+          pass={reinterpreting}
+          onCancel={() => setReinterpreting(undefined)}
+          onSaved={(created, superseded) => {
+            setReinterpreting(undefined);
+            pushToast({
+              tone: "success",
+              title: "重新解释完成",
+              message: `新增 ${created} 个标记，取代 ${superseded} 个历史结论。`,
+            });
+          }}
+        />
+      ) : null}
       <ToastRegion
         messages={toasts}
         onDismiss={(id) =>

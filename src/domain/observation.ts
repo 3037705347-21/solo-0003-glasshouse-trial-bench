@@ -1,12 +1,17 @@
 import type {
   Accession,
   Flag,
+  FlagRevision,
+  FlagState,
   ObservationEntry,
   ObservationPass,
+  ReinterpretationRecord,
+  RuleSet,
   WorkspaceState,
 } from "./types";
 import { createId } from "./id";
-import { GROWTH_BOUNDS, parseDateOnly, todayDateOnly } from "./rules";
+import { parseDateOnly, todayDateOnly } from "./rules";
+import { renderFlagMessage } from "./ruleset";
 import { fail, fieldError, ok, type Result } from "./result";
 import { isAccessionRetired } from "./accession";
 
@@ -20,6 +25,7 @@ export interface ObservationDraft {
 export function validateObservationDraft(
   draft: ObservationDraft,
   state: WorkspaceState,
+  ruleSet: RuleSet,
 ): Result<ObservationDraft> {
   const errors: Array<ReturnType<typeof fieldError>> = [];
   const trial = state.trials.find((item) => item.id === draft.trialId);
@@ -55,6 +61,7 @@ export function validateObservationDraft(
       fieldError("entries", "empty", "请至少添加一条测量记录"),
     );
   }
+  const bounds = ruleSet.growthBounds;
   const accessionsById = new Map(
     state.accessions.map((item) => [item.id, item]),
   );
@@ -97,40 +104,40 @@ export function validateObservationDraft(
     seen.add(entry.accessionId);
     if (
       Number.isNaN(entry.heightMm) ||
-      entry.heightMm < GROWTH_BOUNDS.heightMm.min ||
-      entry.heightMm > GROWTH_BOUNDS.heightMm.max
+      entry.heightMm < bounds.heightMm.min ||
+      entry.heightMm > bounds.heightMm.max
     ) {
       errors.push(
         fieldError(
           `entries.${index}.heightMm`,
           "range",
-          `株高必须在 ${GROWTH_BOUNDS.heightMm.min}-${GROWTH_BOUNDS.heightMm.max} 毫米之间`,
+          `株高必须在 ${bounds.heightMm.min}-${bounds.heightMm.max} 毫米之间`,
         ),
       );
     }
     if (
       Number.isNaN(entry.leafCount) ||
-      entry.leafCount < GROWTH_BOUNDS.leafCount.min ||
-      entry.leafCount > GROWTH_BOUNDS.leafCount.max
+      entry.leafCount < bounds.leafCount.min ||
+      entry.leafCount > bounds.leafCount.max
     ) {
       errors.push(
         fieldError(
           `entries.${index}.leafCount`,
           "range",
-          `叶片数必须在 ${GROWTH_BOUNDS.leafCount.min}-${GROWTH_BOUNDS.leafCount.max} 之间`,
+          `叶片数必须在 ${bounds.leafCount.min}-${bounds.leafCount.max} 之间`,
         ),
       );
     }
     if (
       Number.isNaN(entry.ecMs) ||
-      entry.ecMs < GROWTH_BOUNDS.ecMs.min ||
-      entry.ecMs > GROWTH_BOUNDS.ecMs.max
+      entry.ecMs < bounds.ecMs.min ||
+      entry.ecMs > bounds.ecMs.max
     ) {
       errors.push(
         fieldError(
           `entries.${index}.ecMs`,
           "range",
-          `电导率必须在 ${GROWTH_BOUNDS.ecMs.min}-${GROWTH_BOUNDS.ecMs.max} mS/cm 之间`,
+          `电导率必须在 ${bounds.ecMs.min}-${bounds.ecMs.max} mS/cm 之间`,
         ),
       );
     }
@@ -153,8 +160,9 @@ function isDateOnOrBeforeToday(value: string): boolean {
 export function createObservationPass(
   draft: ObservationDraft,
   state: WorkspaceState,
+  ruleSet: RuleSet,
 ): Result<ObservationPass> {
-  const validated = validateObservationDraft(draft, state);
+  const validated = validateObservationDraft(draft, state, ruleSet);
   if (!validated.ok) {
     return validated;
   }
@@ -165,6 +173,7 @@ export function createObservationPass(
     observedOn: value.observedOn,
     observer: value.observer,
     entries: value.entries.map((entry) => ({ ...entry })),
+    ruleSetId: ruleSet.id,
   });
 }
 
@@ -177,9 +186,15 @@ export interface FlagSeed {
   severity: "info" | "warning" | "critical";
 }
 
+/**
+ * 依据给定规则版本从观测记录派生标记。
+ * 这是纯函数：同一份观测加同一份规则版本永远得到同一组标记，
+ * 因此任何历史结论都可以用存储的规则版本复现。
+ */
 export function deriveFlags(
   pass: ObservationPass,
   accessions: Accession[],
+  ruleSet: RuleSet,
 ): Flag[] {
   const accessionById = new Map(
     accessions.map((accession) => [accession.id, accession]),
@@ -191,77 +206,64 @@ export function deriveFlags(
     if (!accession) {
       return;
     }
-    if (entry.heightMm < 60) {
+    ruleSet.flagThresholds.forEach((threshold) => {
+      const measured = entry[threshold.metric];
+      const triggered =
+        threshold.comparator === "lt"
+          ? measured < threshold.value
+          : measured >= threshold.value;
+      if (!triggered) {
+        return;
+      }
       flags.push(
         makeFlag(
           {
             trialId: pass.trialId,
             accessionId: entry.accessionId,
             observationPassId: pass.id,
-            code: "HT_UNDER",
-            message: `${accession.cultivar} 低于 60 毫米生长阈值`,
-            severity: "warning",
+            code: threshold.code,
+            message: renderFlagMessage(threshold.messageTemplate, {
+              cultivar: accession.cultivar,
+              value: threshold.value,
+            }),
+            severity: threshold.severity,
           },
           createdOn,
+          ruleSet.id,
         ),
       );
-    }
-    if (entry.heightMm >= 420) {
-      flags.push(
-        makeFlag(
-          {
-            trialId: pass.trialId,
-            accessionId: entry.accessionId,
-            observationPassId: pass.id,
-            code: "HT_OVER",
-            message: `${accession.cultivar} 高于 420 毫米生长阈值`,
-            severity: "critical",
-          },
-          createdOn,
-        ),
-      );
-    }
-    if (entry.leafCount < 5) {
-      flags.push(
-        makeFlag(
-          {
-            trialId: pass.trialId,
-            accessionId: entry.accessionId,
-            observationPassId: pass.id,
-            code: "LEAF_LOW",
-            message: `${accession.cultivar} 的真叶数少于 5 片`,
-            severity: "warning",
-          },
-          createdOn,
-        ),
-      );
-    }
-    if (entry.ecMs >= 3.5) {
-      flags.push(
-        makeFlag(
-          {
-            trialId: pass.trialId,
-            accessionId: entry.accessionId,
-            observationPassId: pass.id,
-            code: "EC_HIGH",
-            message: `${accession.cultivar} 的基质电导率偏高`,
-            severity: "critical",
-          },
-          createdOn,
-        ),
-      );
-    }
+    });
   });
   return flags;
 }
 
-function makeFlag(seed: FlagSeed, createdOn: string): Flag {
+function makeFlag(seed: FlagSeed, createdOn: string, ruleSetId: string): Flag {
   return {
     ...seed,
     id: createId("flg"),
     state: "open",
     createdOn,
+    ruleSetId,
+    revisionHistory: [],
   };
+}
+
+function appendRevision(
+  flag: Flag,
+  toState: FlagState,
+  note: string,
+  changedOn: string,
+): FlagRevision[] {
+  return [
+    ...flag.revisionHistory,
+    {
+      id: createId("frev"),
+      changedOn,
+      fromState: flag.state,
+      toState,
+      note: note.trim(),
+    },
+  ];
 }
 
 export function transitionFlag(
@@ -283,12 +285,137 @@ export function transitionFlag(
       ),
     ]);
   }
+  const changedOn = new Date().toISOString();
   return ok({
     ...flag,
     state: next,
-    resolvedOn: new Date().toISOString(),
+    resolvedOn: changedOn,
     resolutionNote: note.trim(),
+    revisionHistory: appendRevision(flag, next, note, changedOn),
   });
+}
+
+/**
+ * 更正一条已经由人工处理的标记：重开为未处理状态。
+ * 被规则取代（superseded）的标记属于历史结论，不能再更正；
+ * 重开必须填写说明，并完整保留在修订历史中。
+ */
+export function correctFlagState(
+  flag: Flag,
+  note: string,
+): Result<Flag> {
+  const errors: Array<ReturnType<typeof fieldError>> = [];
+  if (flag.state !== "resolved" && flag.state !== "waived") {
+    errors.push(
+      fieldError(
+        "state",
+        "not_correctable",
+        flag.state === "superseded"
+          ? "被规则取代的标记是历史结论，不能更正"
+          : "只有已解决或已豁免的标记需要更正",
+      ),
+    );
+  }
+  if (note.trim().length < 8) {
+    errors.push(
+      fieldError("note", "too_short", "请填写至少 8 个字符的更正说明"),
+    );
+  }
+  if (errors.length > 0) {
+    return fail(errors);
+  }
+  const changedOn = new Date().toISOString();
+  return ok({
+    ...flag,
+    state: "open",
+    resolvedOn: undefined,
+    resolutionNote: undefined,
+    revisionHistory: appendRevision(flag, "open", note, changedOn),
+  });
+}
+
+export interface ReinterpretationPlan {
+  pass: ObservationPass;
+  targetRuleSet: RuleSet;
+  created: Flag[];
+  superseded: Flag[];
+  carried: Flag[];
+}
+
+function flagKey(flag: Pick<Flag, "accessionId" | "code">): string {
+  return `${flag.accessionId}::${flag.code}`;
+}
+
+/**
+ * 计算用另一份规则版本重新解释某次观测的差异，不落库。
+ * 预览和确认共用同一份计划，保证用户看到的就是将要发生的。
+ */
+export function planReinterpretation(
+  state: WorkspaceState,
+  passId: string,
+  targetRuleSet: RuleSet,
+): Result<ReinterpretationPlan> {
+  const pass = state.observationPasses.find((item) => item.id === passId);
+  if (!pass) {
+    return fail([fieldError("passId", "unknown", "找不到该观测记录")]);
+  }
+  if (targetRuleSet.status !== "published") {
+    return fail([
+      fieldError("ruleSetId", "retired", "不能按已退役的规则版本重新解释"),
+    ]);
+  }
+  const derived = deriveFlags(pass, state.accessions, targetRuleSet);
+  const current = state.flags.filter(
+    (flag) => flag.observationPassId === passId && flag.state !== "superseded",
+  );
+  const derivedKeys = new Set(derived.map(flagKey));
+  const currentByKey = new Map(current.map((flag) => [flagKey(flag), flag]));
+  const carried = current.filter((flag) => derivedKeys.has(flagKey(flag)));
+  const superseded = current.filter(
+    (flag) => flag.state === "open" && !derivedKeys.has(flagKey(flag)),
+  );
+  const created = derived.filter((flag) => !currentByKey.has(flagKey(flag)));
+  return ok({ pass, targetRuleSet, created, superseded, carried });
+}
+
+/**
+ * 应用重新解释计划：
+ * - 仍然触发的标记原样保留（包括人工解决/豁免的决定）；
+ * - 不再触发且仍未处理的标记转为 superseded，内容保留、记录原因；
+ * - 新触发的标记以目标规则版本新建。
+ * 旧结论从不删除或改写，只被取代，因此历史始终可解释。
+ */
+export function applyReinterpretation(
+  plan: ReinterpretationPlan,
+  note: string,
+): Result<{ updatedFlags: Flag[]; createdFlags: Flag[]; record: ReinterpretationRecord }> {
+  if (note.trim().length < 8) {
+    return fail([
+      fieldError("note", "too_short", "请用至少 8 个字符说明重新解释的原因"),
+    ]);
+  }
+  const changedOn = new Date().toISOString();
+  const updatedFlags = plan.superseded.map((flag) => ({
+    ...flag,
+    state: "superseded" as FlagState,
+    supersededOn: changedOn,
+    supersededReason: note.trim(),
+    supersededByRuleSetId: plan.targetRuleSet.id,
+    revisionHistory: appendRevision(flag, "superseded", note, changedOn),
+  }));
+  const record: ReinterpretationRecord = {
+    id: createId("reinterpret"),
+    passId: plan.pass.id,
+    trialId: plan.pass.trialId,
+    fromRuleSetId: plan.pass.ruleSetId,
+    toRuleSetId: plan.targetRuleSet.id,
+    createdFlagIds: plan.created.map((flag) => flag.id),
+    supersededFlagIds: plan.superseded.map((flag) => flag.id),
+    carriedFlagIds: plan.carried.map((flag) => flag.id),
+    note: note.trim(),
+    createdOn: changedOn,
+  };
+  return ok({ updatedFlags, createdFlags: plan.created, record });
 }
 
 export function latestObservationForAccession(

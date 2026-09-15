@@ -2,13 +2,18 @@ import { useMemo, useState } from "react";
 import { Play, ShieldCheck } from "lucide-react";
 import { Button } from "../../components/Button";
 import { PageHeader } from "../../components/PageHeader";
+import { StatusBadge } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import {
   applyClearance,
   buildClearanceSnapshot,
 } from "../../domain/clearance";
 import { transitionTrial } from "../../domain/trial";
-import { latestSnapshotForTrial } from "../../state/selectors";
+import {
+  currentRuleSetForTrial,
+  latestSnapshotForTrial,
+  ruleSetLabel,
+} from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { SnapshotCard } from "./SnapshotCard";
 
@@ -18,10 +23,15 @@ export function ClearancePage() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const latest = latestSnapshotForTrial(state, trialId);
   const trial = state.trials.find((item) => item.id === trialId);
+  const currentRuleSet = currentRuleSetForTrial(state, trialId);
 
   const liveSnapshot = useMemo(
-    () => buildClearanceSnapshot(state, trialId),
-    [state, trialId],
+    () => buildClearanceSnapshot(state, trialId, currentRuleSet),
+    [state, trialId, currentRuleSet],
+  );
+
+  const snapshotStale = Boolean(
+    latest && latest.ruleSetId !== currentRuleSet.id,
   );
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
@@ -33,7 +43,7 @@ export function ClearancePage() {
   };
 
   const handleGenerate = () => {
-    const snapshot = buildClearanceSnapshot(state, trialId);
+    const snapshot = buildClearanceSnapshot(state, trialId, currentRuleSet);
     const trials = applyClearance(state, snapshot);
     dispatch({ type: "clearance/generated", snapshot, trials });
     pushToast({
@@ -113,18 +123,24 @@ export function ClearancePage() {
             </option>
           ))}
         </select>
+        <StatusBadge tone="info">
+          {`当前判定规则：${ruleSetLabel(state, currentRuleSet.id)}`}
+        </StatusBadge>
       </section>
       <section className="clearance-preview">
         <div className="panel-heading">
           <div>
             <span className="panel-title">实时约束视图</span>
             <span className="panel-subtitle">
-              根据当前材料、台架和标记重新计算
+              根据当前材料、台架和标记，按{ruleSetLabel(state, currentRuleSet.id)}重新计算
             </span>
           </div>
           <ShieldCheck size={20} className="panel-icon" aria-hidden="true" />
         </div>
-        <SnapshotCard snapshot={liveSnapshot} />
+        <SnapshotCard
+          snapshot={liveSnapshot}
+          ruleSetText={ruleSetLabel(state, liveSnapshot.ruleSetId)}
+        />
       </section>
       {latest ? (
         <section className="clearance-preview">
@@ -133,8 +149,14 @@ export function ClearancePage() {
               <span className="panel-title">已保存快照</span>
               <span className="panel-subtitle">最近生成的放行快照</span>
             </div>
+            {snapshotStale ? (
+              <StatusBadge tone="warning">规则已更新，建议重新生成</StatusBadge>
+            ) : null}
           </div>
-          <SnapshotCard snapshot={latest} />
+          <SnapshotCard
+            snapshot={latest}
+            ruleSetText={ruleSetLabel(state, latest.ruleSetId)}
+          />
         </section>
       ) : null}
       <ToastRegion
