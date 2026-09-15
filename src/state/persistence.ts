@@ -5,11 +5,16 @@ import { createSampleWorkspaceState } from "./sampleData";
 export const WORKSPACE_STORAGE_KEY = "glasshouse-trial-bench:workspace:v1";
 
 function normalizeAccession(accession: Accession): Accession {
+  const lifecycleStatus =
+    accession.lifecycleStatus ??
+    (accession.mergedIntoId
+      ? "merged"
+      : accession.retiredAt
+        ? "retired"
+        : "active");
   return {
     ...accession,
-    lifecycleStatus:
-      accession.lifecycleStatus ??
-      (accession.retiredAt ? "retired" : "active"),
+    lifecycleStatus,
     retirementHistory: Array.isArray(accession.retirementHistory)
       ? accession.retirementHistory
       : [],
@@ -22,6 +27,10 @@ export function normalizeWorkspaceState(
   return {
     ...state,
     accessions: state.accessions.map(normalizeAccession),
+    mergeRecords: Array.isArray(state.mergeRecords) ? state.mergeRecords : [],
+    duplicateReviews: Array.isArray(state.duplicateReviews)
+      ? state.duplicateReviews
+      : [],
   };
 }
 

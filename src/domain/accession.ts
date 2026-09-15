@@ -37,6 +37,54 @@ export function isAccessionRetired(accession: Accession): boolean {
   return accession.lifecycleStatus === "retired";
 }
 
+export function isAccessionMerged(accession: Accession): boolean {
+  return accession.lifecycleStatus === "merged";
+}
+
+/** 可进入新分配、新观测、新编辑的唯一在用状态。 */
+export function isAccessionOperational(accession: Accession): boolean {
+  return accession.lifecycleStatus === "active";
+}
+
+/** 沿 mergedIntoId 解析到当前唯一归属；非墓碑原样返回。 */
+export function resolveAccessionId(
+  state: WorkspaceState,
+  accessionId: string,
+): string {
+  const byId = new Map(state.accessions.map((item) => [item.id, item]));
+  let cursor = accessionId;
+  const guard = new Set<string>([cursor]);
+  for (;;) {
+    const current = byId.get(cursor);
+    const next = current?.mergedIntoId;
+    if (!next || guard.has(next)) {
+      return cursor;
+    }
+    guard.add(next);
+    cursor = next;
+  }
+}
+
+export function resolveAccession(
+  state: WorkspaceState,
+  accessionId: string,
+): Accession | undefined {
+  return state.accessions.find(
+    (item) => item.id === resolveAccessionId(state, accessionId),
+  );
+}
+
+/** 直接或经身份别名指向某存活者的全部材料（含存活者自身）。 */
+export function accessionsResolvingTo(
+  state: WorkspaceState,
+  accessionId: string,
+): Accession[] {
+  const survivorId = resolveAccessionId(state, accessionId);
+  return state.accessions.filter(
+    (item) => resolveAccessionId(state, item.id) === survivorId,
+  );
+}
+
 export function latestRetirementRecord(
   accession: Accession,
 ): AccessionRetirementRecord | undefined {
@@ -161,6 +209,15 @@ export function updateAccession(
   draft: AccessionDraft,
   state: WorkspaceState,
 ): Result<Accession> {
+  if (isAccessionMerged(current)) {
+    return fail([
+      fieldError(
+        "lifecycleStatus",
+        "merged",
+        "该批次已合并入其他材料，不能再编辑；请在存活材料上修改",
+      ),
+    ]);
+  }
   const validated = validateAccessionDraft(draft, state, current.id);
   if (!validated.ok) {
     return validated;
@@ -203,7 +260,7 @@ export function replacementCandidatesForAccession(
     (candidate) =>
       candidate.id !== accession.id &&
       candidate.trialId === accession.trialId &&
-      !isAccessionRetired(candidate) &&
+      isAccessionOperational(candidate) &&
       !replacementWouldCycle(state, accession.id, candidate.id),
   );
 }
@@ -214,7 +271,15 @@ export function retireAccession(
   state: WorkspaceState,
 ): Result<Accession> {
   const errors: Array<ReturnType<typeof fieldError>> = [];
-  if (isAccessionRetired(accession)) {
+  if (isAccessionMerged(accession)) {
+    errors.push(
+      fieldError(
+        "lifecycleStatus",
+        "merged",
+        "该批次已合并入其他材料，不能再停用",
+      ),
+    );
+  } else if (isAccessionRetired(accession)) {
     errors.push(
       fieldError("lifecycleStatus", "already_retired", "该材料已经停用"),
     );
@@ -292,7 +357,15 @@ export function restoreAccession(
   benchConditionsConfirmed: boolean,
 ): Result<Accession> {
   const errors: Array<ReturnType<typeof fieldError>> = [];
-  if (!isAccessionRetired(accession)) {
+  if (isAccessionMerged(accession)) {
+    errors.push(
+      fieldError(
+        "lifecycleStatus",
+        "merged",
+        "该批次已合并，合并不可逆，不能恢复",
+      ),
+    );
+  } else if (!isAccessionRetired(accession)) {
     errors.push(
       fieldError("lifecycleStatus", "already_active", "该材料当前不是停用状态"),
     );

@@ -8,7 +8,7 @@ import type {
 import { createId } from "./id";
 import { GROWTH_BOUNDS, parseDateOnly, todayDateOnly } from "./rules";
 import { fail, fieldError, ok, type Result } from "./result";
-import { isAccessionRetired } from "./accession";
+import { isAccessionMerged, isAccessionRetired } from "./accession";
 
 export interface ObservationDraft {
   trialId: string;
@@ -67,6 +67,14 @@ export function validateObservationDraft(
           `entries.${index}.accessionId`,
           "unknown",
           "请选择有效材料",
+        ),
+      );
+    } else if (isAccessionMerged(accession)) {
+      errors.push(
+        fieldError(
+          `entries.${index}.accessionId`,
+          "merged",
+          `${accession.accessionNo} 已合并入其他批次，请选择存活材料`,
         ),
       );
     } else if (isAccessionRetired(accession)) {
@@ -175,6 +183,7 @@ export interface FlagSeed {
   code: string;
   message: string;
   severity: "info" | "warning" | "critical";
+  sourceAccessionId?: string;
 }
 
 export function deriveFlags(
@@ -197,6 +206,7 @@ export function deriveFlags(
           {
             trialId: pass.trialId,
             accessionId: entry.accessionId,
+            sourceAccessionId: entry.sourceAccessionId ?? entry.accessionId,
             observationPassId: pass.id,
             code: "HT_UNDER",
             message: `${accession.cultivar} 低于 60 毫米生长阈值`,
@@ -212,6 +222,7 @@ export function deriveFlags(
           {
             trialId: pass.trialId,
             accessionId: entry.accessionId,
+            sourceAccessionId: entry.sourceAccessionId ?? entry.accessionId,
             observationPassId: pass.id,
             code: "HT_OVER",
             message: `${accession.cultivar} 高于 420 毫米生长阈值`,
@@ -227,6 +238,7 @@ export function deriveFlags(
           {
             trialId: pass.trialId,
             accessionId: entry.accessionId,
+            sourceAccessionId: entry.sourceAccessionId ?? entry.accessionId,
             observationPassId: pass.id,
             code: "LEAF_LOW",
             message: `${accession.cultivar} 的真叶数少于 5 片`,
@@ -242,6 +254,7 @@ export function deriveFlags(
           {
             trialId: pass.trialId,
             accessionId: entry.accessionId,
+            sourceAccessionId: entry.sourceAccessionId ?? entry.accessionId,
             observationPassId: pass.id,
             code: "EC_HIGH",
             message: `${accession.cultivar} 的基质电导率偏高`,
@@ -261,6 +274,7 @@ function makeFlag(seed: FlagSeed, createdOn: string): Flag {
     id: createId("flg"),
     state: "open",
     createdOn,
+    sourceAccessionId: seed.sourceAccessionId,
   };
 }
 

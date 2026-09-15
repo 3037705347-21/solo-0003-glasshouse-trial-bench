@@ -1,7 +1,9 @@
 import type {
   Accession,
+  AccessionMergeRecord,
   Bench,
   ClearanceSnapshot,
+  DuplicateReview,
   Flag,
   ObservationPass,
   Trial,
@@ -16,6 +18,12 @@ export type WorkspaceAction =
   | { type: "trial/transitioned"; trialId: string; state: TrialState }
   | { type: "accession/created"; accession: Accession }
   | { type: "accession/updated"; accession: Accession }
+  | {
+      type: "accession/merged";
+      state: WorkspaceState;
+      record: AccessionMergeRecord;
+    }
+  | { type: "duplicate/reviewed"; review: DuplicateReview }
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }

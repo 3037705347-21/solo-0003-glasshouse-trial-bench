@@ -1,7 +1,9 @@
 import type {
   Accession,
+  AccessionMergeRecord,
   Bench,
   ClearanceSnapshot,
+  DuplicateReview,
   Flag,
   ObservationPass,
   Trial,
@@ -88,6 +90,21 @@ const accessions: Accession[] = [
     retirementHistory: [],
   },
   {
+    id: "acc-tom-04",
+    trialId: "trial-sol-01",
+    accessionNo: "ACC-0009",
+    cultivar: "MicroTom",
+    source: "Pioneer Seed Lab",
+    propagatedOn: "2026-02-18",
+    quantity: 90,
+    trayCells: 104,
+    preferredLight: "full-sun",
+    genotypeNote: "矮化品种，单盆果实密度较高，标签写法不同。",
+    labels: ["矮化", "挂果"],
+    lifecycleStatus: "active",
+    retirementHistory: [],
+  },
+  {
     id: "acc-bee-01",
     trialId: "trial-ama-02",
     accessionNo: "ACC-0004",
@@ -129,6 +146,21 @@ const accessions: Accession[] = [
     preferredLight: "partial-shade",
     genotypeNote: "条纹甜菜，用于质地和储藏性检查。",
     labels: ["条纹", "储藏"],
+    lifecycleStatus: "active",
+    retirementHistory: [],
+  },
+  {
+    id: "acc-bee-04",
+    trialId: "trial-ama-02",
+    accessionNo: "ACC-0010",
+    cultivar: "Bulls Blood",
+    source: "Root Heritage",
+    propagatedOn: "2026-04-21",
+    quantity: 100,
+    trayCells: 128,
+    preferredLight: "partial-shade",
+    genotypeNote: "深红叶片补录批次，与主批次隔三周播种，需保留为独立批次。",
+    labels: ["叶用", "深色"],
     lifecycleStatus: "active",
     retirementHistory: [],
   },
@@ -180,10 +212,10 @@ const benches: Bench[] = [
     code: "E-2",
     sector: "东翼",
     capacity: 4,
-    assignedIds: [],
+    assignedIds: ["acc-tom-04"],
     lightProfile: "full-sun",
     irrigationLine: "IR-1",
-    status: "available",
+    status: "assigned",
   },
   {
     id: "bench-west-1",
@@ -256,6 +288,13 @@ const observationPasses: ObservationPass[] = [
         ecMs: 1.9,
         notes: "长势旺盛，但节间伸长不够均匀。",
       },
+      {
+        accessionId: "acc-tom-04",
+        heightMm: 70,
+        leafCount: 7,
+        ecMs: 1.6,
+        notes: "补录条目，测量值与 Micro Tom 主批次接近。",
+      },
     ],
   },
   {
@@ -287,6 +326,21 @@ const observationPasses: ObservationPass[] = [
       },
     ],
   },
+  {
+    id: "obs-tom-02",
+    trialId: "trial-sol-01",
+    observedOn: "2026-03-06",
+    observer: "M. Ikeda",
+    entries: [
+      {
+        accessionId: "acc-tom-04",
+        heightMm: 88,
+        leafCount: 8,
+        ecMs: 1.7,
+        notes: "补录批次第二次测量，节间与主批次一致。",
+      },
+    ],
+  },
 ];
 
 const flags: Flag[] = [
@@ -315,6 +369,8 @@ const flags: Flag[] = [
 ];
 
 const clearanceSnapshots: ClearanceSnapshot[] = [];
+const mergeRecords: AccessionMergeRecord[] = [];
+const duplicateReviews: DuplicateReview[] = [];
 
 export function createSampleWorkspaceState(): WorkspaceState {
   return {
@@ -324,5 +380,7 @@ export function createSampleWorkspaceState(): WorkspaceState {
     observationPasses,
     flags,
     clearanceSnapshots,
+    mergeRecords,
+    duplicateReviews,
   };
 }

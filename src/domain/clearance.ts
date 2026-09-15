@@ -6,7 +6,8 @@ import type {
   WorkspaceState,
 } from "./types";
 import { createId } from "./id";
-import { isAccessionRetired } from "./accession";
+import { isAccessionMerged, isAccessionRetired } from "./accession";
+import type { Accession } from "./types";
 
 export function buildClearanceSnapshot(
   state: WorkspaceState,
@@ -14,7 +15,8 @@ export function buildClearanceSnapshot(
 ): ClearanceSnapshot {
   const trial = state.trials.find((item) => item.id === trialId);
   const accessions = state.accessions.filter(
-    (accession) => accession.trialId === trialId,
+    (accession) =>
+      accession.trialId === trialId && !isAccessionMerged(accession),
   );
   const activeAccessions = accessions.filter(
     (accession) => !isAccessionRetired(accession),

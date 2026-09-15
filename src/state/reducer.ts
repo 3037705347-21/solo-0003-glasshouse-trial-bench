@@ -32,6 +32,21 @@ export function workspaceReducer(
           accession.id === action.accession.id ? action.accession : accession,
         ),
       };
+    case "accession/merged":
+      return action.state;
+    case "duplicate/reviewed": {
+      const existing = state.duplicateReviews.find(
+        (review) => review.pairKey === action.review.pairKey,
+      );
+      return {
+        ...state,
+        duplicateReviews: existing
+          ? state.duplicateReviews.map((review) =>
+              review.pairKey === action.review.pairKey ? action.review : review,
+            )
+          : [...state.duplicateReviews, action.review],
+      };
+    }
     case "bench/assigned":
     case "bench/released":
       return {

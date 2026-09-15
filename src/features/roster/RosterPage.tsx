@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Ban, History, Plus, RotateCcw, Sprout } from "lucide-react";
+import { Ban, GitMerge, History, Plus, RotateCcw, Sprout } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { DataTable, type DataColumn } from "../../components/DataTable";
@@ -11,6 +11,7 @@ import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import {
   accessionMatchesQuery,
+  isAccessionMerged,
   isAccessionRetired,
   nextAccessionNumber,
 } from "../../domain/accession";
@@ -27,7 +28,13 @@ import {
 } from "./AccessionLifecycleDialogs";
 import { RosterForm } from "./RosterForm";
 
-type RosterSegment = "all" | "active" | "assigned" | "unassigned" | "retired";
+type RosterSegment =
+  | "all"
+  | "active"
+  | "assigned"
+  | "unassigned"
+  | "retired"
+  | "merged";
 
 export function RosterPage() {
   const { state } = useWorkspace();
@@ -56,10 +63,13 @@ export function RosterPage() {
       )
       .filter((accession) => {
         if (segment === "active") {
-          return !isAccessionRetired(accession);
+          return !isAccessionRetired(accession) && !isAccessionMerged(accession);
         }
         if (segment === "retired") {
           return isAccessionRetired(accession);
+        }
+        if (segment === "merged") {
+          return isAccessionMerged(accession);
         }
         const status = accessionStatus(state, accession);
         if (segment === "assigned") {
@@ -121,15 +131,25 @@ export function RosterPage() {
       render: (accession) => {
         const status = accessionStatus(state, accession);
         const label =
-          status === "retired"
-            ? "已停用"
-            : status === "assigned"
-              ? "已分配"
-              : status === "blocked"
-                ? "受限"
-                : "未分配";
+          status === "merged"
+            ? "已合并"
+            : status === "retired"
+              ? "已停用"
+              : status === "assigned"
+                ? "已分配"
+                : status === "blocked"
+                  ? "受限"
+                  : "未分配";
         return (
-          <StatusBadge tone={status === "retired" ? "warning" : statusTone(label)}>
+          <StatusBadge
+            tone={
+              status === "merged"
+                ? "info"
+                : status === "retired"
+                  ? "warning"
+                  : statusTone(label)
+            }
+          >
             {label}
           </StatusBadge>
         );
@@ -137,8 +157,16 @@ export function RosterPage() {
     },
     {
       key: "replacement",
-      header: "替代材料",
+      header: "替代 / 归属",
       render: (accession) => {
+        if (isAccessionMerged(accession)) {
+          const survivor = state.accessions.find(
+            (item) => item.id === accession.mergedIntoId,
+          );
+          return survivor
+            ? `归属 ${survivor.accessionNo} - ${survivor.cultivar}`
+            : "归属未知";
+        }
         const replacement = replacementForAccession(state, accession);
         return replacement
           ? `${replacement.accessionNo} - ${replacement.cultivar}`
@@ -161,7 +189,7 @@ export function RosterPage() {
             <History size={15} />
             历史
           </Button>
-          {isAccessionRetired(accession) ? (
+          {isAccessionMerged(accession) ? null : isAccessionRetired(accession) ? (
             <Button
               tone="ghost"
               size="sm"
@@ -212,10 +240,20 @@ export function RosterPage() {
         title="材料登记"
         description="维护将进入观测和台架分配流程的植物品系。"
         actions={
-          <Button onClick={openCreate} data-testid="open-create-accession">
-            <Plus size={16} />
-            新建材料
-          </Button>
+          <>
+            <Button
+              tone="secondary"
+              onClick={() => navigate("/duplicates")}
+              data-testid="open-duplicate-governance"
+            >
+              <GitMerge size={16} />
+              重复治理
+            </Button>
+            <Button onClick={openCreate} data-testid="open-create-accession">
+              <Plus size={16} />
+              新建材料
+            </Button>
+          </>
         }
       />
       <section className="control-strip">
@@ -247,6 +285,7 @@ export function RosterPage() {
             { value: "assigned", label: "已分配" },
             { value: "unassigned", label: "未分配" },
             { value: "retired", label: "已停用" },
+            { value: "merged", label: "已合并" },
           ]}
           onChange={setSegment}
         />

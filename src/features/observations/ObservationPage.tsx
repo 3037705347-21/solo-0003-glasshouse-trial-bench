@@ -95,23 +95,37 @@ export function ObservationPage() {
                   </div>
                   <p>{pass.entries.length} 条测量记录</p>
                   <div className="pass-card-tags">
-                    {pass.entries.map((entry) => {
+                    {pass.entries.map((entry, index) => {
                       const accession = state.accessions.find(
                         (item) => item.id === entry.accessionId,
                       );
+                      const source = entry.sourceAccessionId
+                        ? state.accessions.find(
+                            (item) => item.id === entry.sourceAccessionId,
+                          )
+                        : undefined;
                       return (
-                        <StatusBadge
-                          tone={
-                            accession && isAccessionRetired(accession)
-                              ? "warning"
-                              : "neutral"
-                          }
-                          key={entry.accessionId}
+                        <span
+                          className="pass-tag-wrap"
+                          key={`${entry.accessionId}-${index}`}
                         >
-                          {accession
-                            ? `${accession.accessionNo}${isAccessionRetired(accession) ? " 已停用" : ""}`
-                            : entry.accessionId}
-                        </StatusBadge>
+                          <StatusBadge
+                            tone={
+                              accession && isAccessionRetired(accession)
+                                ? "warning"
+                                : "neutral"
+                            }
+                          >
+                            {accession
+                              ? `${accession.accessionNo}${isAccessionRetired(accession) ? " 已停用" : ""}`
+                              : entry.accessionId}
+                          </StatusBadge>
+                          {source && source.id !== entry.accessionId ? (
+                            <StatusBadge tone="info">
+                              {`原 ${source.accessionNo}`}
+                            </StatusBadge>
+                          ) : null}
+                        </span>
                       );
                     })}
                   </div>

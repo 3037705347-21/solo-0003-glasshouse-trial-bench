@@ -12,7 +12,7 @@ interface FlagPanelProps {
 }
 
 export function FlagPanel({ flags }: FlagPanelProps) {
-  const { dispatch } = useWorkspace();
+  const { state, dispatch } = useWorkspace();
   const [selectedId, setSelectedId] = useState(() => flags[0]?.id ?? "");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | undefined>();
@@ -49,27 +49,38 @@ export function FlagPanel({ flags }: FlagPanelProps) {
         <span>{flags.length}</span>
       </div>
       <div className="flag-list">
-        {flags.map((flag) => (
-          <button
-            className={`flag-list-item ${selected?.id === flag.id ? "flag-list-item-active" : ""}`}
-            key={flag.id}
-            onClick={() => {
-              setSelectedId(flag.id);
-              setNote("");
-              setError(undefined);
-            }}
-            data-testid={`flag-${flag.id}`}
-          >
-            <StatusBadge tone={statusTone(flag.severity)}>
-              {flag.severity === "critical"
-                ? "严重"
-                : flag.severity === "warning"
-                  ? "警告"
-                  : "提示"}
-            </StatusBadge>
-            <span>{flag.code}</span>
-          </button>
-        ))}
+        {flags.map((flag) => {
+          const source =
+            flag.sourceAccessionId && flag.sourceAccessionId !== flag.accessionId
+              ? state.accessions.find(
+                  (item) => item.id === flag.sourceAccessionId,
+                )
+              : undefined;
+          return (
+            <button
+              className={`flag-list-item ${selected?.id === flag.id ? "flag-list-item-active" : ""}`}
+              key={flag.id}
+              onClick={() => {
+                setSelectedId(flag.id);
+                setNote("");
+                setError(undefined);
+              }}
+              data-testid={`flag-${flag.id}`}
+            >
+              <StatusBadge tone={statusTone(flag.severity)}>
+                {flag.severity === "critical"
+                  ? "严重"
+                  : flag.severity === "warning"
+                    ? "警告"
+                    : "提示"}
+              </StatusBadge>
+              <span>{flag.code}</span>
+              {source ? (
+                <StatusBadge tone="info">{`原 ${source.accessionNo}`}</StatusBadge>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
       {selected ? (
         <div className="flag-editor">

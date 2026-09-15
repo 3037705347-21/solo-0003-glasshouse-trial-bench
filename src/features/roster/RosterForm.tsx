@@ -13,6 +13,7 @@ import {
   createAccession,
   updateAccession,
 } from "../../domain/accession";
+import { findSoftDuplicates } from "../../domain/duplicates";
 import { useWorkspace } from "../../state/store";
 
 interface RosterFormProps {
@@ -107,6 +108,21 @@ export function RosterForm({
       state.trials.find((trial) => trial.id === trialId)?.code ?? "当前试验",
     [state.trials, trialId],
   );
+
+  const softDuplicates = useMemo(() => {
+    return findSoftDuplicates(
+      state,
+      {
+        trialId: draft.trialId,
+        accessionNo: draft.accessionNo,
+        cultivar: draft.cultivar,
+        source: draft.source,
+        propagatedOn: draft.propagatedOn,
+        preferredLight: draft.preferredLight,
+      },
+      accession?.id,
+    );
+  }, [state, draft, accession]);
 
   return (
     <form
@@ -205,6 +221,30 @@ export function RosterForm({
           rows={4}
         />
       </div>
+      {softDuplicates.length > 0 ? (
+        <div className="soft-duplicate-callout" data-testid="soft-duplicate-warning">
+          <strong>发现可能重复的已登记批次：</strong>
+          <ul>
+            {softDuplicates.slice(0, 3).map((pair) => {
+              const other = state.accessions.find(
+                (item) => item.id === pair.rightId,
+              );
+              if (!other) {
+                return null;
+              }
+              return (
+                <li key={pair.key}>
+                  {other.accessionNo} · {other.cultivar}（{other.source}）
+                  — {pair.signals.map((signal) => signal.label).join("、")}
+                </li>
+              );
+            })}
+          </ul>
+          <span>
+            如果确认是不同批次可继续保存；如果是重复录入，请到“重复治理”页合并。
+          </span>
+        </div>
+      ) : null}
       <div className="editor-actions">
         <Button tone="secondary" onClick={onCancel}>
           取消

@@ -1411,3 +1411,375 @@ button {
     justify-content: flex-start;
   }
 }
+
+/* ===== 重复治理与合并 ===== */
+
+.soft-duplicate-callout {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--warning, #c98a17);
+  background: rgba(201, 138, 23, 0.08);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.soft-duplicate-callout ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.duplicate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.duplicate-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--surface-2, #fafafa);
+}
+
+.duplicate-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.duplicate-score {
+  font-size: 0.85rem;
+  color: var(--muted, #666);
+}
+
+.duplicate-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.duplicate-members {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.duplicate-member-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--surface, #fff);
+}
+
+.duplicate-member-card strong {
+  font-size: 0.98rem;
+}
+
+.duplicate-member-card span {
+  font-size: 0.85rem;
+  color: var(--muted, #555);
+}
+
+.duplicate-scale {
+  color: var(--muted, #888);
+}
+
+.duplicate-signals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.duplicate-signals h4 {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #666);
+}
+
+.duplicate-signals ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.duplicate-signal-match,
+.duplicate-signal-distinct {
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+}
+
+.duplicate-signal-match {
+  background: rgba(34, 145, 90, 0.08);
+}
+
+.duplicate-signal-distinct {
+  background: rgba(190, 60, 60, 0.08);
+}
+
+.duplicate-signal-match span,
+.duplicate-signal-distinct span {
+  color: var(--muted, #555);
+}
+
+.duplicate-dismissed-list,
+.merge-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.duplicate-dismissed-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+}
+
+.merge-log-entry {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.merge-log-entry header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.merge-log-entry header span {
+  margin-left: auto;
+  font-size: 0.82rem;
+  color: var(--muted, #777);
+}
+
+.merge-log-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.merge-log-link {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  color: inherit;
+}
+
+.merge-log-link:hover {
+  border-color: var(--accent, #2f6f4e);
+}
+
+.merge-callout {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-left: 4px solid #c98a17;
+  background: rgba(201, 138, 23, 0.08);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 0.9rem;
+}
+
+.merge-section {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.merge-section h3 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.merge-muted {
+  color: var(--muted, #666);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.merge-warning {
+  color: #a15c08;
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.merge-member-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.merge-member-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--surface, #fff);
+  cursor: pointer;
+}
+
+.merge-member-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.merge-member-card-selected {
+  border-color: var(--accent, #2f6f4e);
+  box-shadow: 0 0 0 2px rgba(47, 111, 78, 0.18);
+}
+
+.merge-conflict-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.merge-conflict-row {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 12px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.merge-conflict-field {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.merge-conflict-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.merge-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.merge-option-selected {
+  border-color: var(--accent, #2f6f4e);
+  background: rgba(47, 111, 78, 0.08);
+}
+
+.merge-option small {
+  color: var(--muted, #888);
+}
+
+.merge-quantity-row,
+.merge-bench-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.merge-quantity-input {
+  width: 110px;
+}
+
+.merge-tombstone-banner {
+  border-left: 4px solid #356a9c;
+}
+
+.merge-tombstone-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.merge-reason-text {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: var(--muted, #555);
+}
+
+.merge-record-entry h5 {
+  margin: 8px 0 4px;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #666);
+}
+
+.merge-record-entry ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.86rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.merge-record-detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.pass-tag-wrap {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .duplicate-members,
+  .duplicate-signals {
+    grid-template-columns: 1fr;
+  }
+
+  .duplicate-scale {
+    transform: rotate(90deg);
+    justify-self: center;
+  }
+
+  .merge-conflict-row {
+    grid-template-columns: 1fr;
+  }
+}
