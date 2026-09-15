@@ -9,12 +9,17 @@ import { createId } from "./id";
 import { GROWTH_BOUNDS, parseDateOnly, todayDateOnly } from "./rules";
 import { fail, fieldError, ok, type Result } from "./result";
 import { isAccessionRetired } from "./accession";
+import { fingerprintObservationDraft, mintIdempotencyToken } from "./dedup";
 
 export interface ObservationDraft {
   trialId: string;
   observedOn: string;
   observer: string;
   entries: ObservationEntry[];
+  /** 表单打开时生成、重试时复用；缺省时由领域层补一个新令牌。 */
+  idempotencyToken: string;
+  /** 预生成的观测 id，保证去重决策与工单引用的是同一条记录。 */
+  passId?: string;
 }
 
 export function validateObservationDraft(
@@ -141,6 +146,7 @@ export function validateObservationDraft(
   return ok({
     ...draft,
     observer: draft.observer.trim(),
+    idempotencyToken: draft.idempotencyToken || mintIdempotencyToken(),
   });
 }
 
@@ -159,12 +165,18 @@ export function createObservationPass(
     return validated;
   }
   const value = validated.value;
+  const recordedAt = new Date().toISOString();
   return ok({
-    id: createId("obs"),
+    id: value.passId ?? createId("obs"),
     trialId: value.trialId,
     observedOn: value.observedOn,
     observer: value.observer,
     entries: value.entries.map((entry) => ({ ...entry })),
+    idempotencyToken: value.idempotencyToken,
+    contentFingerprint: fingerprintObservationDraft(value),
+    recordedAt,
+    dedupStatus: "canonical",
+    convergedAccessionIds: [],
   });
 }
 
@@ -291,12 +303,70 @@ export function transitionFlag(
   });
 }
 
+/**
+ * 观测被去重收敛后，撤回其派生的未处理标记：
+ * open → withdrawn 并写明收敛去向；已处理的标记保持原样（历史结论不被去重改写）。
+ */
+export function withdrawFlagsForConvergedPasses(
+  flags: Flag[],
+  convergedPassIds: string[],
+  reason: string,
+): Flag[] {
+  const targets = new Set(convergedPassIds);
+  return flags.map((flag) => {
+    if (flag.state !== "open" || !targets.has(flag.observationPassId)) {
+      return flag;
+    }
+    return {
+      ...flag,
+      state: "withdrawn",
+      resolvedOn: new Date().toISOString(),
+      resolutionNote: reason,
+    };
+  });
+}
+
+/**
+ * 条目级撤回：部分收敛时，只撤回被收敛材料的 open 标记，
+ * 同一观测中其他材料的标记继续有效。
+ */
+export function withdrawFlagsForConvergedEntries(
+  flags: Flag[],
+  keys: Array<{ passId: string; accessionId: string }>,
+  reason: string,
+): Flag[] {
+  const keySet = new Set(keys.map((key) => `${key.passId}::${key.accessionId}`));
+  const resolvedOn = new Date().toISOString();
+  return flags.map((flag) => {
+    if (
+      flag.state !== "open" ||
+      !keySet.has(`${flag.observationPassId}::${flag.accessionId}`)
+    ) {
+      return flag;
+    }
+    return {
+      ...flag,
+      state: "withdrawn",
+      resolvedOn,
+      resolutionNote: reason,
+    };
+  });
+}
+
 export function latestObservationForAccession(
   passes: ObservationPass[],
   accessionId: string,
 ): ObservationEntry | undefined {
   const matches = passes
-    .filter((pass) => pass.entries.some((entry) => entry.accessionId === accessionId))
+    .filter(
+      (pass) =>
+        pass.dedupStatus !== "converged" &&
+        pass.entries.some(
+          (entry) =>
+            entry.accessionId === accessionId &&
+            !pass.convergedAccessionIds.includes(accessionId),
+        ),
+    )
     .sort((left, right) => right.observedOn.localeCompare(left.observedOn));
   return matches[0]?.entries.find((entry) => entry.accessionId === accessionId);
 }

@@ -46,6 +46,11 @@ export function AccessionHistoryPage() {
     }
     return state.observationPasses
       .filter((pass) => pass.trialId === accession.trialId)
+      .filter(
+        (pass) =>
+          pass.dedupStatus !== "converged" &&
+          !pass.convergedAccessionIds.includes(accession.id),
+      )
       .flatMap((pass) =>
         pass.entries
           .filter((entry) => entry.accessionId === accession.id)
@@ -285,6 +290,9 @@ export function AccessionHistoryPage() {
                     <StatusBadge tone={statusTone(flag.severity)}>
                       {flag.severity}
                     </StatusBadge>
+                    {flag.state === "withdrawn" ? (
+                      <StatusBadge tone="neutral">随重复观测收敛撤回</StatusBadge>
+                    ) : null}
                   </div>
                   <span>{flag.message}</span>
                 </div>

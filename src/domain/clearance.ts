@@ -8,6 +8,17 @@ import type {
 import { createId } from "./id";
 import { isAccessionRetired } from "./accession";
 
+/** open 标记只有在其来源观测仍有效、且该材料条目未被去重收敛时才阻止放行。 */
+function isFlagLive(state: WorkspaceState, flag: (typeof state.flags)[number]): boolean {
+  const pass = state.observationPasses.find(
+    (item) => item.id === flag.observationPassId,
+  );
+  if (!pass || pass.dedupStatus === "converged") {
+    return false;
+  }
+  return !pass.convergedAccessionIds.includes(flag.accessionId);
+}
+
 export function buildClearanceSnapshot(
   state: WorkspaceState,
   trialId: string,
@@ -29,8 +40,13 @@ export function buildClearanceSnapshot(
     (flag) =>
       flag.trialId === trialId &&
       flag.state === "open" &&
-      activeAccessionIds.has(flag.accessionId),
+      activeAccessionIds.has(flag.accessionId) &&
+      isFlagLive(state, flag),
   );
+  // 去重裁决未完成本身构成放行阻止项：放行快照必须基于确定的观测集。
+  const pendingReviewCount = state.duplicateReviews.filter(
+    (review) => review.trialId === trialId && review.status === "pending",
+  ).length;
   const blockers: ClearanceBlocker[] = [];
   activeAccessions.forEach((accession) => {
     if (!assignedIds.has(accession.id)) {
@@ -61,6 +77,12 @@ export function buildClearanceSnapshot(
     blockers.push({
       code: "NO_ACCESSIONS",
         message: "该试验没有材料",
+    });
+  }
+  if (pendingReviewCount > 0) {
+    blockers.push({
+      code: "PENDING_DEDUP_REVIEW",
+      message: `${pendingReviewCount} 个疑似重复观测等待人工裁决`,
     });
   }
   if (trial?.state === "draft") {

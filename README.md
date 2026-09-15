@@ -29,6 +29,7 @@ node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
 node scripts/smoke.mjs advance-trial-clearance
 node scripts/smoke.mjs retire-accession-replacement
+node scripts/smoke.mjs deduplicate-observations
 ```
 
 每条命令都会启动并关闭一个本地 Vite 预览服务，端口为 `4177`。检查过程不调用外部服务，也不依赖在线数据库。

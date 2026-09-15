@@ -1411,3 +1411,91 @@ button {
     justify-content: flex-start;
   }
 }
+
+/* 观测去重：裁决队列、差异对比与收敛状态 */
+.review-panel {
+  margin-bottom: 20px;
+}
+
+.review-list {
+  display: grid;
+  gap: 16px;
+}
+
+.review-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.review-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.review-card-head div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-diff table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: var(--surface);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.review-diff th,
+.review-diff td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+.review-diff th {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.review-decision,
+.review-survivor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.review-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.review-attribution {
+  display: grid;
+  gap: 10px;
+}
+
+.pass-card-converged {
+  opacity: 0.62;
+  background: var(--surface-soft);
+}
+
+.pass-dedup-note {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--blue-100);
+  color: var(--blue-700);
+  font-size: 12px;
+}

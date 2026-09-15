@@ -2,11 +2,17 @@ import type {
   Accession,
   Bench,
   ClearanceSnapshot,
+  DedupAudit,
+  DuplicateReview,
   Flag,
   ObservationPass,
   Trial,
   WorkspaceState,
 } from "../domain/types";
+import {
+  isPassLive,
+  liveEntriesOf,
+} from "../domain/dedup";
 import {
   isAccessionRetired,
   latestRetirementRecord,
@@ -86,13 +92,65 @@ export function openFlagsForTrial(
   );
 }
 
+/** 观测历史按业务日期倒序；整次收敛的记录仍展示（解释性），但排在最后并带标记。 */
 export function passesForTrial(
   state: WorkspaceState,
   trialId: string,
 ): ObservationPass[] {
   return state.observationPasses
     .filter((pass) => pass.trialId === trialId)
-    .sort((left, right) => right.observedOn.localeCompare(left.observedOn));
+    .sort((left, right) => {
+      const dateOrder = right.observedOn.localeCompare(left.observedOn);
+      if (dateOrder !== 0) {
+        return dateOrder;
+      }
+      // 同一天：有效观测在前，收敛记录在后。
+      return Number(isPassLive(left)) - Number(isPassLive(right));
+    });
+}
+
+/** 参与指标、标记与放行计算的有效观测（排除整次收敛与已收敛条目）。 */
+export function livePassesForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): ObservationPass[] {
+  return passesForTrial(state, trialId).filter(isPassLive);
+}
+
+export function pendingReviewsForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): DuplicateReview[] {
+  return state.duplicateReviews
+    .filter((review) => review.trialId === trialId && review.status === "pending")
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export function resolvedReviewsForPass(
+  state: WorkspaceState,
+  passId: string,
+): DuplicateReview[] {
+  return state.duplicateReviews.filter(
+    (review) =>
+      review.status === "resolved" &&
+      (review.candidatePassId === passId || review.existingPassId === passId),
+  );
+}
+
+export function auditsForPass(
+  state: WorkspaceState,
+  passId: string,
+): DedupAudit[] {
+  return state.dedupAudits
+    .filter(
+      (audit) =>
+        audit.candidatePassId === passId || audit.canonicalPassId === passId,
+    )
+    .sort((left, right) => right.at.localeCompare(left.at));
+}
+
+export function liveEntryCount(pass: ObservationPass): number {
+  return liveEntriesOf(pass).length;
 }
 
 export function latestSnapshotForTrial(

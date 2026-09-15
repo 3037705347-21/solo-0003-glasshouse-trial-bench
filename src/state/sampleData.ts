@@ -2,11 +2,14 @@ import type {
   Accession,
   Bench,
   ClearanceSnapshot,
+  DedupAudit,
+  DuplicateReview,
   Flag,
   ObservationPass,
   Trial,
   WorkspaceState,
 } from "../domain/types";
+import { fingerprintObservationPass } from "../domain/dedup";
 
 const trials: Trial[] = [
   {
@@ -228,8 +231,22 @@ const benches: Bench[] = [
   },
 ];
 
+/** 为示例观测补齐身份三元组（示例数据视为去重机制上线时迁移的历史观测）。 */
+function samplePass(pass: Omit<ObservationPass, "idempotencyToken" | "contentFingerprint" | "recordedAt" | "dedupStatus" | "convergedAccessionIds"> &
+  Partial<Pick<ObservationPass, "dedupStatus" | "convergedAccessionIds" | "recordedAt" | "canonicalPassId">>): ObservationPass {
+  const built: ObservationPass = {
+    ...pass,
+    idempotencyToken: `legacy_idem_${pass.id}`,
+    contentFingerprint: "",
+    recordedAt: pass.recordedAt ?? `${pass.observedOn}T08:00:00.000Z`,
+    dedupStatus: pass.dedupStatus ?? "canonical",
+    convergedAccessionIds: pass.convergedAccessionIds ?? [],
+  };
+  return { ...built, contentFingerprint: fingerprintObservationPass(built) };
+}
+
 const observationPasses: ObservationPass[] = [
-  {
+  samplePass({
     id: "obs-tom-01",
     trialId: "trial-sol-01",
     observedOn: "2026-02-26",
@@ -257,8 +274,8 @@ const observationPasses: ObservationPass[] = [
         notes: "长势旺盛，但节间伸长不够均匀。",
       },
     ],
-  },
-  {
+  }),
+  samplePass({
     id: "obs-bee-01",
     trialId: "trial-ama-02",
     observedOn: "2026-04-08",
@@ -286,6 +303,148 @@ const observationPasses: ObservationPass[] = [
         notes: "穴盘边缘有轻微倒苗。",
       },
     ],
+  }),
+  // 场景 A：字节级重复录入（内容指纹一致），系统已自动收敛到 obs-bee-02a。
+  samplePass({
+    id: "obs-bee-02a",
+    trialId: "trial-ama-02",
+    observedOn: "2026-04-15",
+    observer: "R. Ono",
+    recordedAt: "2026-04-15T08:30:00.000Z",
+    entries: [
+      { accessionId: "acc-bee-01", heightMm: 70, leafCount: 9, ecMs: 2.0, notes: "" },
+      { accessionId: "acc-bee-02", heightMm: 74, leafCount: 9, ecMs: 1.9, notes: "" },
+    ],
+  }),
+  samplePass({
+    id: "obs-bee-02b-dup",
+    trialId: "trial-ama-02",
+    observedOn: "2026-04-15",
+    observer: "R. Ono",
+    recordedAt: "2026-04-15T08:31:10.000Z",
+    dedupStatus: "converged",
+    canonicalPassId: "obs-bee-02a",
+    convergedAccessionIds: ["acc-bee-01", "acc-bee-02"],
+    entries: [
+      { accessionId: "acc-bee-01", heightMm: 70, leafCount: 9, ecMs: 2.0, notes: "" },
+      { accessionId: "acc-bee-02", heightMm: 74, leafCount: 9, ecMs: 1.9, notes: "" },
+    ],
+  }),
+  // 场景 B：容差内重测，等待人工裁决（54 vs 57mm，超出 5mm？|57-54|=3，容差内）。
+  samplePass({
+    id: "obs-bee-03",
+    trialId: "trial-ama-02",
+    observedOn: "2026-04-22",
+    observer: "R. Ono",
+    recordedAt: "2026-04-22T08:00:00.000Z",
+    entries: [
+      { accessionId: "acc-bee-03", heightMm: 54, leafCount: 7, ecMs: 2.1, notes: "" },
+    ],
+  }),
+  samplePass({
+    id: "obs-bee-04",
+    trialId: "trial-ama-02",
+    observedOn: "2026-04-22",
+    observer: "R. Ono",
+    recordedAt: "2026-04-22T15:20:00.000Z",
+    entries: [
+      { accessionId: "acc-bee-03", heightMm: 57, leafCount: 7, ecMs: 2.2, notes: "下午复测，读数略高" },
+    ],
+  }),
+  // 场景 C：显著差异的同日重测，人工已裁决两条都保留（合理重测）。
+  samplePass({
+    id: "obs-bee-05",
+    trialId: "trial-ama-02",
+    observedOn: "2026-05-06",
+    observer: "R. Ono",
+    recordedAt: "2026-05-06T08:00:00.000Z",
+    entries: [
+      { accessionId: "acc-bee-01", heightMm: 78, leafCount: 10, ecMs: 2.0, notes: "" },
+    ],
+  }),
+  samplePass({
+    id: "obs-bee-06",
+    trialId: "trial-ama-02",
+    observedOn: "2026-05-06",
+    observer: "R. Ono",
+    recordedAt: "2026-05-06T17:30:00.000Z",
+    entries: [
+      { accessionId: "acc-bee-01", heightMm: 96, leafCount: 12, ecMs: 2.6, notes: "傍晚复测，植株明显伸长" },
+    ],
+  }),
+];
+
+const duplicateReviews: DuplicateReview[] = [
+  {
+    id: "rev-bee-pending-01",
+    trialId: "trial-ama-02",
+    status: "pending",
+    candidatePassId: "obs-bee-04",
+    existingPassId: "obs-bee-03",
+    sharedAccessionIds: ["acc-bee-03"],
+    differences: [
+      {
+        accessionId: "acc-bee-03",
+        heightDeltaMm: 3,
+        leafDelta: 0,
+        ecDelta: 0.1,
+        withinTolerance: true,
+      },
+    ],
+    suggestion: "converge",
+    createdAt: "2026-04-22T15:20:00.000Z",
+  },
+  {
+    id: "rev-bee-resolved-01",
+    trialId: "trial-ama-02",
+    status: "resolved",
+    candidatePassId: "obs-bee-06",
+    existingPassId: "obs-bee-05",
+    sharedAccessionIds: ["acc-bee-01"],
+    differences: [
+      {
+        accessionId: "acc-bee-01",
+        heightDeltaMm: 18,
+        leafDelta: 2,
+        ecDelta: 0.6,
+        withinTolerance: false,
+      },
+    ],
+    suggestion: "keep_both",
+    createdAt: "2026-05-06T17:30:00.000Z",
+    decidedAt: "2026-05-07T01:00:00.000Z",
+    decidedBy: "L. Tanaka",
+    verdict: "keep_both",
+    decisionNote: "两次测量间隔近 10 小时且株高差异 18 mm，属于植株真实生长，按合理重测保留两条。",
+  },
+];
+
+const dedupAudits: DedupAudit[] = [
+  {
+    id: "aud-bee-auto-01",
+    trialId: "trial-ama-02",
+    at: "2026-04-15T08:31:10.000Z",
+    kind: "auto_converged",
+    candidatePassId: "obs-bee-02b-dup",
+    canonicalPassId: "obs-bee-02a",
+    convergedAccessionIds: ["acc-bee-01", "acc-bee-02"],
+    reason: "内容指纹完全一致且在自动收敛窗口内，判定为重复录入",
+    matchedBy: "fingerprint",
+  },
+  {
+    id: "aud-bee-manual-01",
+    trialId: "trial-ama-02",
+    at: "2026-05-07T01:00:00.000Z",
+    kind: "manual",
+    candidatePassId: "obs-bee-06",
+    canonicalPassId: "obs-bee-05",
+    convergedAccessionIds: [],
+    reason: "人工裁决保留两次观测（合理重测）",
+    matchedBy: "manual_review",
+    reviewId: "rev-bee-resolved-01",
+    decidedBy: "L. Tanaka",
+    decisionNote: "两次测量间隔近 10 小时且株高差异 18 mm，属于植株真实生长，按合理重测保留两条。",
+    verdict: "keep_both",
   },
 ];
 
@@ -324,5 +483,7 @@ export function createSampleWorkspaceState(): WorkspaceState {
     observationPasses,
     flags,
     clearanceSnapshots,
+    duplicateReviews,
+    dedupAudits,
   };
 }

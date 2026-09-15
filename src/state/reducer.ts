@@ -45,6 +45,12 @@ export function workspaceReducer(
         ...state,
         observationPasses: [...state.observationPasses, action.pass],
         flags: [...state.flags, ...action.flags],
+        duplicateReviews: action.review
+          ? [...state.duplicateReviews, action.review]
+          : state.duplicateReviews,
+        dedupAudits: action.audit
+          ? [...state.dedupAudits, action.audit]
+          : state.dedupAudits,
       };
     case "flag/transitioned":
       return {
@@ -53,6 +59,25 @@ export function workspaceReducer(
           flag.id === action.flag.id ? action.flag : flag,
         ),
       };
+    case "duplicate/resolved": {
+      const updatedById = new Map(
+        action.updatedPasses.map((pass) => [pass.id, pass]),
+      );
+      const withdrawnById = new Map(
+        action.withdrawnFlags.map((flag) => [flag.id, flag]),
+      );
+      return {
+        ...state,
+        observationPasses: state.observationPasses.map((pass) =>
+          updatedById.get(pass.id) ?? pass,
+        ),
+        flags: state.flags.map((flag) => withdrawnById.get(flag.id) ?? flag),
+        duplicateReviews: state.duplicateReviews.map((review) =>
+          review.id === action.review.id ? action.review : review,
+        ),
+        dedupAudits: [...state.dedupAudits, action.audit],
+      };
+    }
     case "clearance/generated":
       return {
         ...state,

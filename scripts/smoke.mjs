@@ -16,6 +16,7 @@ const scenarios = {
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
   "retire-accession-replacement": retireAccessionReplacement,
+  "deduplicate-observations": deduplicateObservations,
 };
 
 const scenarioPaths = {
@@ -24,6 +25,7 @@ const scenarioPaths = {
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
   "retire-accession-replacement": "/roster",
+  "deduplicate-observations": "/observations",
 };
 
 async function waitForServer() {
@@ -83,6 +85,66 @@ async function recordObservationPass(page) {
     (count) => document.querySelectorAll('[data-testid^="pass-"]').length > count,
     before,
   );
+}
+
+async function selectAmaranthTrial(page) {
+  await page.getByTestId("observation-trial-select").selectOption("trial-ama-02");
+}
+
+async function fillAndSavePass(page, { observer, values, observerTestId = "observer-input" }) {
+  await page.getByTestId("open-observation-form").click();
+  await page.getByTestId(observerTestId).fill(observer);
+  const row = page.locator(".entry-row").first();
+  const numbers = row.locator('input[type="number"]');
+  await numbers.nth(0).fill(String(values[0]));
+  await numbers.nth(1).fill(String(values[1]));
+  await numbers.nth(2).fill(String(values[2]));
+  await page.getByTestId("save-observation-button").click();
+}
+
+async function deduplicateObservations(page) {
+  await selectAmaranthTrial(page);
+
+  // 1) 种子数据中已有一个容差内疑似重复（rev-bee-pending-01，54 vs 57 mm），裁决为收敛。
+  await page.locator('[data-testid="review-rev-bee-pending-01"]').waitFor();
+  await page.getByTestId("review-decided-by").fill("L. Tanaka");
+  await page.getByTestId("review-note").fill("下午复测在重测容差内，与上午属同一次物理观测，收敛保留先一次读数。");
+  await page.getByTestId("submit-review").click();
+  await page
+    .locator('[data-testid="pass-obs-bee-04"][data-dedup-status="converged"]')
+    .waitFor();
+
+  // 2) 全新录入 A，保存成功。
+  await fillAndSavePass(page, { observer: "R. Ono", values: [120, 11, 2.4] });
+  await page.getByText("观测已记录", { exact: true }).waitFor();
+
+  // 3) 关闭后重新打开表单（新幂等令牌），提交字节级完全相同的内容 → 自动收敛。
+  await fillAndSavePass(page, { observer: "R. Ono", values: [120, 11, 2.4] });
+  await page.getByText("重复录入已自动收敛", { exact: true }).waitFor();
+
+  // 4) 再提交同材料、数值显著不同的同日观测 → 开人工裁决工单。
+  await fillAndSavePass(page, { observer: "R. Ono", values: [150, 15, 3.2] });
+  await page.getByText("疑似重复待裁决", { exact: false }).waitFor();
+  await page.locator('[data-testid^="review-rev_"]').waitFor();
+
+  // 5) 裁决为合理重测，两条都保留。
+  await page.getByTestId("verdict-keep-both").check();
+  await page.getByTestId("review-decided-by").fill("L. Tanaka");
+  await page.getByTestId("review-note").fill("株高相差 30 毫米且 EC 明显上升，判定为间隔期内的真实生长，保留两次观测。");
+  await page.getByTestId("submit-review").click();
+  await page.locator('[data-testid^="review-rev_"]').waitFor({ state: "detached" });
+
+  // 6) 结果核对：收敛记录可见但带状态，两条显著不同的观测都保持 canonical。
+  const converged = await page
+    .locator('.pass-card[data-dedup-status="converged"]')
+    .count();
+  if (converged < 2) {
+    throw new Error(`expected at least 2 converged pass cards, got ${converged}`);
+  }
+  const retainNotes = await page.getByText(/人工裁决保留/).count();
+  if (retainNotes < 1) {
+    throw new Error("expected a manual keep-both audit note on the observation history");
+  }
 }
 
 async function advanceTrialClearance(page) {

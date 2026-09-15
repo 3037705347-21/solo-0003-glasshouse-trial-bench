@@ -2,6 +2,8 @@ import type {
   Accession,
   Bench,
   ClearanceSnapshot,
+  DedupAudit,
+  DuplicateReview,
   Flag,
   ObservationPass,
   Trial,
@@ -18,8 +20,21 @@ export type WorkspaceAction =
   | { type: "accession/updated"; accession: Accession }
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
-  | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
+  | {
+      type: "observation/recorded";
+      pass: ObservationPass;
+      flags: Flag[];
+      review?: DuplicateReview;
+      audit?: DedupAudit;
+    }
   | { type: "flag/transitioned"; flag: Flag }
+  | {
+      type: "duplicate/resolved";
+      review: DuplicateReview;
+      audit: DedupAudit;
+      updatedPasses: ObservationPass[];
+      withdrawnFlags: Flag[];
+    }
   | {
       type: "clearance/generated";
       snapshot: ClearanceSnapshot;
@@ -31,6 +46,8 @@ export function isWorkspaceState(value: unknown): value is WorkspaceState {
     return false;
   }
   const candidate = value as Partial<WorkspaceState>;
+  // duplicateReviews / dedupAudits 是后加字段：缺失时由 normalizeWorkspaceState 补齐，
+  // 不能因此判定旧版本存储损坏而回退示例工作区。
   return (
     Array.isArray(candidate.trials) &&
     Array.isArray(candidate.accessions) &&
