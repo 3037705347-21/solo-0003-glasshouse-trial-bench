@@ -8,10 +8,7 @@ import type {
   TrialState,
   WorkspaceState,
 } from "../domain/types";
-import type {
-  AuditEntry,
-  WorkspaceReplaceSource,
-} from "../domain/audit";
+import type { WorkspaceReplaceSource } from "../domain/audit";
 
 export type WorkspaceAction =
   | { type: "hydrate"; state: WorkspaceState }
@@ -40,11 +37,6 @@ export type WorkspaceAction =
       snapshot: ClearanceSnapshot;
       trials: Trial[];
     };
-
-/** 日志动作只追加审计历史，不触碰工作区数据。 */
-export type AuditAction =
-  | { type: "audit/appended"; entry: AuditEntry }
-  | { type: "audit/hydrated"; entries: AuditEntry[] };
 
 export function isWorkspaceState(value: unknown): value is WorkspaceState {
   if (!value || typeof value !== "object") {

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { NotebookPen, Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
@@ -16,7 +17,14 @@ import { PassForm } from "./PassForm";
 
 export function ObservationPage() {
   const { state } = useWorkspace();
-  const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
+  const [searchParams] = useSearchParams();
+  const trialParam = searchParams.get("trial") ?? "";
+  const focusFlagId = searchParams.get("flag") ?? "";
+  const [trialId, setTrialId] = useState(() =>
+    state.trials.some((trial) => trial.id === trialParam)
+      ? trialParam
+      : (state.trials[0]?.id ?? ""),
+  );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const passes = passesForTrial(state, trialId);
@@ -110,7 +118,7 @@ export function ObservationPage() {
             </div>
           )}
         </section>
-        <FlagPanel flags={flags} />
+        <FlagPanel flags={flags} focusFlagId={focusFlagId} />
       </div>
       <Dialog
         open={dialogOpen}

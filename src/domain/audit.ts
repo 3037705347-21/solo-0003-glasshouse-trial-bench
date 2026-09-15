@@ -213,7 +213,12 @@ function formatScalar(field: string, value: unknown): string {
   }
   switch (field) {
     case "state":
-      return trialStateLabel[value as TrialState] ?? String(value);
+      // 试验状态与标记状态取值互不相交，统一在此翻译。
+      return (
+        trialStateLabel[value as TrialState] ??
+        flagStateLabel[value as FlagState] ??
+        String(value)
+      );
     case "preferredLight":
     case "lightProfile":
       return lightLabel[value as PreferredLight] ?? String(value);
@@ -616,9 +621,7 @@ export function buildClearanceEntry(
 export type WorkspaceReplaceSource = "sample" | "import";
 
 interface EntityConfig<T> {
-  key: keyof WorkspaceState;
   objectType: AuditObjectType;
-  typeLabel: string;
   idOf: (entity: T) => string;
   labelOf: (entity: T) => string;
   trialIdOf?: (entity: T) => string;
@@ -655,7 +658,7 @@ function diffCollection<T extends { id: string }>(
         objectLabel: config.labelOf(after),
         kind: "created",
         changes: [],
-        resultLabel: describeCreated(config.objectType, after, afterState),
+        resultLabel: describeCreated(config.objectType, after),
         trialId: config.trialIdOf?.(after),
       });
       return;
@@ -695,8 +698,7 @@ function diffCollection<T extends { id: string }>(
 function describeCreated(
   type: AuditObjectType,
   entity: unknown,
-  state: WorkspaceState,
-): string {
+): string | undefined {
   if (type === "accession") {
     const accession = entity as Accession;
     return `品种 ${clip(accession.cultivar, 24)} · 数量 ${accession.quantity}`;
@@ -721,7 +723,6 @@ function describeCreated(
     const snapshot = entity as ClearanceSnapshot;
     return snapshot.status === "ready" ? "就绪" : `${snapshot.blockers.length} 个阻止项`;
   }
-  void state;
   return undefined;
 }
 
@@ -729,7 +730,7 @@ function describeRemoved(
   type: AuditObjectType,
   entity: unknown,
   state: WorkspaceState,
-): string {
+): string | undefined {
   if (type === "accession") {
     const accession = entity as Accession;
     const bench = state.benches.find((candidate) =>
@@ -783,9 +784,7 @@ export function buildWorkspaceReplacedEntry(
       before.trials,
       after.trials,
       {
-        key: "trials",
         objectType: "trial",
-        typeLabel: "试验",
         idOf: (trial) => trial.id,
         labelOf: trialLabel,
         trialIdOf: (trial) => trial.id,
@@ -798,9 +797,7 @@ export function buildWorkspaceReplacedEntry(
       before.accessions,
       after.accessions,
       {
-        key: "accessions",
         objectType: "accession",
-        typeLabel: "材料",
         idOf: (accession) => accession.id,
         labelOf: accessionLabel,
         trialIdOf: (accession) => accession.trialId,
@@ -814,9 +811,7 @@ export function buildWorkspaceReplacedEntry(
       before.observationPasses,
       after.observationPasses,
       {
-        key: "observationPasses",
         objectType: "observation",
-        typeLabel: "观测",
         idOf: (pass) => pass.id,
         labelOf: passLabel,
         trialIdOf: (pass) => pass.trialId,
@@ -828,9 +823,7 @@ export function buildWorkspaceReplacedEntry(
       before.flags,
       after.flags,
       {
-        key: "flags",
         objectType: "flag",
-        typeLabel: "标记",
         idOf: (flag) => flag.id,
         labelOf: (flag) => flag.code,
         trialIdOf: (flag) => flag.trialId,
@@ -843,9 +836,7 @@ export function buildWorkspaceReplacedEntry(
       before.clearanceSnapshots,
       after.clearanceSnapshots,
       {
-        key: "clearanceSnapshots",
         objectType: "snapshot",
-        typeLabel: "放行快照",
         idOf: (snapshot) => snapshot.id,
         labelOf: (snapshot) =>
           `放行快照 · ${snapshot.status === "ready" ? "就绪" : "阻止"}`,
@@ -879,9 +870,7 @@ function diffBenches(
   after: WorkspaceState,
 ): AuditItem[] {
   const config: EntityConfig<Bench> = {
-    key: "benches",
     objectType: "bench",
-    typeLabel: "台架",
     idOf: (bench) => bench.id,
     labelOf: benchLabel,
     fields: ["sector", "capacity", "lightProfile", "irrigationLine", "status"],
@@ -901,6 +890,7 @@ function diffBenches(
       JSON.stringify(benchBefore.assignedIds) !==
         JSON.stringify(benchAfter.assignedIds)
     ) {
+      const trialId = inferBenchTrialId(before, after, benchAfter.assignedIds);
       const item = items.find(
         (candidate) =>
           candidate.objectType === "bench" && candidate.objectId === benchAfter.id,
@@ -913,6 +903,9 @@ function diffBenches(
       };
       if (item) {
         item.changes.unshift(assignmentChange);
+        if (!item.trialId) {
+          item.trialId = trialId;
+        }
       } else {
         items.push({
           objectType: "bench",
@@ -920,11 +913,25 @@ function diffBenches(
           objectLabel: benchLabel(benchAfter),
           kind: "updated",
           changes: [assignmentChange],
+          trialId,
         });
       }
     }
   });
   return items;
+}
+
+/** 台架本身不隶属试验；借由其上材料反查试验，便于跳回后定位试验筛选。 */
+function inferBenchTrialId(
+  before: WorkspaceState,
+  after: WorkspaceState,
+  assignedIds: string[],
+): string | undefined {
+  const ids = new Set(assignedIds);
+  const accession =
+    after.accessions.find((candidate) => ids.has(candidate.id)) ??
+    before.accessions.find((candidate) => ids.has(candidate.id));
+  return accession?.trialId;
 }
 
 /* ------------------------------------------------------------------ */

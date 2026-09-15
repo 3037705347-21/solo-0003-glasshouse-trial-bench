@@ -9,11 +9,17 @@ import { useWorkspace } from "../../state/store";
 
 interface FlagPanelProps {
   flags: DomainFlag[];
+  focusFlagId?: string;
 }
 
-export function FlagPanel({ flags }: FlagPanelProps) {
+export function FlagPanel({ flags, focusFlagId }: FlagPanelProps) {
   const { dispatch } = useWorkspace();
-  const [selectedId, setSelectedId] = useState(() => flags[0]?.id ?? "");
+  const focusExists = focusFlagId
+    ? flags.some((flag) => flag.id === focusFlagId)
+    : false;
+  const [selectedId, setSelectedId] = useState(
+    () => (focusExists ? (focusFlagId as string) : (flags[0]?.id ?? "")),
+  );
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | undefined>();
   const selected = flags.find((flag) => flag.id === selectedId) ?? flags[0];
@@ -51,7 +57,7 @@ export function FlagPanel({ flags }: FlagPanelProps) {
       <div className="flag-list">
         {flags.map((flag) => (
           <button
-            className={`flag-list-item ${selected?.id === flag.id ? "flag-list-item-active" : ""}`}
+            className={`flag-list-item ${selected?.id === flag.id ? "flag-list-item-active" : ""} ${focusFlagId === flag.id ? "flag-list-item-focus" : ""}`}
             key={flag.id}
             onClick={() => {
               setSelectedId(flag.id);

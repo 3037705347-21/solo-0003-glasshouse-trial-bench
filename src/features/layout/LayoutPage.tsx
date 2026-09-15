@@ -1,8 +1,11 @@
 import { useMemo, useState } from "react";
-import { Grid3X3 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Grid3X3, Trash2 } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
+import { Button } from "../../components/Button";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import { assignAccession, releaseAccession } from "../../domain/bench";
+import type { Bench } from "../../domain/types";
 import { accessionById, accessionsForTrial } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { AssignmentPanel } from "./AssignmentPanel";
@@ -10,7 +13,14 @@ import { BenchCard } from "./BenchCard";
 
 export function LayoutPage() {
   const { state, dispatch } = useWorkspace();
-  const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
+  const [searchParams] = useSearchParams();
+  const trialParam = searchParams.get("trial") ?? "";
+  const focusBenchId = searchParams.get("bench") ?? "";
+  const [trialId, setTrialId] = useState(() =>
+    state.trials.some((trial) => trial.id === trialParam)
+      ? trialParam
+      : (state.trials[0]?.id ?? ""),
+  );
   const [selectedAccessionId, setSelectedAccessionId] = useState("");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -23,6 +33,10 @@ export function LayoutPage() {
   };
 
   const accessions = accessionsForTrial(state, trialId);
+  const trialAccessionIds = useMemo(
+    () => new Set(accessions.map((accession) => accession.id)),
+    [accessions],
+  );
   const selectedAccession = accessionById(state, selectedAccessionId);
 
   const sortedBenches = useMemo(
@@ -31,6 +45,14 @@ export function LayoutPage() {
         left.code.localeCompare(right.code),
       ),
     [state.benches],
+  );
+
+  const occupiedBenches = useMemo(
+    () =>
+      state.benches.filter((bench) =>
+        bench.assignedIds.some((id) => trialAccessionIds.has(id)),
+      ),
+    [state.benches, trialAccessionIds],
   );
 
   const handleAssign = (accessionId: string, benchId: string) => {
@@ -51,8 +73,8 @@ export function LayoutPage() {
     dispatch({ type: "bench/assigned", bench: result.value });
     pushToast({
       tone: "success",
-        title: "台架分配成功",
-        message: `${accession.cultivar} 已分配到 ${bench.code}`,
+      title: "台架分配成功",
+      message: `${accession.cultivar} 已分配到 ${bench.code}`,
     });
   };
 
@@ -73,8 +95,56 @@ export function LayoutPage() {
     dispatch({ type: "bench/released", bench: result.value });
     pushToast({
       tone: "success",
-        title: "材料已移出",
-        message: "该台架空位已恢复可用。",
+      title: "材料已移出",
+      message: "该台架空位已恢复可用。",
+    });
+  };
+
+  /**
+   * 批量移出当前试验在各台架上的全部材料。
+   * 每个台架独立重放 releaseAccession；只有至少一个台架变化时才 dispatch，
+   * 审计层记录为一条包含多个台架对象的整体操作。
+   */
+  const handleReleaseTrial = () => {
+    if (occupiedBenches.length === 0) {
+      pushToast({
+        tone: "info",
+        title: "无需移出",
+        message: "当前试验没有材料分配在台架上。",
+      });
+      return;
+    }
+    const updatedBenches: Bench[] = [];
+    const releasedIds: string[] = [];
+    for (const bench of occupiedBenches) {
+      const idsOnBench = bench.assignedIds.filter((id) =>
+        trialAccessionIds.has(id),
+      );
+      let current = bench;
+      for (const id of idsOnBench) {
+        const result = releaseAccession(id, current);
+        if (result.ok) {
+          current = result.value;
+          releasedIds.push(id);
+        }
+      }
+      if (current !== bench) {
+        updatedBenches.push(current);
+      }
+    }
+    if (updatedBenches.length === 0) {
+      return;
+    }
+    dispatch({
+      type: "bench/batch-released",
+      benches: updatedBenches,
+      accessionIds: releasedIds,
+      trialId,
+    });
+    pushToast({
+      tone: "success",
+      title: "批量移出完成",
+      message: `${releasedIds.length} 个材料已从 ${updatedBenches.length} 个台架移出。`,
     });
   };
 
@@ -84,6 +154,17 @@ export function LayoutPage() {
         eyebrow="台架规划"
         title="台架布局"
         description="根据光照、容量和隔离约束，将材料分配到可用台架。"
+        actions={
+          <Button
+            tone="secondary"
+            onClick={handleReleaseTrial}
+            disabled={occupiedBenches.length === 0}
+            data-testid="batch-release-trial"
+          >
+            <Trash2 size={16} />
+            批量移出当前试验（{occupiedBenches.length} 个台架）
+          </Button>
+        }
       />
       <section className="control-strip">
         <select
@@ -118,14 +199,25 @@ export function LayoutPage() {
           </div>
           <div className="bench-grid-list">
             {sortedBenches.map((bench) => (
-              <BenchCard
+              <div
                 key={bench.id}
-                bench={bench}
-                accessions={accessions}
-                selectedAccession={selectedAccession}
-                onAssign={handleAssign}
-                onRelease={handleRelease}
-              />
+                className={
+                  focusBenchId === bench.id ? "bench-focus-wrap" : undefined
+                }
+                data-testid={
+                  focusBenchId === bench.id
+                    ? `audit-focus-bench-${bench.id}`
+                    : undefined
+                }
+              >
+                <BenchCard
+                  bench={bench}
+                  accessions={accessions}
+                  selectedAccession={selectedAccession}
+                  onAssign={handleAssign}
+                  onRelease={handleRelease}
+                />
+              </div>
             ))}
           </div>
         </section>

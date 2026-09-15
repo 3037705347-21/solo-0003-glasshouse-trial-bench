@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Leaf, Plus, Sprout } from "lucide-react";
 import { Button } from "../../components/Button";
 import { DataTable, type DataColumn } from "../../components/DataTable";
@@ -26,8 +27,15 @@ type RosterSegment = "all" | "assigned" | "unassigned";
 
 export function RosterPage() {
   const { state } = useWorkspace();
-  const [trialFilter, setTrialFilter] = useState(() => state.trials[0]?.id ?? "");
-  const [query, setQuery] = useState("");
+  const [searchParams] = useSearchParams();
+  const trialParam = searchParams.get("trial") ?? "";
+  const queryParam = searchParams.get("q") ?? "";
+  const [trialFilter, setTrialFilter] = useState(() =>
+    state.trials.some((trial) => trial.id === trialParam)
+      ? trialParam
+      : (state.trials[0]?.id ?? ""),
+  );
+  const [query, setQuery] = useState(queryParam);
   const [segment, setSegment] = useState<RosterSegment>("all");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingAccession, setEditingAccession] = useState<Accession | undefined>();

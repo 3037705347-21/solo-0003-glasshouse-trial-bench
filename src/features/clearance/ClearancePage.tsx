@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Play, ShieldCheck } from "lucide-react";
 import { Button } from "../../components/Button";
 import { PageHeader } from "../../components/PageHeader";
@@ -14,7 +15,13 @@ import { SnapshotCard } from "./SnapshotCard";
 
 export function ClearancePage() {
   const { state, dispatch } = useWorkspace();
-  const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
+  const [searchParams] = useSearchParams();
+  const trialParam = searchParams.get("trial") ?? "";
+  const [trialId, setTrialId] = useState(() =>
+    state.trials.some((trial) => trial.id === trialParam)
+      ? trialParam
+      : (state.trials[0]?.id ?? ""),
+  );
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const latest = latestSnapshotForTrial(state, trialId);
   const trial = state.trials.find((item) => item.id === trialId);
