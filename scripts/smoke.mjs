@@ -17,6 +17,7 @@ const scenarios = {
   "advance-trial-clearance": advanceTrialClearance,
   "retire-accession-replacement": retireAccessionReplacement,
   "merge-duplicate-accessions": mergeDuplicateAccessions,
+  "merge-conflict-guardrails": mergeConflictGuardrails,
 };
 
 const scenarioPaths = {
@@ -26,6 +27,7 @@ const scenarioPaths = {
   "advance-trial-clearance": "/clearance",
   "retire-accession-replacement": "/roster",
   "merge-duplicate-accessions": "/duplicates",
+  "merge-conflict-guardrails": "/duplicates",
 };
 
 async function waitForServer() {
@@ -101,6 +103,18 @@ async function assertCount(locator, expected, label) {
   const actual = await locator.count();
   if (actual !== expected) {
     throw new Error(`${label}: expected ${expected}, got ${actual}`);
+  }
+}
+
+async function assertDisabled(locator, label) {
+  if (!(await locator.isDisabled())) {
+    throw new Error(`${label}: expected disabled`);
+  }
+}
+
+async function assertEnabled(locator, label) {
+  if (!(await locator.isEnabled())) {
+    throw new Error(`${label}: expected enabled`);
   }
 }
 
@@ -390,6 +404,228 @@ async function mergeDuplicateAccessions(page) {
     .innerText();
   if (beetSnapshotAfter !== beetSnapshotBefore) {
     throw new Error("saved clearance snapshot changed after accession merge");
+  }
+}
+
+async function createAccessionViaForm(page, values) {
+  await page.getByTestId("open-create-accession").click();
+  await page.getByTestId("accession-number-input").fill(values.accessionNo);
+  await page.getByTestId("cultivar-input").fill(values.cultivar);
+  await page.getByLabel("来源").fill(values.source);
+  await page.getByLabel("繁殖日期").fill(values.propagatedOn);
+  await page.getByLabel("数量").fill(String(values.quantity));
+  await page.getByLabel("适宜光照").selectOption(values.preferredLight);
+  await page.locator("textarea").first().fill(values.note);
+  await page.getByTestId("save-accession-button").click();
+  await page
+    .locator("tr")
+    .filter({ hasText: values.accessionNo })
+    .first()
+    .waitFor();
+}
+
+async function getAccessionId(page, accessionNo) {
+  return page.evaluate((no) => {
+    const raw = localStorage.getItem("glasshouse-trial-bench:workspace:v1");
+    return JSON.parse(raw).state.accessions.find((a) => a.accessionNo === no)?.id;
+  }, accessionNo);
+}
+
+async function retireRow(page, accessionNo, replacementLabel) {
+  const row = page.locator("tr").filter({ hasText: accessionNo }).first();
+  await row.getByRole("button", { name: "停用" }).click();
+  if (replacementLabel) {
+    await page.getByTestId("retire-replacement-select").selectOption({
+      label: replacementLabel,
+    });
+  }
+  await page
+    .getByTestId("retire-accession-reason")
+    .fill("护栏验证用批次，完成后停用。");
+  await page.getByTestId("confirm-retire-accession").click();
+  await row.getByText("已停用", { exact: true }).waitFor();
+}
+
+async function mergeConflictGuardrails(page) {
+  // 造两个高数量、光照冲突的“同一品种”批次。
+  const pairValues = {
+    cultivar: "Guard Ridge",
+    source: "Guardrail Seed House",
+    propagatedOn: "2026-02-25",
+  };
+  await page.goto(`${baseUrl}/#/roster`, { waitUntil: "networkidle" });
+  await createAccessionViaForm(page, {
+    ...pairValues,
+    accessionNo: "ACC-0011",
+    quantity: 300,
+    preferredLight: "full-sun",
+    note: "护栏测试批次一，全日照品系，数量较大。",
+  });
+  await createAccessionViaForm(page, {
+    ...pairValues,
+    accessionNo: "ACC-0012",
+    quantity: 250,
+    preferredLight: "shade",
+    note: "护栏测试批次二，遮阴品系，数量较大。",
+  });
+  const id11 = await getAccessionId(page, "ACC-0011");
+  const id12 = await getAccessionId(page, "ACC-0012");
+
+  // 分别放到全日照台架 E-2 和遮阴台架 N-1。
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  await page
+    .getByTestId("assignment-accession-select")
+    .selectOption({ label: "ACC-0011 - Guard Ridge" });
+  await page.getByTestId(`assign-bench-bench-east-2`).click();
+  await page.getByText("台架分配成功", { exact: true }).first().waitFor();
+  await page
+    .getByTestId("assignment-accession-select")
+    .selectOption({ label: "ACC-0012 - Guard Ridge" });
+  await page.getByTestId(`assign-bench-bench-north-1`).click();
+  await page.getByText("台架分配成功", { exact: true }).first().waitFor();
+
+  // 两个候选都停用：弹窗不能卡死，确认按钮必须禁用，并支持就地恢复其一。
+  await page.goto(`${baseUrl}/#/roster`, { waitUntil: "networkidle" });
+  await retireRow(page, "ACC-0011", "ACC-0002 - Micro Tom");
+  await retireRow(page, "ACC-0012", "ACC-0002 - Micro Tom");
+
+  await page.goto(`${baseUrl}/#/duplicates`, { waitUntil: "networkidle" });
+  const retiredPairCard = page
+    .locator(".duplicate-card")
+    .filter({ hasText: "ACC-0011" })
+    .filter({ hasText: "ACC-0012" });
+  await retiredPairCard.getByRole("button", { name: /发起合并/ }).click();
+  await page.getByTestId("merge-accessions-form").waitFor();
+  // 没有在用存活者时，确认合并不可提交，而不是弹出“无法合并”死路。
+  assertDisabled(
+    page.getByTestId("confirm-merge-accessions"),
+    "confirm button with no operational survivor",
+  );
+  await page
+    .getByTestId(`merge-restore-confirm-${id11}`)
+    .check();
+  await page.getByTestId(`merge-restore-${id11}`).click();
+  await page
+    .getByTestId(`merge-survivor-${id11}`)
+    .getByText("存活者", { exact: true })
+    .waitFor();
+  assertEnabled(
+    page.getByTestId("confirm-merge-accessions"),
+    "confirm button after inline restore",
+  );
+
+  // 数量护栏：求和 550 超过 500，单选项必须禁用；自定义 501 也被领域层拒绝。
+  const sumRadio = page.getByTestId("merge-quantity-sum");
+  await sumRadio.waitFor();
+  assertDisabled(sumRadio, "quantity sum over 500");
+  await page.getByText(`数量求和（550）：超过 500 上限，不可用`).waitFor();
+  await page.locator(".merge-quantity-row input[type=radio]").nth(2).check();
+  await page.getByTestId("merge-quantity-custom").fill("501");
+  // 光照默认取存活者（全日照）；目标台架选择 E-2。
+  await page.getByTestId("merge-target-bench-bench-east-2").check();
+  await page
+    .getByTestId("merge-reason-input")
+    .fill("两批 Guard Ridge 实为同一批重复录入，护栏验证合并。");
+  await page.getByTestId("confirm-merge-accessions").click();
+  await page
+    .getByTestId("merge-quantity-error")
+    .getByText("1 到 500")
+    .waitFor();
+  // 改回保留 300 后通过；N-1 的占用必须被移除，存活者唯一落在 E-2。
+  await page.locator(".merge-quantity-row input[type=radio]").first().check();
+  await page.getByTestId("confirm-merge-accessions").click();
+  await page.getByText("批次已合并", { exact: true }).waitFor();
+
+  const stateAfterFirstMerge = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("glasshouse-trial-bench:workspace:v1")).state,
+  );
+  const survivor11 = stateAfterFirstMerge.accessions.find((a) => a.id === id11);
+  const tombstone12 = stateAfterFirstMerge.accessions.find((a) => a.id === id12);
+  if (tombstone12.lifecycleStatus !== "merged" || tombstone12.mergedIntoId !== id11) {
+    throw new Error("retired member did not become a tombstone pointing at survivor");
+  }
+  if (survivor11.quantity !== 300 || survivor11.preferredLight !== "full-sun") {
+    throw new Error("survivor quantity/light changed unexpectedly");
+  }
+  const east2 = stateAfterFirstMerge.benches.find((b) => b.id === "bench-east-2");
+  const north1 = stateAfterFirstMerge.benches.find((b) => b.id === "bench-north-1");
+  if (!east2.assignedIds.includes(id11)) {
+    throw new Error("survivor not placed on the chosen compatible bench");
+  }
+  if (east2.assignedIds.includes(id12) || north1.assignedIds.includes(id12) || north1.assignedIds.includes(id11)) {
+    throw new Error("merged identities left on a non-target bench");
+  }
+
+  // 光照护栏：再造一对，字段裁决改为遮阴后，全日照台架必须被拒绝。
+  await page.goto(`${baseUrl}/#/roster`, { waitUntil: "networkidle" });
+  await createAccessionViaForm(page, {
+    ...pairValues,
+    accessionNo: "ACC-0013",
+    quantity: 40,
+    preferredLight: "full-sun",
+    note: "护栏测试批次三，默认全日照。",
+  });
+  await createAccessionViaForm(page, {
+    ...pairValues,
+    accessionNo: "ACC-0014",
+    quantity: 40,
+    preferredLight: "shade",
+    note: "护栏测试批次四，实际为遮阴。",
+  });
+  const id13 = await getAccessionId(page, "ACC-0013");
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  await page
+    .getByTestId("assignment-accession-select")
+    .selectOption({ label: "ACC-0013 - Guard Ridge" });
+  await page.getByTestId(`assign-bench-bench-east-2`).click();
+  await page.getByText("台架分配成功", { exact: true }).first().waitFor();
+
+  await page.goto(`${baseUrl}/#/duplicates`, { waitUntil: "networkidle" });
+  const secondPairCard = page
+    .locator(".duplicate-card")
+    .filter({ hasText: "ACC-0013" })
+    .filter({ hasText: "ACC-0014" });
+  await secondPairCard.getByRole("button", { name: /发起合并/ }).click();
+  await page.getByTestId("merge-accessions-form").waitFor();
+  // 在“适宜光照”冲突行选择 ACC-0014 的遮阴值。
+  const lightConflict = page
+    .locator(".merge-conflict-row")
+    .filter({ hasText: "适宜光照" });
+  await lightConflict
+    .locator("label")
+    .filter({ hasText: "ACC-0014" })
+    .click();
+  // E-2 是全日照台架，选项上出现不兼容徽标，且提交被领域层拒绝。
+  const east2Option = page
+    .locator("label.merge-option")
+    .filter({ has: page.getByTestId("merge-target-bench-bench-east-2") });
+  await east2Option.getByText("不兼容").waitFor();
+  await page.getByTestId("merge-target-bench-bench-east-2").check();
+  await page
+    .getByTestId("merge-reason-input")
+    .fill("两批 Guard Ridge 重复录入，合并后按遮阴养护。");
+  await page.getByTestId("confirm-merge-accessions").click();
+  await page
+    .getByTestId("merge-bench-error")
+    .getByText("不兼容")
+    .waitFor();
+  // 改选“不分配台架”后合并成功，存活者不落在任何台架上。
+  await page.getByTestId("merge-target-bench-unassigned").check();
+  await page.getByTestId("confirm-merge-accessions").click();
+  await page.getByText("批次已合并", { exact: true }).waitFor();
+
+  const stateAfterSecondMerge = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("glasshouse-trial-bench:workspace:v1")).state,
+  );
+  const survivor13 = stateAfterSecondMerge.accessions.find((a) => a.id === id13);
+  if (survivor13.preferredLight !== "shade") {
+    throw new Error("survivor light did not follow field resolution");
+  }
+  const onAnyBench = stateAfterSecondMerge.benches.some((bench) =>
+    bench.assignedIds.includes(id13),
+  );
+  if (onAnyBench) {
+    throw new Error("survivor landed on a bench after choosing unassigned");
   }
 }
 

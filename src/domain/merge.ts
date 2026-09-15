@@ -8,12 +8,22 @@ import type {
   WorkspaceState,
 } from "./types";
 import { createId } from "./id";
+import { BENCH_LIGHT_COMPATIBILITY } from "./rules";
 import { fail, fieldError, ok, type FieldError, type Result } from "./result";
 import {
   isAccessionMerged,
   isAccessionOperational,
   isAccessionRetired,
 } from "./accession";
+
+export const MERGE_REASON_MIN_LENGTH = 6;
+export const MERGE_QUANTITY_MAX = 500;
+
+const LIGHT_LABEL = {
+  "full-sun": "全日照",
+  "partial-shade": "半阴",
+  shade: "遮阴",
+} as const;
 
 /**
  * 身份合并规则（不变量）：
@@ -31,8 +41,6 @@ import {
  *    条目，另一条按记录留档。
  * 8. 冻结：已放行试验不允许再合并。
  */
-
-export const MERGE_REASON_MIN_LENGTH = 6;
 
 export const SCALAR_MERGE_FIELDS: MergeFieldKey[] = [
   "accessionNo",
@@ -328,11 +336,29 @@ export function commitAccessionMerge(
       (total, member) => total + member.quantity,
       0,
     );
+    if (resolvedQuantity > MERGE_QUANTITY_MAX) {
+      errors.push(
+        fieldError(
+          "quantity",
+          "sum_exceeds_max",
+          `来源数量求和为 ${resolvedQuantity}，超过单批次上限 ${MERGE_QUANTITY_MAX}；请改用保留某批次数量或自定义`,
+        ),
+      );
+    }
   } else if (quantityResolution.strategy === "custom") {
     const custom = quantityResolution.customQuantity;
-    if (custom === undefined || Number.isNaN(custom) || custom < 1 || custom > 500) {
+    if (
+      custom === undefined ||
+      Number.isNaN(custom) ||
+      custom < 1 ||
+      custom > MERGE_QUANTITY_MAX
+    ) {
       errors.push(
-        fieldError("quantity", "range", "自定义数量必须在 1 到 500 之间"),
+        fieldError(
+          "quantity",
+          "range",
+          `自定义数量必须在 1 到 ${MERGE_QUANTITY_MAX} 之间`,
+        ),
       );
     }
     resolvedQuantity = custom ?? survivor.quantity;
@@ -348,31 +374,91 @@ export function commitAccessionMerge(
     resolvedQuantity = chosen ? chosen.quantity : survivor.quantity;
   }
 
+  // 字段裁决先确定合并后的光照，再据此校验目标台架；
+  // 合并结果必须继续满足既有的光照兼容与台架状态规则。
+  const lightResolution = resolutionByField.get("preferredLight");
+  const lightSource = allMembers.find(
+    (member) => member.id === (lightResolution?.chosenSourceId ?? survivor.id),
+  );
+  const resolvedLight = lightSource
+    ? lightSource.preferredLight
+    : survivor.preferredLight;
+
   const distinctBenches = new Set(
     occupiedBenches
       .map((entry) => entry.benchId)
       .filter((benchId): benchId is string => Boolean(benchId)),
   );
-  if (distinctBenches.size > 1) {
-    if (request.targetBenchId === "unassigned") {
-      // 显式选择不分配是允许的。
-    } else if (!distinctBenches.has(request.targetBenchId)) {
+  // 多台架时必须显式选择；只有一个来源台架时默认落到该台架，
+  // 但只要该台架对“裁决后的光照”不兼容，也必须显式改选或不分配。
+  const effectiveTargetBenchId =
+    request.targetBenchId ||
+    (distinctBenches.size <= 1 ? ([...distinctBenches][0] ?? "unassigned") : "");
+  if (distinctBenches.size > 1 && !effectiveTargetBenchId) {
+    errors.push(
+      fieldError(
+        "targetBenchId",
+        "required",
+        "来源分布在多个台架，请选择唯一目标台架或合并后不分配",
+      ),
+    );
+  } else if (effectiveTargetBenchId === "unassigned") {
+    // 显式不占台架永远允许，且能安全绕开所有台架冲突。
+  } else if (
+    !distinctBenches.has(effectiveTargetBenchId) ||
+    !state.benches.some((bench) => bench.id === effectiveTargetBenchId)
+  ) {
+    errors.push(
+      fieldError(
+        "targetBenchId",
+        "invalid_bench",
+        "请在来源所在台架中选择唯一目标台架，或选择合并后不分配",
+      ),
+    );
+  } else {
+    const targetBench = state.benches.find(
+      (bench) => bench.id === effectiveTargetBenchId,
+    );
+    if (
+      targetBench &&
+      (targetBench.status === "blocked" || targetBench.status === "quarantine")
+    ) {
       errors.push(
         fieldError(
           "targetBenchId",
-          "invalid_bench",
-          "请在来源所在台架中选择唯一目标台架，或选择合并后不分配",
+          "bench_unavailable",
+          `台架 ${targetBench.code} 当前${targetBench.status === "blocked" ? "停用" : "隔离"}，不能作为合并后的位置；请改选其他台架或不分配`,
         ),
       );
+    } else if (
+      targetBench &&
+      !BENCH_LIGHT_COMPATIBILITY[resolvedLight].includes(
+        targetBench.lightProfile,
+      )
+    ) {
+      errors.push(
+        fieldError(
+          "targetBenchId",
+          "light_mismatch",
+          `合并后光照需求为 ${LIGHT_LABEL[resolvedLight]}，与台架 ${targetBench.code}（${LIGHT_LABEL[targetBench.lightProfile]}）不兼容；请改选光照来源、其他台架或不分配`,
+        ),
+      );
+    } else if (targetBench) {
+      const memberIdSet = new Set(allMembers.map((member) => member.id));
+      const otherOccupants = targetBench.assignedIds.filter(
+        (id) => !memberIdSet.has(id),
+      ).length;
+      // 合并后所有来源在目标台架只占一个槽位。
+      if (otherOccupants + 1 > targetBench.capacity) {
+        errors.push(
+          fieldError(
+            "targetBenchId",
+            "capacity",
+            `台架 ${targetBench.code} 没有空位（已占 ${otherOccupants}/${targetBench.capacity}），请改选其他台架或不分配`,
+          ),
+        );
+      }
     }
-  } else if (
-    request.targetBenchId !== "unassigned" &&
-    request.targetBenchId &&
-    !distinctBenches.has(request.targetBenchId)
-  ) {
-    errors.push(
-      fieldError("targetBenchId", "unknown", "目标台架不是来源当前所在台架"),
-    );
   }
   if (errors.length > 0 || !mergedOn) {
     return fail(errors);
@@ -451,8 +537,7 @@ export function commitAccessionMerge(
       : flag,
   );
 
-  const targetBenchId =
-    distinctBenches.size > 1 ? request.targetBenchId : [...distinctBenches][0];
+  const targetBenchId = effectiveTargetBenchId;
   const wantsTargetBench = targetBenchId !== "unassigned" && Boolean(targetBenchId);
   const benchResolutions: AccessionMergeRecord["benchResolutions"] = [];
 

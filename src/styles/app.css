@@ -1783,3 +1783,50 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* 合并向导：存活者卡片与就地恢复 */
+.merge-member-card {
+  cursor: default;
+}
+
+.merge-member-select {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.merge-member-select:disabled {
+  cursor: not-allowed;
+}
+
+.merge-member-select:disabled strong,
+.merge-member-select:disabled span {
+  opacity: 0.75;
+}
+
+.merge-restore-box {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.merge-restore-box .checkbox-field {
+  font-size: 0.8rem;
+}
+
+.merge-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
