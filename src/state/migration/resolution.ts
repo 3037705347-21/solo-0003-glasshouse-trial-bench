@@ -266,11 +266,28 @@ export function resolveDanglingByRelink(
 
   const nextState = updateOwner(state, issue, (record) => {
     if (issue.field === "assignedIds") {
-      record.assignedIds = (Array.isArray(record.assignedIds)
+      // 同一悬空 ID 可能在一个台架的占用列表里重复出现（旧数据的冗余槽位）。
+      // 问题已按 (台架, 字段, 悬空值) 归并为一条，修复也必须塌缩为唯一材料：
+      // 只把第一次出现替换为新目标，后续重复出现直接丢弃；正常槽位原样保留。
+      // 这样修复后材料唯一，不会因为多个悬空槽各生成一个新引用而重复占用。
+      const current = Array.isArray(record.assignedIds)
         ? record.assignedIds
-        : []
-      ).map((id) => (id === issue.missingRef ? newRef : id));
-      // 替换不改变占用数，但仍按占用重算状态（覆盖旧数据里自相矛盾的状态）。
+        : [];
+      const collapsed: unknown[] = [];
+      let replaced = false;
+      for (const id of current) {
+        if (id === issue.missingRef) {
+          if (!replaced) {
+            collapsed.push(newRef);
+            replaced = true;
+          }
+          // 后续重复出现：丢弃，不再 push
+          continue;
+        }
+        collapsed.push(id);
+      }
+      record.assignedIds = collapsed;
+      // 替换不改变首个悬空槽的占用，但仍按塌缩后的占用重算状态。
       recomputeBenchStatus(record);
       return;
     }

@@ -630,3 +630,134 @@ test("观测条目重关联拒绝同一次观测中已存在的材料（去重�
     ["acc-dup", "acc-free"],
   );
 });
+
+test("同台架中重复出现的同一悬空 ID 归并为一条问题，重关联后材料唯一且正常槽位不动", () => {
+  const state = minimalState({
+    trials: [{ id: "t1" } as any],
+    accessions: [
+      { id: "acc-a", trialId: "t1", lifecycleStatus: "active", preferredLight: "full-sun" } as any,
+      { id: "acc-b", trialId: "t1", lifecycleStatus: "active", preferredLight: "full-sun" } as any,
+    ],
+    benches: [
+      // 同一悬空 ID 出现 3 次，中间夹着一个正常槽位
+      {
+        id: "b1",
+        code: "B1",
+        capacity: 6,
+        status: "assigned",
+        lightProfile: "full-sun",
+        assignedIds: ["acc-ghost", "acc-a", "acc-ghost", "acc-ghost"],
+      } as any,
+    ],
+  });
+  const result = migrateWorkspace(v1Envelope(state), NOW);
+  if (!result.ok) throw new Error("expected ok");
+
+  // 只归并出一条该悬空值的问题
+  const ghostIssues = result.issues.filter(
+    (i) =>
+      i.ownerCollection === "benches" &&
+      i.field === "assignedIds" &&
+      (i as DanglingReferenceIssue).missingRef === "acc-ghost",
+  );
+  assert.equal(ghostIssues.length, 1);
+  const issue = ghostIssues[0] as DanglingReferenceIssue;
+
+  // 重关联：3 个悬空出现塌缩为 1 个新目标，正常槽位 acc-a 保持原位置
+  const fixed = resolveDanglingByRelink(result.state, result.issues, issue, "acc-b");
+  assert.equal(fixed.ok, true);
+  if (!fixed.ok) throw new Error(JSON.stringify(fixed.errors));
+  assert.deepEqual(
+    (fixed.value.state.benches[0] as any).assignedIds,
+    ["acc-b", "acc-a"],
+  );
+
+  // 复检不再有该悬空问题，也没有重复材料问题
+  assert.equal(
+    fixed.value.issues.some(
+      (i) =>
+        i.code.startsWith("dangling_") &&
+        (i as DanglingReferenceIssue).missingRef === "acc-ghost",
+    ),
+    false,
+  );
+});
+
+test("重复悬空 ID 清空时全部移除，正常槽位不动，状态按剩余占用重算", () => {
+  const state = minimalState({
+    trials: [{ id: "t1" } as any],
+    accessions: [
+      { id: "acc-a", trialId: "t1", lifecycleStatus: "active", preferredLight: "full-sun" } as any,
+    ],
+    benches: [
+      {
+        id: "b1",
+        code: "B1",
+        capacity: 6,
+        status: "assigned",
+        lightProfile: "full-sun",
+        assignedIds: ["acc-ghost", "acc-a", "acc-ghost"],
+      } as any,
+      // 只有重复悬空槽、无合法占用：清空后应变 available
+      {
+        id: "b2",
+        code: "B2",
+        capacity: 4,
+        status: "assigned",
+        lightProfile: "full-sun",
+        assignedIds: ["acc-ghost", "acc-ghost"],
+      } as any,
+    ],
+  });
+  const result = migrateWorkspace(v1Envelope(state), NOW);
+  if (!result.ok) throw new Error("expected ok");
+
+  const issueFor = (benchId: string) =>
+    result.issues.find(
+      (i) => i.ownerCollection === "benches" && i.ownerId === benchId,
+    ) as DanglingReferenceIssue;
+
+  const clearedB1 = resolveDanglingByClear(result.state, result.issues, issueFor("b1"));
+  assert.equal(clearedB1.ok, true);
+  if (!clearedB1.ok) throw new Error("expected ok");
+  const b1 = (clearedB1.value.state.benches as any[]).find((b) => b.id === "b1");
+  assert.deepEqual(b1.assignedIds, ["acc-a"]);
+  assert.equal(b1.status, "assigned");
+
+  const clearedB2 = resolveDanglingByClear(clearedB1.value.state, clearedB1.value.issues, issueFor("b2"));
+  assert.equal(clearedB2.ok, true);
+  if (!clearedB2.ok) throw new Error("expected ok");
+  const b2 = (clearedB2.value.state.benches as any[]).find((b) => b.id === "b2");
+  assert.deepEqual(b2.assignedIds, []);
+  assert.equal(b2.status, "available");
+});
+
+test("重复悬空槽重关联到已在同台架的正常材料时被拒绝且不落盘重复", () => {
+  const state = minimalState({
+    trials: [{ id: "t1" } as any],
+    accessions: [
+      { id: "acc-a", trialId: "t1", lifecycleStatus: "active", preferredLight: "full-sun" } as any,
+    ],
+    benches: [
+      {
+        id: "b1",
+        code: "B1",
+        capacity: 6,
+        status: "assigned",
+        lightProfile: "full-sun",
+        assignedIds: ["acc-a", "acc-ghost", "acc-ghost"],
+      } as any,
+    ],
+  });
+  const result = migrateWorkspace(v1Envelope(state), NOW);
+  if (!result.ok) throw new Error("expected ok");
+  const issue = result.issues.find(
+    (i) => i.ownerCollection === "benches",
+  ) as DanglingReferenceIssue;
+
+  const rejected = resolveDanglingByRelink(result.state, result.issues, issue, "acc-a");
+  assert.equal(rejected.ok, false);
+  if (!rejected.ok) assert.equal(rejected.errors[0].code, "duplicate");
+  // 原状态（含重复悬空值）不变
+  assert.deepEqual((result.state.benches[0] as any).assignedIds, ["acc-a", "acc-ghost", "acc-ghost"]);
+});

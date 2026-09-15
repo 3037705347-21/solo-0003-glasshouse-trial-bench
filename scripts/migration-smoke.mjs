@@ -160,6 +160,20 @@ function buildLegacyV1Workspace() {
           genotypeNote: "用于悬空观测条目重新关联的在用材料。",
           labels: [],
         },
+        // 重复悬空槽位的重关联目标（空闲、全日照）
+        {
+          id: "acc-dup-target",
+          trialId: "trial-legacy",
+          accessionNo: "ACC-9008",
+          cultivar: "Duplicate Collapse Target",
+          source: "Legacy Seed House",
+          propagatedOn: "2026-06-03",
+          quantity: 40,
+          trayCells: 72,
+          preferredLight: "full-sun",
+          genotypeNote: "用于同台架重复悬空 ID 塌缩为唯一材料的目标。",
+          labels: [],
+        },
       ],
       benches: [
         // 待修复台架：一个合法相邻槽位 + 一个悬空槽位
@@ -203,6 +217,18 @@ function buildLegacyV1Workspace() {
           sector: "测试翼",
           capacity: 3,
           assignedIds: ["acc-clear-gone"],
+          lightProfile: "full-sun",
+          irrigationLine: "IR-T",
+          status: "assigned",
+        },
+        // 重复悬空 ID 台架：同一悬空 ID 出现两次，中间夹一个正常槽位。
+        // 问题必须归并为一条；重关联后塌缩为一个唯一材料，正常槽位不动。
+        {
+          id: "bench-dup-ghost",
+          code: "B-DUP",
+          sector: "测试翼",
+          capacity: 6,
+          assignedIds: ["acc-dup-ghost", "acc-dup", "acc-dup-ghost"],
           lightProfile: "full-sun",
           irrigationLine: "IR-T",
           status: "assigned",
@@ -369,6 +395,56 @@ async function scenarioNeighboursUntouched(page) {
   await relBench.getByText("Already On Bench").waitFor();
   // 相邻台架容量文案稳定：1 个占用、3 个空位
   await neighbourBench.locator("dd").filter({ hasText: "3" }).first().waitFor();
+}
+
+// 同台架中重复出现的同一悬空 ID：问题归并为一条，重关联后塌缩为唯一材料，
+// 正常槽位不动，刷新后持久一致。
+async function scenarioDuplicateGhostCollapse(page) {
+  await openIssueDialog(page);
+
+  // 同一悬空值在整个问题列表中只有一条
+  const cards = page
+    .getByTestId("issue-list")
+    .locator(".issue-card", { hasText: "（acc-dup-ghost）" });
+  await assertPoll(
+    async () => (await cards.count()) === 1,
+    "同一悬空 ID 重复出现应归并为一条问题",
+  );
+
+  const card = issueCardByMissingRef(page, "acc-dup-ghost");
+  await card.locator("select").selectOption("acc-dup-target");
+  await card.getByRole("button", { name: "重新关联" }).click();
+  await page
+    .getByTestId("issue-list")
+    .locator(".issue-card", { hasText: "acc-dup-ghost" })
+    .waitFor({ state: "detached" });
+  await page.getByTestId("close-issue-dialog").click();
+
+  const bench = page.getByTestId("bench-card-bench-dup-ghost");
+  // 正常槽位材料不动
+  await bench.getByText("Already On Bench").waitFor();
+  // 新目标恰好出现一次（不生成重复材料）
+  const targetRows = bench.getByText("Duplicate Collapse Target");
+  await assertPoll(
+    async () => (await targetRows.count()) === 1,
+    "重关联后塌缩为唯一材料（应只出现一次）",
+  );
+
+  // 刷新后持久一致：落盘的占用列表恰好两个不同材料，无重复
+  await page.reload({ waitUntil: "networkidle" });
+  const stored = JSON.parse(await readPrimaryKey(page));
+  const storedBench = stored.state.benches.find((b) => b.id === "bench-dup-ghost");
+  await assert.deepEqual(storedBench.assignedIds, ["acc-dup-target", "acc-dup"]);
+  const unique = new Set(storedBench.assignedIds);
+  await assert.equal(unique.size, storedBench.assignedIds.length);
+
+  const reloaded = page.getByTestId("bench-card-bench-dup-ghost");
+  await reloaded.getByText("Already On Bench").waitFor();
+  await assertPoll(
+    async () =>
+      (await reloaded.getByText("Duplicate Collapse Target").count()) === 1,
+    "刷新后塌缩结果仍唯一",
+  );
 }
 
 /** 在核对对话框里按缺失引用值定位问题卡片（多个台架场景共用）。 */
@@ -632,6 +708,14 @@ async function run() {
       await scenarioObservationDedupe(page);
       await context.close();
       console.log("✅ migration: 观测重关联遵循同次去重");
+    }
+
+    // 同台架重复悬空 ID 归并为一条，重关联塌缩为唯一材料（含刷新持久化）
+    {
+      const { page, context } = await freshPageWithStorage(browser, legacy);
+      await scenarioDuplicateGhostCollapse(page);
+      await context.close();
+      console.log("✅ migration: 重复悬空 ID 归并且塌缩为唯一材料");
     }
 
     // 刷新恢复：完成修复后整页重载，结果与处理状态持久保留
