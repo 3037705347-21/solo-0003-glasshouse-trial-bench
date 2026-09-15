@@ -57,12 +57,10 @@ export function ObservationPage() {
 
   const handleRevised = (outcome: ObservationRevisionOutcome) => {
     setRevisingPass(undefined);
-    // state 仍是派发前的版本链，新版本号 = 链长 + 1
-    const version = `v${passSeriesVersions(state, outcome.revision.seriesId).length + 1}`;
     pushToast({
       tone: "success",
       title: "观测已更正",
-      message: `${version} 已生效：${outcome.retiredFlags.length} 个标记失效，${outcome.derivedFlags.length} 个新标记派生。`,
+      message: `v${outcome.version} 已生效：${outcome.retiredFlags.length} 个标记失效，${outcome.derivedFlags.length} 个新标记派生。`,
     });
   };
 

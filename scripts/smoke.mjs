@@ -17,6 +17,7 @@ const scenarios = {
   "advance-trial-clearance": advanceTrialClearance,
   "retire-accession-replacement": retireAccessionReplacement,
   "revise-observation-pass": reviseObservationPass,
+  "revise-observation-concurrent": reviseObservationConcurrent,
 };
 
 const scenarioPaths = {
@@ -26,6 +27,7 @@ const scenarioPaths = {
   "advance-trial-clearance": "/clearance",
   "retire-accession-replacement": "/roster",
   "revise-observation-pass": "/observations",
+  "revise-observation-concurrent": "/observations",
 };
 
 async function waitForServer() {
@@ -333,6 +335,112 @@ async function reviseObservationPass(page) {
   await banner.getByText("次观测修订生效", { exact: false }).waitFor();
 }
 
+async function fillRevisionForm(page, height, reviser, reason) {
+  await page
+    .locator(".entry-row")
+    .first()
+    .locator('input[type="number"]')
+    .nth(0)
+    .fill(height);
+  await page.getByTestId("reviser-input").fill(reviser);
+  await page.getByTestId("revision-reason-input").fill(reason);
+}
+
+async function readStoredWorkspace(page) {
+  return page.evaluate(() => {
+    const raw = window.localStorage.getItem(
+      "glasshouse-trial-bench:workspace:v1",
+    );
+    return JSON.parse(raw);
+  });
+}
+
+async function reviseObservationConcurrent(page, browser) {
+  // 同一浏览器上下文中的两个页面共享同一份本地存储，模拟两个页面并发。
+  const context = await browser.newContext();
+  const pageA = await context.newPage();
+  await pageA.goto(`${baseUrl}/#/observations`, { waitUntil: "networkidle" });
+  await pageA.evaluate(() => window.localStorage.clear());
+  await pageA.reload({ waitUntil: "networkidle" });
+  const pageB = await context.newPage();
+  await pageB.goto(`${baseUrl}/#/observations`, { waitUntil: "networkidle" });
+
+  // 两个页面同时基于同一旧版本 v1 打开更正对话框。
+  await pageA.getByTestId("revise-pass-obs-tom-01").click();
+  await pageA.getByTestId("revision-impact").waitFor();
+  await pageB.getByTestId("revise-pass-obs-tom-01").click();
+  await pageB.getByTestId("revision-impact").waitFor();
+
+  // 页面 A 先提交：成功生成 v2。
+  await fillRevisionForm(pageA, "45", "A. First", "页面 A 的更正，先生效。");
+  await pageA.getByTestId("save-revision-button").click();
+  await pageA.getByText("观测已更正", { exact: true }).waitFor();
+
+  // 页面 B 仍基于已失效的 v1 提交：必须被拒绝并提示最新版本。
+  await fillRevisionForm(pageB, "300", "B. Second", "页面 B 基于旧版本的更正。");
+  await pageB.getByTestId("save-revision-button").click();
+  await pageB.getByTestId("revision-conflict").waitFor();
+  await pageB
+    .getByText("该观测已存在更新的修订版本 v2，请基于最新版本更正", { exact: true })
+    .waitFor();
+  await pageB.getByRole("button", { name: "取消" }).click();
+
+  // 已提交的链头不能丢失：共享存储中该链只有 v1、v2，链头株高为 45。
+  const stored = await readStoredWorkspace(pageA);
+  const series = stored.state.observationPasses.filter(
+    (pass) => pass.seriesId === "obs-tom-01",
+  );
+  if (series.length !== 2) {
+    throw new Error(`expected 2 versions after conflict, got ${series.length}`);
+  }
+  const head = series.find((pass) => !pass.supersededById);
+  if (!head || head.entries[0].heightMm !== 45) {
+    throw new Error("committed chain head lost or overwritten");
+  }
+  if (typeof stored.revision !== "number" || stored.revision < 1) {
+    throw new Error("stored workspace is missing a revision counter");
+  }
+
+  // 页面 B 通过 storage 事件同步到最新链，无需手动刷新。
+  await pageB.getByTestId("revision-chain-obs-tom-01").click();
+  await pageB
+    .getByTestId("revision-chain")
+    .getByText("v2 · 当前版本", { exact: true })
+    .waitFor();
+  await pageB.getByRole("button", { name: "关闭对话框" }).click();
+
+  // 重复重试：同步双击提交按钮，只产生一个新版本。
+  await pageA.getByTestId("revise-pass-obs-tom-01").click();
+  await pageA.getByTestId("revision-impact").waitFor();
+  await fillRevisionForm(pageA, "50", "A. Retry", "重复提交检测，双击按钮。");
+  await pageA
+    .getByTestId("save-revision-button")
+    .evaluate((button) => {
+      button.click();
+      button.click();
+    });
+  await pageA.getByText("v3 已生效", { exact: false }).waitFor();
+  const retried = await readStoredWorkspace(pageA);
+  const retriedSeries = retried.state.observationPasses.filter(
+    (pass) => pass.seriesId === "obs-tom-01",
+  );
+  if (retriedSeries.length !== 3) {
+    throw new Error(
+      `double submit should produce exactly one new version, got ${retriedSeries.length - 2}`,
+    );
+  }
+
+  // 刷新后版本链状态保持。
+  await pageA.reload({ waitUntil: "networkidle" });
+  await pageA.getByTestId("revision-chain-obs-tom-01").click();
+  await pageA
+    .getByTestId("revision-chain")
+    .getByText("v3 · 当前版本", { exact: true })
+    .waitFor();
+  await pageA.getByRole("button", { name: "关闭对话框" }).click();
+  await context.close();
+}
+
 async function runScenario(scenarioName) {
   const server = spawn(viteBin, ["preview", "--host", "127.0.0.1", "--port", String(port)], {
     cwd: root,
@@ -344,7 +452,7 @@ async function runScenario(scenarioName) {
     await waitForServer();
     browser = await chromium.launch({ headless: true });
     const page = await freshPage(browser, scenarioPaths[scenarioName]);
-    await scenarios[scenarioName](page);
+    await scenarios[scenarioName](page, browser);
     console.log(`✅ workflow ${scenarioName}`);
     await page.close();
   } finally {

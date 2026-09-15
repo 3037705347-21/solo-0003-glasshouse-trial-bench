@@ -349,6 +349,8 @@ export interface ObservationRevisionOutcome {
   retiredFlags: Flag[];
   /** 基于更正后数据重新派生的标记 */
   derivedFlags: Flag[];
+  /** 新版本在链上的版本号（v1 起算） */
+  version: number;
 }
 
 export function isPassSuperseded(pass: ObservationPass): boolean {
@@ -517,7 +519,35 @@ export function reviseObservationPass(
       };
     });
 
-  return ok({ revision, supersededPass, retiredFlags, derivedFlags });
+  return ok({ revision, supersededPass, retiredFlags, derivedFlags, version });
+}
+
+/**
+ * 将修订结果应用到工作区状态：旧版本写入取代指针并追加新版本，
+ * 失效标记原位替换，新派生标记追加。reducer 与共享状态事务共用。
+ */
+export function applyObservationRevision(
+  state: WorkspaceState,
+  outcome: ObservationRevisionOutcome,
+): WorkspaceState {
+  return {
+    ...state,
+    observationPasses: [
+      ...state.observationPasses.map((pass) =>
+        pass.id === outcome.supersededPass.id ? outcome.supersededPass : pass,
+      ),
+      outcome.revision,
+    ],
+    flags: [
+      ...state.flags.map((flag) => {
+        const retired = outcome.retiredFlags.find(
+          (item) => item.id === flag.id,
+        );
+        return retired ?? flag;
+      }),
+      ...outcome.derivedFlags,
+    ],
+  };
 }
 
 function passContentEquals(

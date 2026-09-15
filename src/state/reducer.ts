@@ -1,4 +1,5 @@
 import type { WorkspaceState } from "../domain/types";
+import { applyObservationRevision } from "../domain/observation";
 import type { WorkspaceAction } from "./types";
 
 export function workspaceReducer(
@@ -47,26 +48,7 @@ export function workspaceReducer(
         flags: [...state.flags, ...action.flags],
       };
     case "observation/revised":
-      return {
-        ...state,
-        observationPasses: [
-          ...state.observationPasses.map((pass) =>
-            pass.id === action.supersededPass.id
-              ? action.supersededPass
-              : pass,
-          ),
-          action.pass,
-        ],
-        flags: [
-          ...state.flags.map((flag) => {
-            const retired = action.retiredFlags.find(
-              (item) => item.id === flag.id,
-            );
-            return retired ?? flag;
-          }),
-          ...action.derivedFlags,
-        ],
-      };
+      return applyObservationRevision(state, action.outcome);
     case "flag/transitioned":
       return {
         ...state,

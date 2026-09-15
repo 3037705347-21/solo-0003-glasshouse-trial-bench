@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
 import { TextAreaField, TextField } from "../../components/fields";
@@ -6,11 +6,7 @@ import type {
   ObservationRevisionDraft,
   ObservationRevisionOutcome,
 } from "../../domain/observation";
-import {
-  deriveFlags,
-  passSeries,
-  reviseObservationPass,
-} from "../../domain/observation";
+import { deriveFlags, passSeries } from "../../domain/observation";
 import type { FieldError } from "../../domain/result";
 import type { Accession, ObservationPass } from "../../domain/types";
 import { activeAccessionsForTrial } from "../../state/selectors";
@@ -28,7 +24,7 @@ export function RevisePassDialog({
   onCancel,
   onSaved,
 }: RevisePassDialogProps) {
-  const { state, dispatch } = useWorkspace();
+  const { state, commitObservationRevision } = useWorkspace();
   const [draft, setDraft] = useState<ObservationRevisionDraft>({
     observedOn: pass.observedOn,
     observer: pass.observer,
@@ -37,6 +33,9 @@ export function RevisePassDialog({
     revisedBy: "",
   });
   const [errors, setErrors] = useState<FieldError[]>([]);
+  const [pending, setPending] = useState(false);
+  /** 同步重入防护：双击或快速重试只放行第一个提交 */
+  const pendingRef = useRef(false);
   const errorFor = (field: string) =>
     errors.find((error) => error.field === field)?.message;
 
@@ -71,20 +70,23 @@ export function RevisePassDialog({
     return { retiring, settled, derived };
   }, [state, pass, draft.observedOn, draft.entries]);
 
-  const handleSubmit = () => {
-    const result = reviseObservationPass(pass.id, draft, state);
-    if (!result.ok) {
-      setErrors(result.errors);
+  const handleSubmit = async () => {
+    if (pendingRef.current) {
       return;
     }
-    dispatch({
-      type: "observation/revised",
-      pass: result.value.revision,
-      supersededPass: result.value.supersededPass,
-      retiredFlags: result.value.retiredFlags,
-      derivedFlags: result.value.derivedFlags,
-    });
-    onSaved(result.value);
+    pendingRef.current = true;
+    setPending(true);
+    try {
+      const result = await commitObservationRevision(pass.id, draft);
+      if (!result.ok) {
+        setErrors(result.errors);
+        return;
+      }
+      onSaved(result.value);
+    } finally {
+      pendingRef.current = false;
+      setPending(false);
+    }
   };
 
   return (
@@ -175,8 +177,8 @@ export function RevisePassDialog({
           <Button tone="secondary" type="button" onClick={onCancel}>
             取消
           </Button>
-          <Button type="submit" data-testid="save-revision-button">
-            确认更正
+          <Button type="submit" disabled={pending} data-testid="save-revision-button">
+            {pending ? "提交中…" : "确认更正"}
           </Button>
         </div>
       </form>

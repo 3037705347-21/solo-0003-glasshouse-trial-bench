@@ -8,6 +8,7 @@ import type {
   TrialState,
   WorkspaceState,
 } from "../domain/types";
+import type { ObservationRevisionOutcome } from "../domain/observation";
 
 export type WorkspaceAction =
   | { type: "hydrate"; state: WorkspaceState }
@@ -19,13 +20,7 @@ export type WorkspaceAction =
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
-  | {
-      type: "observation/revised";
-      pass: ObservationPass;
-      supersededPass: ObservationPass;
-      retiredFlags: Flag[];
-      derivedFlags: Flag[];
-    }
+  | { type: "observation/revised"; outcome: ObservationRevisionOutcome }
   | { type: "flag/transitioned"; flag: Flag }
   | {
       type: "clearance/generated";
