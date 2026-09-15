@@ -9,7 +9,10 @@ import type {
   RepairArchive,
   RepairItemRecord,
   RepairJournal,
+  RepairPhase,
 } from "./types";
+
+export type RecoveryPhase = RepairPhase;
 
 export interface CreateJournalInput {
   stateBefore: WorkspaceState;
@@ -67,13 +70,6 @@ function simulateSteps(journal: RepairJournal): WorkspaceState[] {
   return steps;
 }
 
-export type RecoveryPhase =
-  | "nothing-to-do"
-  | "completed"
-  | "already-applied"
-  | "resumed"
-  | "conflict";
-
 export interface RecoveryResult {
   phase: RecoveryPhase;
   /** 对账后应当持久化的工作区状态；冲突时等于传入的 currentState（原状态）。 */
@@ -89,11 +85,15 @@ export interface RecoveryResult {
 /**
  * 纯函数恢复状态机：根据会话与“当前实际工作区”判断进度。
  *
- * 可能的组合：
+ * 回滚意图（intent === "rollback"）优先级最高：
+ * 只要用户已经选择回滚，恢复时只把工作区写回修复前快照并归档，
+ * 绝不重新应用修复——无论工作区当前停在修复前、某个中间前缀还是终态。
+ *
+ * 修复意图（intent === "apply" 或缺省）的可能组合：
  * - 会话待执行，工作区 == 修复前：从头幂等执行；
  * - 部分执行，工作区落在某一步的前缀状态：从该步继续，不重复已生效的修复；
  * - 会话已完成但工作区未保存（停在任一步前缀）：幂等补放到终态；
- * - 工作区已保存终态但会话仍 in_progress：只补写会话，绝不再动工作区；
+ * - 工作区已保存终态但会话仍 in_progress/completed active：只补写会话，绝不再动工作区；
  * - 工作区既非修复前也非任何前缀（其他页面/窗口/外部写入）：冲突，保持原状态。
  */
 export function resolveRepairRecovery(
@@ -101,11 +101,14 @@ export function resolveRepairRecovery(
   currentState: WorkspaceState,
   now: string = new Date().toISOString(),
 ): RecoveryResult {
+  // ---- 回滚意图：任何回滚写入边界中断后都收敛到修复前状态 ----
+  if (journal.intent === "rollback") {
+    return resolveRollbackRecovery(journal, currentState, now);
+  }
+
   const steps = simulateSteps(journal);
   const finalState = steps[steps.length - 1];
   const currentFingerprint = fingerprintState(currentState);
-  const beforeFingerprint =
-    journal.stateBeforeFingerprint ?? fingerprintState(journal.stateBefore);
 
   const log = (event: string, detail: string): RepairJournal => ({
     ...journal,
@@ -115,26 +118,34 @@ export function resolveRepairRecovery(
 
   // 终态已在工作区：无论会话标记如何，都不再触碰工作区。
   if (currentFingerprint === fingerprintState(finalState)) {
-    if (journal.status === "completed") {
-      return {
-        phase: "completed",
-        state: currentState,
-        journal,
-        applied: 0,
-        alreadyFixed: 0,
-        conflicts: [],
-        detail: "会话已完成且工作区为终态",
-      };
-    }
-    const completed = finalizeJournal(log("already-applied", "工作区已是终态，补写会话完成状态，不重复执行修复"), currentState, now, "applied");
+    // completed active + 终态工作区：补写归档所需的完成信息（仍由协调器清除 active）。
+    const finalized =
+      journal.status === "completed"
+        ? journal.outcome
+          ? journal
+          : finalizeJournal(
+              log("complete-active-archive", "会话已完成且工作区为终态，补全会话归档"),
+              currentState,
+              now,
+              "applied",
+            )
+        : finalizeJournal(
+            log("already-applied", "工作区已是终态，补写会话完成状态，不重复执行修复"),
+            currentState,
+            now,
+            "applied",
+          );
     return {
-      phase: "already-applied",
+      phase: journal.status === "completed" ? "completed" : "already-applied",
       state: currentState,
-      journal: completed,
+      journal: finalized,
       applied: 0,
-      alreadyFixed: countNotPending(journal),
+      alreadyFixed: journal.status === "completed" ? 0 : countNotPending(journal),
       conflicts: [],
-      detail: "工作区已保存终态，会话尚未标记完成：仅补写会话",
+      detail:
+        journal.status === "completed"
+          ? "会话已完成，等待归档"
+          : "工作区已保存终态，会话尚未标记完成：仅补写会话",
     };
   }
 
@@ -267,6 +278,81 @@ function countNotPending(journal: RepairJournal): number {
   return journal.items.filter((item) => item.status !== "pending").length;
 }
 
+/**
+ * 回滚恢复：用户已选择整批回滚（intent 已持久化）。
+ * - 工作区已是修复前状态：只归档会话（rollback-completed）；
+ * - 工作区停在修复终态或任一中间前缀：写回修复前状态（rollback-resumed）。
+ * 任何情况下都不再执行修复项。
+ */
+function resolveRollbackRecovery(
+  journal: RepairJournal,
+  currentState: WorkspaceState,
+  now: string,
+): RecoveryResult {
+  const beforeFingerprint =
+    journal.stateBeforeFingerprint ?? fingerprintState(journal.stateBefore);
+  const currentFingerprint = fingerprintState(currentState);
+  const targetState = journal.stateBefore;
+
+  if (currentFingerprint === beforeFingerprint) {
+    // 工作区已写回修复前状态（或本来就停在那里）：只需归档会话。
+    const archived: RepairJournal = {
+      ...journal,
+      status: "completed",
+      outcome: "rolled-back",
+      stateAfter: targetState,
+      completedAt: journal.completedAt ?? now,
+      updatedAt: now,
+      recoveryLog: journal.completedAt
+        ? journal.recoveryLog
+        : [
+            ...journal.recoveryLog,
+            {
+              at: now,
+              event: "rollback-recovered-archive",
+              detail: "回滚工作区已写入、归档中断：重启后只补归档，不重新应用修复",
+            },
+          ],
+    };
+    return {
+      phase: "rollback-completed",
+      state: currentState,
+      journal: archived,
+      applied: 0,
+      alreadyFixed: 0,
+      conflicts: [],
+      detail: "工作区已是修复前状态，补写回滚归档",
+    };
+  }
+
+  // 工作区不在修复前状态（终态/中间态/未知）：回滚意图优先，写回修复前快照。
+  const archived: RepairJournal = {
+    ...journal,
+    status: "completed",
+    outcome: "rolled-back",
+    stateAfter: targetState,
+    completedAt: journal.completedAt ?? now,
+    updatedAt: now,
+    recoveryLog: [
+      ...journal.recoveryLog,
+      {
+        at: now,
+        event: "rollback-recovered-write",
+        detail: "回滚意图已持久化但工作区未写回：重启后恢复到修复前状态，不重新应用修复",
+      },
+    ],
+  };
+  return {
+    phase: "rollback-resumed",
+    state: targetState,
+    journal: archived,
+    applied: 0,
+    alreadyFixed: 0,
+    conflicts: [],
+    detail: "按已确认的回滚意图恢复到修复前状态",
+  };
+}
+
 function finalizeJournal(
   journal: RepairJournal,
   stateAfter: WorkspaceState,
@@ -283,20 +369,46 @@ function finalizeJournal(
   };
 }
 
-/** 整批回滚：恢复修复前冻结的状态快照（审计日志保留为 rolled-back）。 */
+/**
+ * 标记会话为“回滚意图”。这个标记必须在回滚的任何工作区写入之前落盘：
+ * 之后无论在哪个写入边界中断，重启都只完成回滚。
+ */
+export function markRollbackIntent(
+  journal: RepairJournal,
+  now: string = new Date().toISOString(),
+): RepairJournal {
+  if (journal.intent === "rollback") {
+    return journal;
+  }
+  return {
+    ...journal,
+    intent: "rollback",
+    updatedAt: now,
+    recoveryLog: [
+      ...journal.recoveryLog,
+      { at: now, event: "rollback-intent", detail: "用户确认整批回滚，意图已持久化" },
+    ],
+  };
+}
+
+/** 整批回滚（内存）：标记回滚意图并返回修复前状态。持久化由协调器负责。 */
 export function rollbackRepair(
   journal: RepairJournal,
   now: string = new Date().toISOString(),
 ): { journal: RepairJournal; state: WorkspaceState } {
+  const marked = markRollbackIntent(journal, now);
   return {
     journal: {
-      ...journal,
+      ...marked,
       status: "completed",
       outcome: "rolled-back",
       completedAt: now,
       updatedAt: now,
       stateAfter: journal.stateBefore,
-      recoveryLog: [...journal.recoveryLog, { at: now, event: "rolled-back", detail: "人工触发整批回滚" }],
+      recoveryLog: [
+        ...marked.recoveryLog,
+        { at: now, event: "rolled-back", detail: "人工触发整批回滚" },
+      ],
     },
     state: journal.stateBefore,
   };

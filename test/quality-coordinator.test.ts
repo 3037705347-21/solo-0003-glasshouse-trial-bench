@@ -15,6 +15,7 @@ import {
 import {
   loadRepairArchive,
   loadWorkspaceEnvelope,
+  saveRepairArchive,
 } from "../src/state/persistence";
 import type { WorkspaceState } from "../src/domain/types";
 import { makeBench, makeState } from "./fixtures";
@@ -393,13 +394,214 @@ describe("resumeRepairBatch — 六种恢复组合", () => {
   });
 });
 
-describe("rollbackRepairBatch — 写入边界故障注入", () => {
-  it("回滚工作区写入后崩溃：重启恢复仍收敛到修复前状态", () => {
+describe("rollbackRepairBatch — 回滚意图持久化与逐边界故障注入", () => {
+  it("三个回滚写入边界任意中断，重启都恢复到修复前状态并清空活动会话", () => {
+    for (const boundary of [1, 2, 3]) {
+      const storage = new MemoryStorage();
+      const damaged = workspaceWithGhosts(2);
+      seedWorkspace(storage, structuredClone(damaged));
+      const plans = plansFor(damaged);
+      // 修复执行到一半后崩溃（第 1 项工作区已写，会话未写）
+      assert.throws(
+        () =>
+          startRepairBatch(storage, plans, {
+            expectedFingerprint: fingerprintState(damaged),
+            injection: { afterWriteCount: 2 },
+          }),
+        InjectedCrash,
+      );
+
+      // 用户选择回滚，在第 boundary 次写入后中断：
+      // 1=回滚意图落盘后；2=工作区写回后；3=归档后（无 crash，正常完成）
+      const throwing = boundary < 3;
+      if (throwing) {
+        assert.throws(
+          () =>
+            rollbackRepairBatch(storage, {
+              injection: { afterWriteCount: boundary },
+            }),
+          InjectedCrash,
+        );
+      } else {
+        rollbackRepairBatch(storage, { injection: { afterWriteCount: 99 } });
+      }
+
+      // 模拟真实重启：全新读取存储并自动恢复
+      const result = resumeRepairBatch(storage);
+      if (boundary < 3) {
+        assert.ok(result, `边界 ${boundary}：活动会话必须被恢复处理`);
+        assert.ok(
+          result.phase === "rollback-resumed" ||
+            result.phase === "rollback-completed",
+          `边界 ${boundary}：必须完成回滚（实际 ${result?.phase}），不能重新应用修复`,
+        );
+      }
+
+      // 最终状态始终是修复前快照
+      assert.deepEqual(
+        loadWorkspaceEnvelope(storage)?.state,
+        damaged,
+        `边界 ${boundary}：工作区必须回到修复前状态`,
+      );
+      const archive = loadRepairArchive(storage);
+      assert.equal(archive.active, null, `边界 ${boundary}：活动会话必须清空`);
+      assert.equal(
+        archive.history[0]?.outcome,
+        "rolled-back",
+        `边界 ${boundary}：历史必须记录回滚`,
+      );
+
+      // 再次“重启”是 no-op，不会重新应用修复
+      const second = resumeRepairBatch(storage);
+      assert.equal(second, null);
+      assert.deepEqual(loadWorkspaceEnvelope(storage)?.state, damaged);
+    }
+  });
+
+  it("回滚意图先于工作区写入落盘：意图落盘即崩溃，重启绝不重新应用修复", () => {
+    const storage = new MemoryStorage();
+    const damaged = workspaceWithGhosts(1);
+    seedWorkspace(storage, structuredClone(damaged));
+    const plans = plansFor(damaged);
+    // 修复已经全部完成：工作区是终态（无悬空引用），但用户随后选择回滚。
+    startRepairBatch(storage, plans, {
+      expectedFingerprint: fingerprintState(damaged),
+    });
+    const fixed = loadWorkspaceEnvelope(storage)!.state;
+    assert.ok(isRepaired(fixed));
+
+    // 新活动会话不存在了；手工构造一个终态 active 会话 + 回滚意图（只写意图后崩溃）
+    const active = loadRepairArchive(storage).history[0];
+    assert.ok(active);
+    saveRepairArchive(storage, {
+      active: {
+        ...active,
+        status: "in_progress",
+        outcome: undefined,
+        intent: "rollback",
+        completedAt: undefined,
+      },
+      history: [],
+    });
+    // 此时工作区仍是修复终态，但 intent=rollback
+    const result = resumeRepairBatch(storage);
+    assert.equal(result?.phase, "rollback-resumed");
+    assert.deepEqual(loadWorkspaceEnvelope(storage)?.state, damaged);
+    assert.equal(loadRepairArchive(storage).active, null);
+  });
+});
+
+describe("真实重启恢复（存储往返）", () => {
+  it("序列化-反序列化后恢复，不依赖任何内存状态", () => {
     const storage = new MemoryStorage();
     const damaged = workspaceWithGhosts(2);
-    seedWorkspace(storage, damaged);
+    seedWorkspace(storage, structuredClone(damaged));
     const plans = plansFor(damaged);
-    // 创建会话后崩溃（第 1 次写入后），保证有一个活动会话可回滚
+
+    assert.throws(
+      () =>
+        startRepairBatch(storage, plans, {
+          expectedFingerprint: fingerprintState(damaged),
+          injection: { afterWriteCount: 3 },
+        }),
+      InjectedCrash,
+    );
+
+    // 模拟真实重启：序列化全部存储内容到 JSON，再灌入一个全新的 MemoryStorage
+    const exported = Object.fromEntries(storage.keys().map((key) => [key, storage.getItem(key)]));
+    const fresh = new MemoryStorage();
+    for (const [key, value] of Object.entries(exported)) {
+      fresh.setItem(key, value as string);
+    }
+
+    const result = resumeRepairBatch(fresh);
+    assert.ok(result);
+    assert.notEqual(result.phase, "conflict");
+    const state = loadWorkspaceEnvelope(fresh)!.state;
+    assert.ok(isRepaired(state));
+    assert.equal(loadRepairArchive(fresh).active, null);
+    assert.equal(loadRepairArchive(fresh).history[0].outcome, "applied");
+
+    // 再重启一次：幂等 no-op
+    assert.equal(resumeRepairBatch(fresh), null);
+  });
+});
+
+describe("completed active 会话归档", () => {
+  it("completed 状态但仍在 active 的会话（终态工作区）在恢复时被归档清除", () => {
+    const storage = new MemoryStorage();
+    const damaged = workspaceWithGhosts(1);
+    seedWorkspace(storage, structuredClone(damaged));
+    const plans = plansFor(damaged);
+    // 跑到终态工作区已写、会话归档未完成（第 4 次写入后崩溃）
+    assert.throws(
+      () =>
+        startRepairBatch(storage, plans, {
+          expectedFingerprint: fingerprintState(damaged),
+          injection: { afterWriteCount: 4 },
+        }),
+      InjectedCrash,
+    );
+    const activeAfterCrash = loadRepairArchive(storage).active;
+    assert.ok(activeAfterCrash);
+    assert.ok(isRepaired(loadWorkspaceEnvelope(storage)!.state));
+
+    // 第一次恢复：already-applied（补写归档）
+    const first = resumeRepairBatch(storage);
+    assert.ok(first);
+    assert.equal(loadRepairArchive(storage).active, null);
+
+    // 构造 completed active 直接验证 phase
+    const completedActive = {
+      ...activeAfterCrash!,
+      status: "completed" as const,
+      outcome: "applied" as const,
+    };
+    saveRepairArchive(storage, { active: completedActive, history: [] });
+    const second = resumeRepairBatch(storage);
+    assert.equal(second?.phase, "completed");
+    assert.equal(loadRepairArchive(storage).active, null);
+    // 工作区没有被再次写入/改动
+    assert.ok(isRepaired(loadWorkspaceEnvelope(storage)!.state));
+
+    // 第三次恢复：没有活动会话
+    assert.equal(resumeRepairBatch(storage), null);
+  });
+});
+
+describe("多窗口写入冲突", () => {
+  it("预演确认后另一个窗口改变工作区：整批拒绝，不应用部分修复", () => {
+    const storage = new MemoryStorage();
+    const damaged = workspaceWithGhosts(2);
+    seedWorkspace(storage, structuredClone(damaged));
+    const plans = plansFor(damaged);
+    const previewFingerprint = fingerprintState(damaged);
+
+    // 另一窗口直接改写工作区（新增台架占用）
+    const foreign = structuredClone(damaged);
+    foreign.benches.push(
+      makeBench({ id: "foreign", code: "B-F", assignedIds: ["other-data"] }),
+    );
+    seedWorkspace(storage, foreign);
+
+    // 本窗口确认修复：指纹不匹配，必须整体拒绝
+    assert.throws(
+      () =>
+        startRepairBatch(storage, plans, {
+          expectedFingerprint: previewFingerprint,
+        }),
+      /预演后/,
+    );
+    // 工作区保持外部写入原样，没有任何部分修复，没有遗留活动会话
+    assert.deepEqual(loadWorkspaceEnvelope(storage)?.state, foreign);
+    assert.equal(loadRepairArchive(storage).active, null);
+  });
+
+  it("修复进行中另一窗口写入无法识别的状态：恢复判冲突并保持该状态", () => {
+    const storage = new MemoryStorage();
+    const damaged = workspaceWithGhosts(2);
+    seedWorkspace(storage, structuredClone(damaged));
+    const plans = plansFor(damaged);
     assert.throws(
       () =>
         startRepairBatch(storage, plans, {
@@ -408,21 +610,18 @@ describe("rollbackRepairBatch — 写入边界故障注入", () => {
         }),
       InjectedCrash,
     );
-    assert.ok(loadRepairArchive(storage).active);
+    const foreign = structuredClone(damaged);
+    foreign.benches[0].code = "RENAMED-BY-OTHER-WINDOW";
+    seedWorkspace(storage, foreign);
 
-    // 回滚的第一次写入（工作区）后崩溃
-    assert.throws(
-      () => rollbackRepairBatch(storage, { injection: { afterWriteCount: 1 } }),
-      InjectedCrash,
-    );
-    // 活动会话仍在；再次回滚（幂等）
-    const journal = rollbackRepairBatch(storage);
-    assert.ok(journal);
-    assert.equal(journal.outcome, "rolled-back");
+    const result = resumeRepairBatch(storage);
+    assert.equal(result?.phase, "conflict");
+    assert.deepEqual(loadWorkspaceEnvelope(storage)?.state, foreign);
+    assert.equal(loadRepairArchive(storage).active?.status, "conflicted");
+    // 冲突后人工回滚仍然可以恢复到修复前快照
+    rollbackRepairBatch(storage);
     assert.deepEqual(loadWorkspaceEnvelope(storage)?.state, damaged);
     assert.equal(loadRepairArchive(storage).active, null);
-    // 历史保留回滚记录
-    assert.equal(loadRepairArchive(storage).history[0].outcome, "rolled-back");
   });
 });
 

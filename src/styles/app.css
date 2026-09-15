@@ -1592,6 +1592,12 @@ button {
   background: var(--green-100);
 }
 
+.recovery-banner-rollback {
+  border-color: #e3b4ad;
+  border-left-color: var(--danger);
+  background: var(--danger-soft);
+}
+
 /* 修复预演对话框 */
 
 .repair-preview {

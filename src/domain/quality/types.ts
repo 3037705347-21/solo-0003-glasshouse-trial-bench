@@ -125,10 +125,21 @@ export type RepairJournalVersion = 1 | 2;
 
 export type RepairPhase =
   | "none"
+  | "nothing-to-do"
   | "completed"
   | "already-applied"
   | "resumed"
+  | "rollback-resumed"
+  | "rollback-completed"
   | "conflict";
+
+/**
+ * 会话当前意图。默认 apply：崩溃恢复时按修复计划对账；
+ * rollback：用户已选择整批回滚，恢复时只完成回滚（写回修复前状态并归档），
+ * 绝不重新应用修复。意图在任何回滚写入之前落盘，因此任意回滚写入边界中断
+ * 都能凭它恢复到修复前状态。
+ */
+export type RepairIntent = "apply" | "rollback";
 
 export interface RepairJournal {
   version: RepairJournalVersion;
@@ -142,6 +153,7 @@ export interface RepairJournal {
    */
   status: "in_progress" | "completed" | "conflicted";
   outcome?: RepairOutcome;
+  intent?: RepairIntent;
   stateBefore: WorkspaceState;
   /** 修复前工作区的稳定指纹，用于检测预演后的外部写入。 */
   stateBeforeFingerprint?: string;

@@ -185,6 +185,14 @@ export function QualityPage() {
               });
               return;
             }
+            if (activeRepair.intent === "rollback") {
+              pushToast({
+                tone: "warning",
+                title: "中断的回滚已完成",
+                message: "工作区已恢复到修复前状态，没有重新应用修复，会话已归档。",
+              });
+              return;
+            }
             pushToast({
               tone: "success",
               title: "未完成修复已继续",

@@ -19,6 +19,7 @@ const scenarios = {
   "quality-healthy-workspace": qualityHealthyWorkspace,
   "quality-repair-damage": qualityRepairDamage,
   "quality-recovery-resume": qualityRecoveryResume,
+  "quality-rollback-crash": qualityRollbackCrash,
   "quality-corrupt-persistence": qualityCorruptPersistence,
 };
 
@@ -30,6 +31,7 @@ const scenarioPaths = {
   "quality-healthy-workspace": "/quality",
   "quality-repair-damage": "/quality",
   "quality-recovery-resume": "/quality",
+  "quality-rollback-crash": "/quality",
   "quality-corrupt-persistence": "/quality",
 };
 
@@ -383,6 +385,159 @@ async function qualityCorruptPersistence(page) {
   assert.equal(remainsCorrupt, corrupt);
   const stats = await page.locator(".quality-stat strong").allTextContents();
   assert.equal(stats.length >= 1, true);
+}
+
+async function qualityRollbackCrash(page) {
+  // 构造“修复已执行到工作区终态、用户选择回滚，但只写回了修复前工作区、归档未完成”的崩溃现场。
+  // 关键点：工作区 == 修复前状态，active 会话已携带 intent=rollback。
+  const damaged = await injectDamage(page, (state) => {
+    const e2 = state.benches.find((bench) => bench.id === "bench-east-2");
+    e2.assignedIds = ["acc-ghost"];
+    return state;
+  });
+
+  const journalId = "rpr_rollback_crash";
+  await page.evaluate(
+    ({ key, journal }) =>
+      window.localStorage.setItem(key, JSON.stringify({ active: journal, history: [] })),
+    {
+      key: REPAIR_ARCHIVE_KEY,
+      journal: {
+        id: journalId,
+        version: 2,
+        startedAt: "2026-03-01T08:00:00.000Z",
+        updatedAt: "2026-03-01T08:05:00.000Z",
+        status: "in_progress",
+        intent: "rollback",
+        stateBefore: damaged,
+        stateBeforeFingerprint: undefined,
+        stateAfter: damaged,
+        items: [
+          {
+            findingId: "ghost-fix",
+            ruleCode: "B-ASSIGN-MISSING-01",
+            severity: "blocking",
+            title: "台架引用了已消失的材料",
+            action: "移除悬空引用",
+            status: "applied",
+            changes: ["曾执行修复"],
+            fix: {
+              kind: "bench.unassign",
+              action: "移除悬空引用",
+              rationale: "只移除引用 id",
+              context: {
+                benchId: "bench-east-2",
+                accessionId: "acc-ghost",
+                reason: "missing-accession",
+              },
+            },
+          },
+        ],
+        recoveryLog: [
+          { at: "2026-03-01T08:00:00.000Z", event: "created" },
+          { at: "2026-03-01T08:05:00.000Z", event: "rollback-intent" },
+        ],
+      },
+    },
+  );
+  await page.reload({ waitUntil: "networkidle" });
+
+  // 启动恢复必须完成回滚（此处工作区已写回修复前，只需补归档），而不是重新应用修复
+  await page
+    .locator("[data-testid='recovery-notice']", { hasText: "回滚已在启动时归档" })
+    .waitFor();
+
+  const state = await loadWorkspaceState(page);
+  assert.deepEqual(
+    state.benches.find((b) => b.id === "bench-east-2").assignedIds,
+    ["acc-ghost"],
+    "回滚中断重启后必须停在修复前状态（悬空引用原样保留），不能重新应用修复",
+  );
+  const archive = await page.evaluate(
+    (key) => JSON.parse(window.localStorage.getItem(key)),
+    REPAIR_ARCHIVE_KEY,
+  );
+  assert.equal(archive.active, null, "活动会话必须清空");
+  assert.equal(archive.history[0].outcome, "rolled-back");
+
+  // 再刷新一次：没有活动会话，也不会重新修复或重新回滚
+  await page.reload({ waitUntil: "networkidle" });
+  const state2 = await loadWorkspaceState(page);
+  assert.deepEqual(
+    state2.benches.find((b) => b.id === "bench-east-2").assignedIds,
+    ["acc-ghost"],
+  );
+
+  // 第二个分支：工作区停在修复终态、回滚意图已落盘但工作区未写回。
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload({ waitUntil: "networkidle" });
+  const damagedForIntent = await injectDamage(page, (workspace) => {
+    workspace.benches.find((b) => b.id === "bench-east-2").assignedIds = ["acc-ghost"];
+    return workspace;
+  });
+  // 工作区手工回到修复终态（悬空引用已解除），会话却携带回滚意图
+  const terminalState = structuredClone(damagedForIntent);
+  terminalState.benches.find((b) => b.id === "bench-east-2").assignedIds = [];
+  await saveWorkspaceState(page, terminalState);
+  await page.evaluate(
+    ({ key, journal }) =>
+      window.localStorage.setItem(key, JSON.stringify({ active: journal, history: [] })),
+    {
+      key: REPAIR_ARCHIVE_KEY,
+      journal: {
+        id: "rpr_rollback_crash_terminal",
+        version: 2,
+        startedAt: "2026-03-02T08:00:00.000Z",
+        updatedAt: "2026-03-02T08:05:00.000Z",
+        status: "in_progress",
+        intent: "rollback",
+        stateBefore: damagedForIntent,
+        stateAfter: terminalState,
+        items: [
+          {
+            findingId: "ghost-fix",
+            ruleCode: "B-ASSIGN-MISSING-01",
+            severity: "blocking",
+            title: "台架引用了已消失的材料",
+            action: "移除悬空引用",
+            status: "applied",
+            changes: ["曾执行修复"],
+            fix: {
+              kind: "bench.unassign",
+              action: "移除悬空引用",
+              rationale: "只移除引用 id",
+              context: {
+                benchId: "bench-east-2",
+                accessionId: "acc-ghost",
+                reason: "missing-accession",
+              },
+            },
+          },
+        ],
+        recoveryLog: [
+          { at: "2026-03-02T08:00:00.000Z", event: "created" },
+          { at: "2026-03-02T08:05:00.000Z", event: "rollback-intent" },
+        ],
+      },
+    },
+  );
+  await page.reload({ waitUntil: "networkidle" });
+
+  // 启动必须按回滚意图把终态写回修复前状态，而不是认为修复已完成
+  await page
+    .locator("[data-testid='recovery-notice']", { hasText: "中断的回滚已在启动时完成" })
+    .waitFor();
+  const rolledBack = await loadWorkspaceState(page);
+  assert.deepEqual(
+    rolledBack.benches.find((b) => b.id === "bench-east-2").assignedIds,
+    ["acc-ghost"],
+    "终态工作区 + 回滚意图：必须恢复到修复前状态",
+  );
+  assert.equal(
+    JSON.parse(await page.evaluate((k) => window.localStorage.getItem(k), REPAIR_ARCHIVE_KEY))
+      .active,
+    null,
+  );
 }
 
 async function runScenario(scenarioName) {

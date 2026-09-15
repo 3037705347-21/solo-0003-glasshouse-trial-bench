@@ -16,6 +16,7 @@ export type {
   RepairJournalVersion,
   RepairOutcome,
   RepairPhase,
+  RepairIntent,
 } from "./types";
 export {
   DOMAIN_LABELS,
@@ -52,6 +53,7 @@ export {
   advanceRepair,
   archiveJournal,
   createRepairJournal,
+  markRollbackIntent,
   pendingItems,
   reconcilePendingPlans,
   resolveRepairRecovery,

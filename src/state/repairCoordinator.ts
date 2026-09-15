@@ -4,6 +4,7 @@ import { applyFix } from "../domain/quality/fixes";
 import type { PlannedFix } from "../domain/quality/fixes";
 import {
   createRepairJournal,
+  markRollbackIntent,
   resolveRepairRecovery,
   rollbackRepair,
   abandonRepair,
@@ -226,11 +227,10 @@ export interface ResumeResult {
 }
 
 /**
- * 启动时恢复：重新读取工作区和活动会话，凭指纹对账实际进度。
- * - 会话完成但工作区未保存：幂等补放；
- * - 工作区已保存但会话未完成：只补写会话；
- * - 部分执行：从前缀继续；
- * - 并发偏离：标记 conflicted 且保持当前工作区不变。
+ * 启动时恢复：重新读取工作区和活动会话，凭指纹与意图对账实际进度。
+ * - apply 意图：按修复前缀续跑/补写/冲突保护；
+ * - rollback 意图：任意回滚写入边界中断后，只恢复到修复前状态并归档，绝不重新应用修复；
+ * - completed active + 终态工作区：清除 active 完成归档。
  */
 export function resumeRepairBatch(
   storage: StorageLike,
@@ -247,7 +247,19 @@ export function resumeRepairBatch(
 
   const counter = new WriteCounter();
 
-  if (recovery.phase === "completed" || recovery.phase === "nothing-to-do") {
+  if (
+    recovery.phase === "completed" ||
+    recovery.phase === "rollback-completed"
+  ) {
+    // 工作区无需改动，但活动会话必须归档清除（修复 completed active 永不消失的问题）。
+    crashablePersist(storage, options.injection, counter, "恢复：会话归档", () => {
+      const latest = loadRepairArchive(storage);
+      const history = [
+        recovery.journal,
+        ...latest.history.filter((h) => h.id !== recovery.journal.id),
+      ].slice(0, 20);
+      saveRepairArchive(storage, { active: null, history });
+    });
     return {
       phase: recovery.phase,
       journal: recovery.journal,
@@ -255,7 +267,7 @@ export function resumeRepairBatch(
       applied: 0,
       alreadyFixed: 0,
       detail: recovery.detail,
-      writes: 0,
+      writes: counter.count,
     };
   }
 
@@ -275,7 +287,8 @@ export function resumeRepairBatch(
     };
   }
 
-  // resumed / already-applied：把对账后的工作区和会话写回（幂等）。
+  // resumed / already-applied / rollback-resumed / nothing-to-do：
+  // 对账后的工作区若与当前不同则补写，然后归档 completed 会话。
   if (fingerprintState(current) !== fingerprintState(recovery.state)) {
     crashablePersist(storage, options.injection, counter, "恢复：工作区补写", () => {
       saveWorkspaceState(recovery.state, storage);
@@ -312,23 +325,42 @@ export function resumeRepairBatch(
   };
 }
 
-/** 人工整批回滚：恢复修复前快照并归档会话。 */
+/**
+ * 人工整批回滚（崩溃安全，三阶段写入）：
+ *   1. 持久化回滚意图（active 会话标记 intent=rollback，工作区尚未改动）
+ *   2. 写回修复前工作区
+ *   3. 归档会话并清除 active
+ * 任意边界中断后，启动恢复只完成回滚，绝不重新应用修复。
+ */
 export function rollbackRepairBatch(
   storage: StorageLike,
   options: { now?: string; injection?: CrashInjection } = {},
 ): RepairJournal | null {
   const archive = loadRepairArchive(storage);
-  const journal = archive.active;
-  if (!journal) {
+  const active = archive.active;
+  if (!active) {
     return null;
   }
   const now = options.now ?? new Date().toISOString();
   const counter = new WriteCounter();
-  const result = rollbackRepair(journal, now);
 
-  crashablePersist(storage, options.injection, counter, "回滚：工作区", () => {
-    saveWorkspaceState(result.state, storage);
+  // 边界 1：回滚意图先落盘（幂等：已标记则重复写也无害）。
+  const marked = markRollbackIntent(active, now);
+  crashablePersist(storage, options.injection, counter, "回滚：意图", () => {
+    const latest = loadRepairArchive(storage);
+    saveRepairArchive(storage, { ...latest, active: marked });
   });
+
+  // 边界 2：工作区写回修复前快照（已一致则跳过写入）。
+  const current = loadWorkspaceEnvelope(storage)?.state ?? emptyWorkspaceState();
+  if (fingerprintState(current) !== fingerprintState(marked.stateBefore)) {
+    crashablePersist(storage, options.injection, counter, "回滚：工作区", () => {
+      saveWorkspaceState(marked.stateBefore, storage);
+    });
+  }
+
+  // 边界 3：归档完成的回滚会话。
+  const result = rollbackRepair(marked, now);
   crashablePersist(storage, options.injection, counter, "回滚：会话归档", () => {
     const latest = loadRepairArchive(storage);
     const history = [
