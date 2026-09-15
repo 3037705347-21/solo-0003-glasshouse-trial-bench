@@ -1,4 +1,8 @@
-import type { Accession, WorkspaceState } from "../domain/types";
+import type {
+  Accession,
+  ObservationPass,
+  WorkspaceState,
+} from "../domain/types";
 import { isWorkspaceState } from "./types";
 import { createSampleWorkspaceState } from "./sampleData";
 
@@ -16,12 +20,20 @@ function normalizeAccession(accession: Accession): Accession {
   };
 }
 
+function normalizeObservationPass(pass: ObservationPass): ObservationPass {
+  return {
+    ...pass,
+    seriesId: pass.seriesId ?? pass.id,
+  };
+}
+
 export function normalizeWorkspaceState(
   state: WorkspaceState,
 ): WorkspaceState {
   return {
     ...state,
     accessions: state.accessions.map(normalizeAccession),
+    observationPasses: state.observationPasses.map(normalizeObservationPass),
   };
 }
 

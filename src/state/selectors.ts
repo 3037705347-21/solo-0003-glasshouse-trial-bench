@@ -11,6 +11,12 @@ import {
   isAccessionRetired,
   latestRetirementRecord,
 } from "../domain/accession";
+import {
+  isPassSuperseded,
+  orderPassSeries,
+  passSeries,
+  passVersionNumber,
+} from "../domain/observation";
 
 export function trialById(
   state: WorkspaceState,
@@ -93,6 +99,60 @@ export function passesForTrial(
   return state.observationPasses
     .filter((pass) => pass.trialId === trialId)
     .sort((left, right) => right.observedOn.localeCompare(left.observedOn));
+}
+
+/**
+ * 试验当前生效的观测版本（每条版本链的链头）。
+ * 被修订取代的旧版本不出现在该视图中，但仍在版本链里可查询。
+ */
+export function effectivePassesForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): ObservationPass[] {
+  return passesForTrial(state, trialId).filter(
+    (pass) => !isPassSuperseded(pass),
+  );
+}
+
+export function passSeriesVersions(
+  state: WorkspaceState,
+  seriesId: string,
+): ObservationPass[] {
+  return orderPassSeries(passSeries(state.observationPasses, seriesId));
+}
+
+export function passVersionLabel(
+  state: WorkspaceState,
+  pass: ObservationPass,
+): string {
+  const series = passSeries(state.observationPasses, pass.seriesId);
+  return `v${passVersionNumber(series, pass)}`;
+}
+
+export function flagsForPass(state: WorkspaceState, passId: string): Flag[] {
+  return state.flags.filter((flag) => flag.observationPassId === passId);
+}
+
+/**
+ * 快照生成之后才生效的观测修订。用于解释旧放行结论：
+ * 快照本身不可变，但修订列表说明它可能已不反映当前数据。
+ */
+export function revisionsAfterSnapshot(
+  state: WorkspaceState,
+  snapshot: ClearanceSnapshot,
+): ObservationPass[] {
+  return state.observationPasses
+    .filter(
+      (pass) =>
+        pass.trialId === snapshot.trialId &&
+        pass.revision !== undefined &&
+        pass.revision.revisedOn > snapshot.generatedOn,
+    )
+    .sort((left, right) =>
+      (left.revision?.revisedOn ?? "").localeCompare(
+        right.revision?.revisedOn ?? "",
+      ),
+    );
 }
 
 export function latestSnapshotForTrial(

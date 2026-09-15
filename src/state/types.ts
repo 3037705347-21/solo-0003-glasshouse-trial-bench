@@ -19,6 +19,13 @@ export type WorkspaceAction =
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
+  | {
+      type: "observation/revised";
+      pass: ObservationPass;
+      supersededPass: ObservationPass;
+      retiredFlags: Flag[];
+      derivedFlags: Flag[];
+    }
   | { type: "flag/transitioned"; flag: Flag }
   | {
       type: "clearance/generated";

@@ -1,26 +1,33 @@
 import { useMemo, useState } from "react";
-import { NotebookPen, Plus } from "lucide-react";
+import { History, NotebookPen, PenLine, Plus } from "lucide-react";
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
 import { PageHeader } from "../../components/PageHeader";
-import { StatusBadge, statusTone } from "../../components/StatusBadge";
+import { StatusBadge } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
-import type { ObservationPass } from "../../domain/types";
+import type { ObservationRevisionOutcome } from "../../domain/observation";
 import { isAccessionRetired } from "../../domain/accession";
+import type { ObservationPass } from "../../domain/types";
 import {
+  effectivePassesForTrial,
   openFlagsForTrial,
-  passesForTrial,
+  passSeriesVersions,
+  passVersionLabel,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { FlagPanel } from "./FlagPanel";
 import { PassForm } from "./PassForm";
+import { RevisePassDialog } from "./RevisePassDialog";
+import { RevisionChainDialog } from "./RevisionChainDialog";
 
 export function ObservationPage() {
   const { state } = useWorkspace();
   const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [revisingPass, setRevisingPass] = useState<ObservationPass | undefined>();
+  const [chainSeriesId, setChainSeriesId] = useState<string | undefined>();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const passes = passesForTrial(state, trialId);
+  const passes = effectivePassesForTrial(state, trialId);
   const flags = openFlagsForTrial(state, trialId);
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
@@ -47,6 +54,17 @@ export function ObservationPage() {
       { passes: 0, entries: 0, criticalFlags: 0 },
     );
   }, [passes, state.flags]);
+
+  const handleRevised = (outcome: ObservationRevisionOutcome) => {
+    setRevisingPass(undefined);
+    // state 仍是派发前的版本链，新版本号 = 链长 + 1
+    const version = `v${passSeriesVersions(state, outcome.revision.seriesId).length + 1}`;
+    pushToast({
+      tone: "success",
+      title: "观测已更正",
+      message: `${version} 已生效：${outcome.retiredFlags.length} 个标记失效，${outcome.derivedFlags.length} 个新标记派生。`,
+    });
+  };
 
   return (
     <div className="page">
@@ -87,36 +105,67 @@ export function ObservationPage() {
             <p className="muted-copy">该试验还没有观测记录。</p>
           ) : (
             <div className="pass-cards">
-              {passes.map((pass) => (
-                <article className="pass-card" key={pass.id} data-testid={`pass-${pass.id}`}>
-                  <div className="pass-card-top">
-                    <strong>{pass.observedOn}</strong>
-                    <span>{pass.observer}</span>
-                  </div>
-                  <p>{pass.entries.length} 条测量记录</p>
-                  <div className="pass-card-tags">
-                    {pass.entries.map((entry) => {
-                      const accession = state.accessions.find(
-                        (item) => item.id === entry.accessionId,
-                      );
-                      return (
-                        <StatusBadge
-                          tone={
-                            accession && isAccessionRetired(accession)
-                              ? "warning"
-                              : "neutral"
-                          }
-                          key={entry.accessionId}
-                        >
-                          {accession
-                            ? `${accession.accessionNo}${isAccessionRetired(accession) ? " 已停用" : ""}`
-                            : entry.accessionId}
+              {passes.map((pass) => {
+                const series = passSeriesVersions(state, pass.seriesId);
+                const revised = pass.revision !== undefined;
+                return (
+                  <article className="pass-card" key={pass.id} data-testid={`pass-${pass.id}`}>
+                    <div className="pass-card-top">
+                      <strong>{pass.observedOn}</strong>
+                      <span>{pass.observer}</span>
+                      {revised ? (
+                        <StatusBadge tone="info">
+                          {`${passVersionLabel(state, pass)} · 修订版`}
                         </StatusBadge>
-                      );
-                    })}
-                  </div>
-                </article>
-              ))}
+                      ) : null}
+                    </div>
+                    <p>{pass.entries.length} 条测量记录</p>
+                    <div className="pass-card-tags">
+                      {pass.entries.map((entry) => {
+                        const accession = state.accessions.find(
+                          (item) => item.id === entry.accessionId,
+                        );
+                        return (
+                          <StatusBadge
+                            tone={
+                              accession && isAccessionRetired(accession)
+                                ? "warning"
+                                : "neutral"
+                            }
+                            key={entry.accessionId}
+                          >
+                            {accession
+                              ? `${accession.accessionNo}${isAccessionRetired(accession) ? " 已停用" : ""}`
+                              : entry.accessionId}
+                          </StatusBadge>
+                        );
+                      })}
+                    </div>
+                    <div className="pass-card-actions">
+                      <Button
+                        tone="ghost"
+                        size="sm"
+                        onClick={() => setRevisingPass(pass)}
+                        data-testid={`revise-pass-${pass.seriesId}`}
+                      >
+                        <PenLine size={15} />
+                        更正
+                      </Button>
+                      {series.length > 1 ? (
+                        <Button
+                          tone="ghost"
+                          size="sm"
+                          onClick={() => setChainSeriesId(pass.seriesId)}
+                          data-testid={`revision-chain-${pass.seriesId}`}
+                        >
+                          <History size={15} />
+                          修订历史
+                        </Button>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>
@@ -145,6 +194,19 @@ export function ObservationPage() {
           <p>请先创建试验，再录入观测。</p>
         )}
       </Dialog>
+      {revisingPass ? (
+        <RevisePassDialog
+          pass={revisingPass}
+          onCancel={() => setRevisingPass(undefined)}
+          onSaved={handleRevised}
+        />
+      ) : null}
+      {chainSeriesId ? (
+        <RevisionChainDialog
+          seriesId={chainSeriesId}
+          onClose={() => setChainSeriesId(undefined)}
+        />
+      ) : null}
       <ToastRegion
         messages={toasts}
         onDismiss={(id) =>

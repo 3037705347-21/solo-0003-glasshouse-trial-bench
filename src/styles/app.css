@@ -1411,3 +1411,149 @@ button {
     justify-content: flex-start;
   }
 }
+
+/* 观测修订 */
+
+.pass-card-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.revision-impact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--amber-100);
+  border-radius: 7px;
+  background: var(--amber-100);
+  color: var(--amber-700);
+  font-size: 13px;
+}
+
+.revision-impact strong {
+  font-size: 14px;
+}
+
+.revision-chain {
+  display: grid;
+  gap: 12px;
+}
+
+.revision-entry-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.revision-entry-meta {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.revision-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.revision-meta-grid dt {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.revision-meta-grid dd {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.revision-reason {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--line-strong);
+  background: var(--surface-soft);
+  border-radius: 0 6px 6px 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.revision-entries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.revision-entry-chip {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.revision-flags {
+  display: grid;
+  gap: 8px;
+}
+
+.revision-flag-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.revision-flag-row small {
+  color: var(--text-muted);
+}
+
+.revision-no-flags {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.snapshot-stale-banner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 0 18px;
+  padding: 13px 15px;
+  border: 1px solid var(--amber-100);
+  border-radius: 7px;
+  background: var(--amber-100);
+  color: var(--amber-700);
+}
+
+.snapshot-stale-banner strong {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 14px;
+}
+
+.snapshot-stale-banner span {
+  display: block;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.snapshot-stale-banner ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .revision-meta-grid {
+    grid-template-columns: 1fr;
+  }
+}

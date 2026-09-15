@@ -63,16 +63,28 @@ export interface ObservationEntry {
   notes: string;
 }
 
+export interface ObservationRevision {
+  id: string;
+  revisedOn: string;
+  revisedBy: string;
+  reason: string;
+  basePassId: string;
+}
+
 export interface ObservationPass {
   id: string;
   trialId: string;
   observedOn: string;
   observer: string;
   entries: ObservationEntry[];
+  seriesId: string;
+  supersedesId?: string;
+  supersededById?: string;
+  revision?: ObservationRevision;
 }
 
 export type FlagSeverity = "info" | "warning" | "critical";
-export type FlagState = "open" | "resolved" | "waived";
+export type FlagState = "open" | "resolved" | "waived" | "superseded";
 
 export interface Flag {
   id: string;
@@ -86,6 +98,8 @@ export interface Flag {
   createdOn: string;
   resolvedOn?: string;
   resolutionNote?: string;
+  supersededByFlagId?: string;
+  supersedesFlagId?: string;
 }
 
 export type ClearanceStatus = "ready" | "blocked";

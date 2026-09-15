@@ -6,12 +6,14 @@ import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { isAccessionRetired } from "../../domain/accession";
+import { isPassSuperseded } from "../../domain/observation";
 import type {
   AccessionRetirementRecord,
   ObservationEntry,
 } from "../../domain/types";
 import {
   benchForAccession,
+  passVersionLabel,
   replacedByAccessions,
   replacementForAccession,
   trialById,
@@ -22,6 +24,8 @@ interface ObservationHistoryRow {
   passId: string;
   observedOn: string;
   observer: string;
+  superseded: boolean;
+  versionLabel: string;
   entry: ObservationEntry;
 }
 
@@ -53,11 +57,13 @@ export function AccessionHistoryPage() {
             passId: pass.id,
             observedOn: pass.observedOn,
             observer: pass.observer,
+            superseded: isPassSuperseded(pass),
+            versionLabel: passVersionLabel(state, pass),
             entry,
           })),
       )
       .sort((left, right) => right.observedOn.localeCompare(left.observedOn));
-  }, [accession, state.observationPasses]);
+  }, [accession, state]);
 
   const relatedFlags = useMemo(
     () =>
@@ -253,6 +259,11 @@ export function AccessionHistoryPage() {
                   <div>
                     <strong>{row.observedOn}</strong>
                     <span>{row.observer}</span>
+                    <StatusBadge tone={row.superseded ? "neutral" : "info"}>
+                      {row.superseded
+                        ? `${row.versionLabel} · 已被修订取代`
+                        : `${row.versionLabel} · 当前版本`}
+                    </StatusBadge>
                   </div>
                   <div>
                     <span>株高 {row.entry.heightMm} mm</span>

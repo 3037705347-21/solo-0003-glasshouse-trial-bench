@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Play, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Play, ShieldCheck } from "lucide-react";
 import { Button } from "../../components/Button";
 import { PageHeader } from "../../components/PageHeader";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
@@ -8,7 +8,11 @@ import {
   buildClearanceSnapshot,
 } from "../../domain/clearance";
 import { transitionTrial } from "../../domain/trial";
-import { latestSnapshotForTrial } from "../../state/selectors";
+import {
+  latestSnapshotForTrial,
+  passVersionLabel,
+  revisionsAfterSnapshot,
+} from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { SnapshotCard } from "./SnapshotCard";
 
@@ -22,6 +26,11 @@ export function ClearancePage() {
   const liveSnapshot = useMemo(
     () => buildClearanceSnapshot(state, trialId),
     [state, trialId],
+  );
+
+  const staleRevisions = useMemo(
+    () => (latest ? revisionsAfterSnapshot(state, latest) : []),
+    [state, latest],
   );
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
@@ -134,6 +143,31 @@ export function ClearancePage() {
               <span className="panel-subtitle">最近生成的放行快照</span>
             </div>
           </div>
+          {staleRevisions.length > 0 ? (
+            <div className="snapshot-stale-banner" data-testid="snapshot-stale-banner">
+              <AlertTriangle size={18} aria-hidden="true" />
+              <div>
+                <strong>
+                  快照生成后已有 {staleRevisions.length} 次观测修订生效
+                </strong>
+                <span>
+                  该快照的结论基于修订前的数据，可能不再反映当前状态；请重新生成快照确认。
+                </span>
+                <ul>
+                  {staleRevisions.map((pass) => (
+                    <li key={pass.id}>
+                      {passVersionLabel(state, pass)} ·{" "}
+                      {pass.revision?.revisedBy} ·{" "}
+                      {pass.revision
+                        ? new Date(pass.revision.revisedOn).toLocaleString()
+                        : ""}{" "}
+                      · {pass.revision?.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : null}
           <SnapshotCard snapshot={latest} />
         </section>
       ) : null}

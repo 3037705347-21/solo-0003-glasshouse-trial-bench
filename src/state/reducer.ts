@@ -46,6 +46,27 @@ export function workspaceReducer(
         observationPasses: [...state.observationPasses, action.pass],
         flags: [...state.flags, ...action.flags],
       };
+    case "observation/revised":
+      return {
+        ...state,
+        observationPasses: [
+          ...state.observationPasses.map((pass) =>
+            pass.id === action.supersededPass.id
+              ? action.supersededPass
+              : pass,
+          ),
+          action.pass,
+        ],
+        flags: [
+          ...state.flags.map((flag) => {
+            const retired = action.retiredFlags.find(
+              (item) => item.id === flag.id,
+            );
+            return retired ?? flag;
+          }),
+          ...action.derivedFlags,
+        ],
+      };
     case "flag/transitioned":
       return {
         ...state,

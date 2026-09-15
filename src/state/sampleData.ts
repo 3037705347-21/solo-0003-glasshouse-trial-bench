@@ -234,6 +234,7 @@ const observationPasses: ObservationPass[] = [
     trialId: "trial-sol-01",
     observedOn: "2026-02-26",
     observer: "M. Ikeda",
+    seriesId: "obs-tom-01",
     entries: [
       {
         accessionId: "acc-tom-01",
@@ -263,6 +264,7 @@ const observationPasses: ObservationPass[] = [
     trialId: "trial-ama-02",
     observedOn: "2026-04-08",
     observer: "R. Ono",
+    seriesId: "obs-bee-01",
     entries: [
       {
         accessionId: "acc-bee-01",
