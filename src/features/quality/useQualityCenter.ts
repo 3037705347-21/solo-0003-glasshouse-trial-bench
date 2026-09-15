@@ -1,23 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  abandonRepair,
   type PlannedFix,
   type QualityFinding,
   type QualityReport,
-  type RepairJournal,
-  advanceRepair,
-  createRepairJournal,
+  fingerprintState,
   previewFixes,
-  rollbackRepair,
   scanWorkspace,
   selectFixable,
   verifyProjectionReport,
 } from "../../domain/quality";
 import { useWorkspace } from "../../state/store";
+import type { WorkspaceState } from "../../domain/types";
 
 export interface DryRunSelection {
   plans: PlannedFix[];
-  projectedState: import("../../domain/types").WorkspaceState;
+  projectedState: WorkspaceState;
   results: ReturnType<typeof previewFixes>["results"];
   conflicts: ReturnType<typeof previewFixes>["results"];
   appliedCount: number;
@@ -25,6 +22,8 @@ export interface DryRunSelection {
   introduced: QualityFinding[];
   remaining: QualityFinding[];
   safe: boolean;
+  /** 预演时工作区指纹，执行时必须仍与之相等。 */
+  fingerprint: string;
 }
 
 export function useQualityCenter() {
@@ -32,9 +31,11 @@ export function useQualityCenter() {
     state,
     bootFindings,
     activeRepair,
-    saveActiveRepair,
-    finishRepair,
-    applyRepairedState,
+    runRepairBatch,
+    resumeRepair,
+    rollbackRepair,
+    abandonRepair,
+    recoveryNotice,
   } = useWorkspace();
   const [report, setReport] = useState<QualityReport>(() =>
     scanWorkspace(state, { persistenceFindings: bootFindings }),
@@ -53,8 +54,7 @@ export function useQualityCenter() {
     return next;
   }, [state, bootFindings]);
 
-  // 修复应用、隔离记录增删或其他页面操作改变工作区后自动重新扫描，
-  // 保证质量中心展示的始终是当前状态的检查结果。
+  // 工作区变化（修复应用、外部写入同步、隔离区变化）后自动重新扫描。
   useEffect(() => {
     const next = scanWorkspace(state, { persistenceFindings: bootFindings });
     setReport(next);
@@ -66,10 +66,8 @@ export function useQualityCenter() {
       if (!current) {
         return current;
       }
-      const liveIds = new Set(next.findings.map((finding) => finding.id));
-      return current.plans.every((plan) => liveIds.has(plan.finding.id))
-        ? current
-        : null;
+      // 预演后工作区指纹若已变化，作废预演，强制用户重新确认。
+      return fingerprintState(state) === current.fingerprint ? current : null;
     });
   }, [state, bootFindings]);
 
@@ -106,7 +104,7 @@ export function useQualityCenter() {
 
   const clearSelection = useCallback(() => setSelected(new Set()), []);
 
-  /** 整批预演：把勾选项在副本上全部跑一遍，生成逐项结果与终态校验。 */
+  /** 整批预演：在副本上跑全部勾选项，生成逐项结果与终态校验。 */
   const preview = useCallback(() => {
     const plans = [...selected]
       .map((id) => fixableById.get(id))
@@ -132,63 +130,26 @@ export function useQualityCenter() {
       introduced: verification.introduced,
       remaining: verification.remaining,
       safe: verification.safe && result.conflicts.length === 0,
+      fingerprint: fingerprintState(state),
     };
     setDryRun(selection);
     return selection;
   }, [selected, fixableById, state, report]);
 
   /**
-   * 执行已确认的整批修复：
-   * 1. 冻结修复前状态，创建可恢复的修复会话；2. 在当前状态上推进；
-   * 3. 一次性写入工作区；4. 会话归入历史。中断后 active 会话仍可继续或回滚。
+   * 执行已确认的整批修复。协调器逐项落盘（工作区 + 会话），
+   * 任意写入边界中断后都可凭指纹恢复；预演指纹失效时整体拒绝。
    */
   const applyConfirmed = useCallback(
-    (selection: DryRunSelection): RepairJournal => {
-      const journal = createRepairJournal({
-        stateBefore: state,
-        plans: selection.plans,
-      });
-      saveActiveRepair(journal);
-      const advanced = advanceRepair(journal, state);
-      saveActiveRepair(advanced.journal);
-      applyRepairedState(advanced.state);
-      const finished: RepairJournal = {
-        ...advanced.journal,
-        stateAfter: advanced.state,
-      };
-      finishRepair(finished);
-      return finished;
+    (selection: DryRunSelection): { ok: true } | { ok: false; reason: string } => {
+      const result = runRepairBatch(selection.plans, selection.fingerprint);
+      if (result.ok) {
+        setDryRun(null);
+        setSelected(new Set());
+      }
+      return result;
     },
-    [state, saveActiveRepair, applyRepairedState, finishRepair],
-  );
-
-  /** 中断恢复：继续未完成会话。对账当前仍存在的问题后幂等重放。 */
-  const resumeActiveRepair = useCallback(
-    (journal: RepairJournal): RepairJournal => {
-      const advanced = advanceRepair(journal, state);
-      applyRepairedState(advanced.state);
-      const finished = { ...advanced.journal, stateAfter: advanced.state };
-      finishRepair(finished);
-      return finished;
-    },
-    [state, applyRepairedState, finishRepair],
-  );
-
-  /** 整批回滚到修复前快照。 */
-  const rollbackActiveRepair = useCallback(
-    (journal: RepairJournal) => {
-      const result = rollbackRepair(journal);
-      applyRepairedState(result.state);
-      finishRepair(result.journal);
-    },
-    [applyRepairedState, finishRepair],
-  );
-
-  const abandonActiveRepair = useCallback(
-    (journal: RepairJournal) => {
-      finishRepair(abandonRepair(journal));
-    },
-    [finishRepair],
+    [runRepairBatch],
   );
 
   return {
@@ -204,8 +165,9 @@ export function useQualityCenter() {
     preview,
     applyConfirmed,
     activeRepair,
-    resumeActiveRepair,
-    rollbackActiveRepair,
-    abandonActiveRepair,
+    resumeRepair,
+    rollbackRepair,
+    abandonRepair,
+    recoveryNotice,
   };
 }

@@ -1,34 +1,16 @@
-import { GROWTH_BOUNDS, TRAY_CELL_OPTIONS, isBenchCompatible, parseDateOnly } from "../rules";
+import { isBenchCompatible, parseDateOnly } from "../rules";
 import type {
   Accession,
   Bench,
   ClearanceSnapshot,
   Flag,
-  ObservationEntry,
   ObservationPass,
-  PreferredLight,
   Trial,
   WorkspaceState,
 } from "../types";
-import { buildFix, buildFinding, evidence, objectRef } from "./catalog";
-import {
-  isNonEmptyString,
-  isNumber,
-  isRecord,
-  isString,
-  isStringArray,
-  objectId,
-  objectLabel,
-} from "./guards";
-import { MANUAL_ROUTES } from "./catalog";
-import type { QualityFinding } from "./types";
-
-const TRIAL_STATES = ["draft", "active", "paused", "cleared"];
-const LIGHTS: PreferredLight[] = ["full-sun", "partial-shade", "shade"];
-const BENCH_STATES = ["available", "assigned", "blocked", "quarantine"];
-const FLAG_STATES = ["open", "resolved", "waived"];
-const FLAG_SEVERITIES = ["info", "warning", "critical"];
-const CLEARANCE_STATUSES = ["ready", "blocked"];
+import { buildFix, buildFinding, evidence, MANUAL_ROUTES, objectRef } from "./catalog";
+import { parseCollections } from "./structure";
+import type { QualityFinding, QualityReport } from "./types";
 
 interface WorkspaceIndex {
   trialIds: Set<string>;
@@ -50,344 +32,31 @@ interface WorkspaceIndex {
   };
 }
 
-/* ------------------------------------------------------------------ */
-/* 结构与字段级检查                                                      */
-/* ------------------------------------------------------------------ */
-
-function structuralFinding(
-  domain: QualityFinding["domain"],
-  ruleCode: string,
-  severity: QualityFinding["severity"],
-  kind: QualityFinding["objectRefs"][number]["kind"],
-  id: string,
-  label: string,
-  title: string,
-  detail: string,
-  fieldEvidence: Array<[string, string]>,
-): QualityFinding {
-  return buildFinding({
-    ruleCode,
-    domain,
-    severity,
-    title,
-    detail,
-    objectRefs: [objectRef(kind, id, label)],
-    evidence: fieldEvidence.map(([name, value]) => evidence(name, value)),
-    manual: MANUAL_ROUTES.quality,
-  });
-}
-
-function validateTrialShape(raw: unknown, index: number): Trial | null {
-  if (!isRecord(raw)) {
-    return null;
-  }
-  const id = objectId(raw, index);
-  const label = objectLabel(raw, ["code"], id);
-  if (!isNonEmptyString(raw.id) || !isNonEmptyString(raw.code)) {
-    return malformed("trials", "trial", id, label, "试验缺少 id 或编号", "T-STRUCT-01");
-  }
-  if (!isString(raw.state) || !TRIAL_STATES.includes(raw.state)) {
-    return malformed(
-      "trials",
-      "trial",
-      raw.id as string,
-      label,
-      `试验状态无效：${isString(raw.state) ? raw.state : typeof raw.state}`,
-      "T-STRUCT-01",
-    );
-  }
-  if (
-    !isString(raw.startDate) ||
-    !isString(raw.endDate) ||
-    !parseDateOnly(raw.startDate) ||
-    !parseDateOnly(raw.endDate)
-  ) {
-    return malformed(
-      "trials",
-      "trial",
-      raw.id as string,
-      label,
-      "试验的开始或结束日期无效",
-      "T-STRUCT-01",
-    );
-  }
-  return raw as unknown as Trial;
-}
-
-function validateAccessionShape(raw: unknown, index: number): Accession | null {
-  if (!isRecord(raw)) {
-    return null;
-  }
-  const id = objectId(raw, index);
-  const label = objectLabel(raw, ["accessionNo", "cultivar"], id);
-  if (!isNonEmptyString(raw.id) || !isNonEmptyString(raw.accessionNo)) {
-    return malformed("accessions", "accession", id, label, "材料缺少 id 或材料编号", "A-STRUCT-01");
-  }
-  if (!isNonEmptyString(raw.trialId)) {
-    return malformed("accessions", "accession", raw.id as string, label, "材料缺少归属试验", "A-STRUCT-01");
-  }
-  if (!LIGHTS.includes(raw.preferredLight as PreferredLight)) {
-    return malformed(
-      "accessions",
-      "accession",
-      raw.id as string,
-      label,
-      `材料的适宜光照无效：${String(raw.preferredLight)}`,
-      "A-STRUCT-01",
-    );
-  }
-  if (!isStringArray(raw.labels)) {
-    return malformed("accessions", "accession", raw.id as string, label, "材料标签不是字符串数组", "A-STRUCT-01");
-  }
-  if (!isNumber(raw.quantity) || raw.quantity < 1 || raw.quantity > 500) {
-    return fieldIssue(
-      "accessions",
-      "accession",
-      raw.id as string,
-      label,
-      "材料数量超出允许范围（1-500）",
-      "A-FIELD-01",
-      ["数量", String(raw.quantity)],
-    );
-  }
-  if (!isNumber(raw.trayCells) || !TRAY_CELL_OPTIONS.includes(raw.trayCells)) {
-    return fieldIssue(
-      "accessions",
-      "accession",
-      raw.id as string,
-      label,
-      `穴盘规格不受支持：${String(raw.trayCells)}`,
-      "A-FIELD-01",
-      ["穴盘规格", String(raw.trayCells)],
-    );
-  }
-  if (!isString(raw.propagatedOn) || !parseDateOnly(raw.propagatedOn)) {
-    return fieldIssue(
-      "accessions",
-      "accession",
-      raw.id as string,
-      label,
-      "繁殖日期无效",
-      "A-FIELD-01",
-      ["繁殖日期", String(raw.propagatedOn)],
-    );
-  }
-  return raw as unknown as Accession;
-}
-
-function validateBenchShape(raw: unknown, index: number): Bench | null {
-  if (!isRecord(raw)) {
-    return null;
-  }
-  const id = objectId(raw, index);
-  const label = objectLabel(raw, ["code"], id);
-  if (!isNonEmptyString(raw.id) || !isNonEmptyString(raw.code)) {
-    return malformed("benches", "bench", id, label, "台架缺少 id 或编号", "B-STRUCT-01");
-  }
-  if (!LIGHTS.includes(raw.lightProfile as PreferredLight)) {
-    return malformed("benches", "bench", raw.id as string, label, `台架光照类型无效：${String(raw.lightProfile)}`, "B-STRUCT-01");
-  }
-  if (!isString(raw.status) || !BENCH_STATES.includes(raw.status)) {
-    return malformed("benches", "bench", raw.id as string, label, `台架状态无效：${String(raw.status)}`, "B-STRUCT-01");
-  }
-  if (!isStringArray(raw.assignedIds)) {
-    return malformed("benches", "bench", raw.id as string, label, "台架分配列表不是 id 数组", "B-STRUCT-01");
-  }
-  if (!isNumber(raw.capacity) || raw.capacity <= 0) {
-    return fieldIssue(
-      "benches",
-      "bench",
-      raw.id as string,
-      label,
-      `台架容量必须为正数：${String(raw.capacity)}`,
-      "B-FIELD-01",
-      ["容量", String(raw.capacity)],
-    );
-  }
-  return raw as unknown as Bench;
-}
-
-function validateEntryShape(raw: unknown): { entry: ObservationEntry | null; issue?: string } {
-  if (!isRecord(raw)) {
-    return { entry: null, issue: "测量条目不是对象" };
-  }
-  if (!isNonEmptyString(raw.accessionId)) {
-    return { entry: null, issue: "测量条目缺少材料 id" };
-  }
-  const bounds: Array<["heightMm" | "leafCount" | "ecMs", string]> = [
-    ["heightMm", "株高"],
-    ["leafCount", "叶片数"],
-    ["ecMs", "电导率"],
-  ];
-  for (const [field, label] of bounds) {
-    const value = raw[field];
-    if (!isNumber(value) || value < GROWTH_BOUNDS[field].min || value > GROWTH_BOUNDS[field].max) {
-      return {
-        entry: null,
-        issue: `${label}越界或无效（允许 ${GROWTH_BOUNDS[field].min}-${GROWTH_BOUNDS[field].max}）：${String(value)}`,
-      };
-    }
-  }
-  return { entry: raw as unknown as ObservationEntry };
-}
-
-function validatePassShape(raw: unknown, index: number): ObservationPass | null {
-  if (!isRecord(raw)) {
-    return null;
-  }
-  const id = objectId(raw, index);
-  const label = objectLabel(raw, ["observedOn", "observer"], id);
-  if (!isNonEmptyString(raw.id) || !isNonEmptyString(raw.trialId)) {
-    return malformed("observations", "pass", id, label, "观测记录缺少 id 或试验 id", "O-STRUCT-01");
-  }
-  if (!isString(raw.observedOn) || !parseDateOnly(raw.observedOn)) {
-    return malformed("observations", "pass", raw.id as string, label, `观测日期无效：${String(raw.observedOn)}`, "O-STRUCT-01");
-  }
-  if (!isNonEmptyString(raw.observer)) {
-    return malformed("observations", "pass", raw.id as string, label, "观测记录缺少观测人", "O-STRUCT-01");
-  }
-  if (!Array.isArray(raw.entries)) {
-    return malformed("observations", "pass", raw.id as string, label, "观测记录没有测量条目数组", "O-STRUCT-01");
-  }
-  return raw as unknown as ObservationPass;
-}
-
-function validateFlagShape(raw: unknown, index: number): Flag | null {
-  if (!isRecord(raw)) {
-    return null;
-  }
-  const id = objectId(raw, index);
-  const label = objectLabel(raw, ["code"], id);
-  if (
-    !isNonEmptyString(raw.id) ||
-    !isNonEmptyString(raw.trialId) ||
-    !isNonEmptyString(raw.accessionId) ||
-    !isNonEmptyString(raw.observationPassId)
-  ) {
-    return malformed("flags", "flag", id, label, "标记缺少 id、试验、材料或观测引用", "F-STRUCT-01");
-  }
-  if (!FLAG_SEVERITIES.includes(raw.severity as string)) {
-    return malformed("flags", "flag", raw.id as string, label, `标记严重程度无效：${String(raw.severity)}`, "F-STRUCT-01");
-  }
-  if (!isString(raw.state) || !FLAG_STATES.includes(raw.state)) {
-    return malformed("flags", "flag", raw.id as string, label, `标记状态无效：${String(raw.state)}`, "F-STRUCT-01");
-  }
-  if (
-    (raw.state === "resolved" || raw.state === "waived") &&
-    (!isNonEmptyString(raw.resolutionNote) || !isString(raw.resolvedOn))
-  ) {
-    return fieldIssue(
-      "flags",
-      "flag",
-      raw.id as string,
-      label,
-      "已处理标记缺少处理说明或处理时间",
-      "F-FIELD-01",
-      ["状态", raw.state as string],
-    );
-  }
-  return raw as unknown as Flag;
-}
-
-function validateSnapshotShape(raw: unknown, index: number): ClearanceSnapshot | null {
-  if (!isRecord(raw)) {
-    return null;
-  }
-  const id = objectId(raw, index);
-  const label = objectLabel(raw, ["generatedOn"], id);
-  if (!isNonEmptyString(raw.id) || !isNonEmptyString(raw.trialId)) {
-    return malformed("clearance", "snapshot", id, label, "快照缺少 id 或试验 id", "C-STRUCT-01");
-  }
-  if (!CLEARANCE_STATUSES.includes(raw.status as string)) {
-    return malformed("clearance", "snapshot", raw.id as string, label, `快照状态无效：${String(raw.status)}`, "C-STRUCT-01");
-  }
-  if (!Array.isArray(raw.metrics) || !Array.isArray(raw.blockers)) {
-    return malformed("clearance", "snapshot", raw.id as string, label, "快照缺少指标或阻止项数组", "C-STRUCT-01");
-  }
-  return raw as unknown as ClearanceSnapshot;
-}
-
-function malformed(
-  domain: QualityFinding["domain"],
-  kind: QualityFinding["objectRefs"][number]["kind"],
-  id: string,
-  label: string,
-  detail: string,
-  ruleCode: string,
-): null {
-  shapeIssues.push(
-    structuralFinding(domain, ruleCode, "blocking", kind, id, label, "对象结构损坏，无法参与跨对象校验", detail, [
-      ["对象", label],
-      ["问题", detail],
-    ]),
-  );
-  return null;
-}
-
-function fieldIssue(
-  domain: QualityFinding["domain"],
-  kind: QualityFinding["objectRefs"][number]["kind"],
-  id: string,
-  label: string,
-  detail: string,
-  ruleCode: string,
-  entry: [string, string],
-): null {
-  shapeIssues.push(
-    structuralFinding(domain, ruleCode, "warning", kind, id, label, "对象字段取值不合法", detail, [
-      ["对象", label],
-      [entry[0], entry[1]],
-    ]),
-  );
-  return null;
-}
-
-// 结构校验在扫描过程中把问题追加到该数组（纯函数语义：每次 scanWorkspace 前重置）。
-let shapeIssues: QualityFinding[] = [];
-
-/* ------------------------------------------------------------------ */
-/* 索引构建                                                             */
-/* ------------------------------------------------------------------ */
-
-function buildIndex(state: WorkspaceState): WorkspaceIndex {
-  shapeIssues = [];
-  const trials = (Array.isArray(state.trials) ? state.trials : [])
-    .map((raw, index) => validateTrialShape(raw, index))
-    .filter((item): item is Trial => item !== null);
-  const accessions = (Array.isArray(state.accessions) ? state.accessions : [])
-    .map((raw, index) => validateAccessionShape(raw, index))
-    .filter((item): item is Accession => item !== null);
-  const benches = (Array.isArray(state.benches) ? state.benches : [])
-    .map((raw, index) => validateBenchShape(raw, index))
-    .filter((item): item is Bench => item !== null);
-  const passes = (Array.isArray(state.observationPasses) ? state.observationPasses : [])
-    .map((raw, index) => validatePassShape(raw, index))
-    .filter((item): item is ObservationPass => item !== null);
-  const flags = (Array.isArray(state.flags) ? state.flags : [])
-    .map((raw, index) => validateFlagShape(raw, index))
-    .filter((item): item is Flag => item !== null);
-  const snapshots = (Array.isArray(state.clearanceSnapshots) ? state.clearanceSnapshots : [])
-    .map((raw, index) => validateSnapshotShape(raw, index))
-    .filter((item): item is ClearanceSnapshot => item !== null);
-
-  return {
-    trialIds: new Set(trials.map((item) => item.id)),
-    accessionIds: new Set(accessions.map((item) => item.id)),
-    benchIds: new Set(benches.map((item) => item.id)),
-    passIds: new Set(passes.map((item) => item.id)),
-    flagIds: new Set(flags.map((item) => item.id)),
-    snapshotIds: new Set(snapshots.map((item) => item.id)),
-    accessionById: new Map(accessions.map((item) => [item.id, item])),
-    trialById: new Map(trials.map((item) => [item.id, item])),
-    benchById: new Map(benches.map((item) => [item.id, item])),
-    valid: { trials, accessions, benches, passes, flags, snapshots },
+function buildIndex(state: WorkspaceState | Partial<WorkspaceState> | null | undefined): {
+  index: WorkspaceIndex;
+  structuralFindings: QualityFinding[];
+} {
+  const parsed = parseCollections(state);
+  const index: WorkspaceIndex = {
+    trialIds: new Set(parsed.trials.map((item) => item.id)),
+    accessionIds: new Set(parsed.accessions.map((item) => item.id)),
+    benchIds: new Set(parsed.benches.map((item) => item.id)),
+    passIds: new Set(parsed.passes.map((item) => item.id)),
+    flagIds: new Set(parsed.flags.map((item) => item.id)),
+    snapshotIds: new Set(parsed.snapshots.map((item) => item.id)),
+    accessionById: new Map(parsed.accessions.map((item) => [item.id, item])),
+    trialById: new Map(parsed.trials.map((item) => [item.id, item])),
+    benchById: new Map(parsed.benches.map((item) => [item.id, item])),
+    valid: {
+      trials: parsed.trials,
+      accessions: parsed.accessions,
+      benches: parsed.benches,
+      passes: parsed.passes,
+      flags: parsed.flags,
+      snapshots: parsed.snapshots,
+    },
   };
-}
-
-function drainShapeIssues(): QualityFinding[] {
-  const issues = shapeIssues;
-  shapeIssues = [];
-  return issues;
+  return { index, structuralFindings: parsed.findings };
 }
 
 /* ------------------------------------------------------------------ */
@@ -651,11 +320,15 @@ function checkBenches(index: WorkspaceIndex): QualityFinding[] {
             severity: "blocking",
             title: "台架引用了已消失的材料",
             detail: `台架 ${bench.code} 的分配列表包含不存在的材料 ${accessionId}，容量与利用率统计失真。`,
-            objectRefs: [objectRef("bench", bench.id, bench.code)],
+            objectRefs: [
+              objectRef("bench", bench.id, bench.code),
+              objectRef("accession", accessionId, accessionId),
+            ],
             evidence: [
               evidence("台架", bench.code),
               evidence("缺失的材料 id", accessionId),
             ],
+            idKey: accessionId,
             fix: buildFix(
               "bench.unassign",
               `从台架 ${bench.code} 移除悬空材料引用 ${accessionId}`,
@@ -900,28 +573,8 @@ function checkObservations(index: WorkspaceIndex): QualityFinding[] {
     }
 
     const entrySeen = new Set<string>();
-    pass.entries.forEach((entry) => {
-      const shaped = validateEntryShape(entry);
-      if (!shaped.entry) {
-        findings.push(
-          buildFinding({
-            ruleCode: "O-ENTRY-STRUCT-01",
-            domain: "observations",
-            severity: "blocking",
-            title: "测量条目结构或取值损坏",
-            detail: `${pass.observedOn} 的观测中有损坏的测量条目：${shaped.issue}。该数据可能包含真实测量，必须人工核对，不能自动改写或删除。`,
-            objectRefs: [objectRef("pass", pass.id, pass.observedOn)],
-            evidence: [
-              evidence("观测日期", pass.observedOn),
-              evidence("问题", shaped.issue ?? "结构损坏"),
-              evidence("材料 id", isRecord(entry) ? String(entry.accessionId ?? "—") : "—"),
-            ],
-            manual: MANUAL_ROUTES.observations,
-          }),
-        );
-        return;
-      }
-      const validEntry = shaped.entry;
+    // 条目结构与取值已在 parseCollections 中深层校验，这里只做跨对象检查。
+    pass.entries.forEach((validEntry) => {
 
       if (!index.accessionIds.has(validEntry.accessionId)) {
         findings.push(
@@ -1214,23 +867,15 @@ export interface ScanOptions {
 }
 
 export function scanWorkspace(
-  state: WorkspaceState,
+  state: WorkspaceState | null | undefined,
   options: ScanOptions = {},
-): import("./types").QualityReport {
-  const safeState: WorkspaceState = {
-    trials: Array.isArray(state?.trials) ? state.trials : [],
-    accessions: Array.isArray(state?.accessions) ? state.accessions : [],
-    benches: Array.isArray(state?.benches) ? state.benches : [],
-    observationPasses: Array.isArray(state?.observationPasses) ? state.observationPasses : [],
-    flags: Array.isArray(state?.flags) ? state.flags : [],
-    clearanceSnapshots: Array.isArray(state?.clearanceSnapshots)
-      ? state.clearanceSnapshots
-      : [],
-  };
-  const index = buildIndex(safeState);
+): QualityReport {
+  const { index, structuralFindings } = buildIndex(
+    (state ?? {}) as WorkspaceState,
+  );
   const findings = [
     ...(options.persistenceFindings ?? []),
-    ...drainShapeIssues(),
+    ...structuralFindings,
     ...checkTrials(index),
     ...checkAccessions(index),
     ...checkBenches(index),
@@ -1239,7 +884,6 @@ export function scanWorkspace(
     ...checkClearance(index),
   ];
 
-  // 同 id 去重（结构检查与跨对象检查可能指向同一对象的不同侧面，id 不同都会保留）。
   const deduped = Array.from(new Map(findings.map((item) => [item.id, item])).values());
   const blocking = deduped.filter((item) => item.severity === "blocking");
   const warning = deduped.filter((item) => item.severity === "warning");

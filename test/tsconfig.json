@@ -13,5 +13,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["./**/*.ts", "../src/domain/**/*.ts", "../src/state/types.ts", "../src/state/sampleData.ts", "../src/state/persistence.ts"]
+  "include": ["./**/*.ts", "../src/domain/**/*.ts", "../src/state/**/*.ts"]
 }

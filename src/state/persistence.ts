@@ -1,5 +1,6 @@
-import type { QualityFinding, RepairArchive, RepairJournal } from "../domain/quality";
-import { buildFinding, evidence, objectRef } from "../domain/quality";
+import type { QualityFinding, RepairArchive, RepairJournal } from "../domain/quality/types";
+import { buildFinding, evidence, objectRef } from "../domain/quality/catalog";
+import { fingerprintState } from "../domain/quality/fingerprint";
 import type { WorkspaceState } from "../domain/types";
 import { isWorkspaceState } from "./types";
 import { createSampleWorkspaceState } from "./sampleData";
@@ -31,7 +32,11 @@ export function browserStorage(): StorageLike {
 
 export interface QuarantineEntry {
   id: string;
-  reason: "parse-error" | "schema-mismatch" | "version-unknown";
+  reason:
+    | "parse-error"
+    | "schema-mismatch"
+    | "version-unknown"
+    | "version-legacy";
   detail: string;
   detectedAt: string;
   storageKey: string;
@@ -106,6 +111,7 @@ function quarantineFinding(entry: QuarantineEntry): QualityFinding {
     "parse-error": "存储内容不是合法 JSON",
     "schema-mismatch": "存储内容缺少必需的工作区集合",
     "version-unknown": "持久化版本号无法识别",
+    "version-legacy": "无版本封装的旧版（v0）工作区",
   };
   return buildFinding({
     ruleCode: "P-QUARANTINE-01",
@@ -216,6 +222,22 @@ export function bootWorkspace(storage: StorageLike): WorkspaceBoot {
   }
 
   const envelope = parsed as Partial<StoredWorkspace>;
+
+  // 旧版本形态：内容本身是一个工作区状态（六个集合都在），但没有版本封装。
+  // 视为 v0 遗留数据，隔离并提示人工迁移，绝不静默包装或替换。
+  if (
+    envelope.version === undefined &&
+    isWorkspaceState(parsed)
+  ) {
+    const entry = createQuarantineEntry(
+      "version-legacy",
+      "数据是未封装版本号的旧版工作区（v0），需要人工迁移到当前版本",
+      raw,
+      0,
+    );
+    return quarantineBoot(storage, entry, quarantine);
+  }
+
   if (envelope.version !== WORKSPACE_FORMAT_VERSION) {
     const entry = createQuarantineEntry(
       "version-unknown",
@@ -303,6 +325,29 @@ export function discardQuarantineEntry(
 /* 工作区读写（保留原接口名，供 store 使用）                              */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 直接读取已保存工作区的信封内容。修复协调器需要读取“存储中的实际状态”
+ * 而不是引导结果（损坏时为空工作区）；损坏或缺失时返回 null。
+ */
+export function loadWorkspaceEnvelope(
+  storage?: StorageLike,
+): { state: WorkspaceState; savedAt?: string } | null {
+  const target = storage ?? browserStorage();
+  try {
+    const raw = target.getItem(WORKSPACE_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<StoredWorkspace>;
+    if (parsed.version !== WORKSPACE_FORMAT_VERSION || !isWorkspaceState(parsed.state)) {
+      return null;
+    }
+    return { state: parsed.state, savedAt: parsed.savedAt };
+  } catch {
+    return null;
+  }
+}
+
 export function loadWorkspaceState(storage?: StorageLike): WorkspaceState {
   return bootWorkspace(storage ?? browserStorage()).state;
 }
@@ -334,14 +379,54 @@ function isRepairJournal(value: unknown): value is RepairJournal {
     return false;
   }
   const candidate = value as Partial<RepairJournal>;
+  // 兼容 v1 会话（无 version/recoveryLog）与 v2 的 conflicted 状态。
+  const validStatus =
+    candidate.status === "in_progress" ||
+    candidate.status === "completed" ||
+    candidate.status === "conflicted";
   return (
     typeof candidate.id === "string" &&
     typeof candidate.startedAt === "string" &&
-    (candidate.status === "in_progress" || candidate.status === "completed") &&
+    validStatus &&
     typeof candidate.stateBefore === "object" &&
     candidate.stateBefore !== null &&
     Array.isArray(candidate.items)
   );
+}
+
+/**
+ * 把旧版（v1，无 version/recoveryLog/指纹）会话规范化为当前格式，
+ * 保证旧归档和手工注入的会话也能参与指纹对账恢复。
+ */
+function normalizeJournal(value: unknown): RepairJournal | null {
+  if (!isRepairJournal(value)) {
+    return null;
+  }
+  const candidate = value as RepairJournal;
+  const normalized: RepairJournal = {
+    ...candidate,
+    version: candidate.version === 2 ? 2 : 1,
+    recoveryLog: Array.isArray(candidate.recoveryLog)
+      ? candidate.recoveryLog
+      : [
+          {
+            at: candidate.startedAt,
+            event: "legacy-journal",
+            detail: "会话来自旧版本，已补全恢复日志",
+          },
+        ],
+    items: candidate.items.map((item) => ({
+      ...item,
+      changes: Array.isArray(item.changes) ? item.changes : [],
+    })),
+  };
+  if (!normalized.stateBeforeFingerprint) {
+    normalized.stateBeforeFingerprint = fingerprintState(normalized.stateBefore);
+  }
+  if (!normalized.previewFingerprint) {
+    normalized.previewFingerprint = normalized.stateBeforeFingerprint;
+  }
+  return normalized;
 }
 
 export function loadRepairArchive(storage: StorageLike): RepairArchive {
@@ -352,9 +437,11 @@ export function loadRepairArchive(storage: StorageLike): RepairArchive {
     }
     const parsed = JSON.parse(raw) as Partial<RepairArchive>;
     return {
-      active: isRepairJournal(parsed.active) ? parsed.active : null,
+      active: normalizeJournal(parsed.active),
       history: Array.isArray(parsed.history)
-        ? parsed.history.filter(isRepairJournal)
+        ? (parsed.history
+            .map((item) => normalizeJournal(item))
+            .filter((item): item is RepairJournal => item !== null))
         : [],
     };
   } catch {

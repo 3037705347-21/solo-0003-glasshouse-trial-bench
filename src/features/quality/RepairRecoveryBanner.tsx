@@ -1,4 +1,4 @@
-import { History, RotateCcw, Undo2 } from "lucide-react";
+import { AlertTriangle, History, RotateCcw, Undo2 } from "lucide-react";
 import { Button } from "../../components/Button";
 import { pendingItems } from "../../domain/quality";
 import type { RepairJournal } from "../../domain/quality";
@@ -19,28 +19,40 @@ export function RepairRecoveryBanner({
   const pending = pendingItems(journal);
   const completed = journal.items.filter((item) => item.status !== "pending");
   const started = new Date(journal.startedAt);
+  const conflicted = journal.status === "conflicted";
 
   return (
-    <section className="recovery-banner" data-testid="repair-recovery-banner">
+    <section
+      className={`recovery-banner${conflicted ? " recovery-banner-conflict" : ""}`}
+      data-testid="repair-recovery-banner"
+    >
       <div className="recovery-banner-icon">
-        <History size={20} />
+        {conflicted ? <AlertTriangle size={20} /> : <History size={20} />}
       </div>
       <div className="recovery-banner-copy">
-        <strong>检测到一次未完成的整批修复</strong>
+        <strong>
+          {conflicted
+            ? "修复会话与当前工作区冲突"
+            : "检测到一次未完成的整批修复"}
+        </strong>
         <p>
           修复会话开始于 {started.toLocaleString()}，共 {journal.items.length} 项：
-          已处理 {completed.length} 项，待执行 {pending.length} 项。为避免重复执行，
-          待执行项会先与当前数据对账，已不存在的问题会自动跳过。
+          已处理 {completed.length} 项，待执行 {pending.length} 项。
+          {conflicted
+            ? ` ${journal.conflictReason ?? "工作区在预演后被改变，自动流程已停止。可整批回滚到修复前状态，或放弃会话保留当前数据。"}`
+            : " 系统会先按指纹对账实际进度，已生效的修复不会重复执行。"}
         </p>
       </div>
       <div className="recovery-banner-actions">
-        <Button size="sm" onClick={onResume} data-testid="resume-repair">
-          <RotateCcw size={15} />
-          继续执行
-        </Button>
+        {!conflicted ? (
+          <Button size="sm" onClick={onResume} data-testid="resume-repair">
+            <RotateCcw size={15} />
+            继续执行
+          </Button>
+        ) : null}
         <Button
           size="sm"
-          tone="secondary"
+          tone={conflicted ? "danger" : "secondary"}
           onClick={onRollback}
           data-testid="rollback-repair"
         >

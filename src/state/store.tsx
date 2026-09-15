@@ -10,7 +10,18 @@ import {
   useRef,
   useState,
 } from "react";
-import type { QualityFinding, RepairArchive, RepairJournal } from "../domain/quality";
+import {
+  type PlannedFix,
+  type QualityFinding,
+  type RepairArchive,
+  type RepairJournal,
+} from "../domain/quality";
+import {
+  abandonRepairBatch,
+  resumeRepairBatch,
+  rollbackRepairBatch,
+  startRepairBatch,
+} from "./repairCoordinator";
 import type { WorkspaceState } from "../domain/types";
 import { createSampleWorkspaceState } from "./sampleData";
 import {
@@ -20,6 +31,7 @@ import {
   clearWorkspaceStorage,
   discardQuarantineEntry as discardQuarantineEntryStorage,
   loadRepairArchive,
+  loadWorkspaceEnvelope,
   quarantineFindings,
   saveRepairArchive,
   saveWorkspaceState,
@@ -43,43 +55,112 @@ interface WorkspaceContextValue {
   discardQuarantineEntry: (id: string) => void;
   repairArchive: RepairArchive;
   activeRepair: RepairJournal | null;
-  saveActiveRepair: (journal: RepairJournal) => void;
-  finishRepair: (journal: RepairJournal) => void;
-  applyRepairedState: (state: WorkspaceState) => void;
+  /** 启动自动恢复或人工续跑的结果摘要（供横幅展示）。 */
+  recoveryNotice: RecoveryNotice | null;
+  /** 启动崩溃安全整批修复（协调器负责逐项落盘与冲突保护）。 */
+  runRepairBatch: (
+    plans: PlannedFix[],
+    expectedFingerprint: string,
+  ) => { ok: true } | { ok: false; reason: string };
+  resumeRepair: () => void;
+  rollbackRepair: () => void;
+  abandonRepair: () => void;
+  refreshRepairArchive: () => void;
+}
+
+export interface RecoveryNotice {
+  tone: "success" | "warning" | "info";
+  title: string;
+  message: string;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const storage: StorageLike = useMemo(() => browserStorage(), []);
-  const [boot] = useState(() => bootWorkspace(storage));
-  const [state, dispatch] = useReducer(workspaceReducer, boot.state);
+
+  // 引导 + 活动会话自动恢复只在首次挂载时执行一次。
+  const initial = useMemo(() => {
+    const boot = bootWorkspace(storage);
+    let notice: RecoveryNotice | null = null;
+    let archive = loadRepairArchive(storage);
+    let effectiveState = boot.state;
+
+    if (archive.active) {
+      try {
+        const result = resumeRepairBatch(storage);
+        archive = loadRepairArchive(storage);
+        if (result) {
+          if (result.phase === "conflict") {
+            notice = {
+              tone: "warning",
+              title: "修复会话与当前数据冲突",
+              message: result.detail,
+            };
+          } else if (result.phase === "already-applied") {
+            notice = {
+              tone: "success",
+              title: "修复已生效，已补全会话记录",
+              message:
+                "检测到修复工作区已保存、会话尚未完成。已只补全会话状态，没有重复执行任何修复。",
+            };
+          } else if (result.phase === "resumed") {
+            notice = {
+              tone: "success",
+              title: "未完成的整批修复已自动续跑",
+              message: result.detail,
+            };
+            const envelope = loadWorkspaceEnvelope(storage);
+            if (envelope) {
+              effectiveState = envelope.state;
+            }
+          }
+          archive = loadRepairArchive(storage);
+        }
+      } catch (error) {
+        notice = {
+          tone: "warning",
+          title: "修复恢复中断",
+          message: error instanceof Error ? error.message : "恢复过程出现异常，会话保留以便重试。",
+        };
+      }
+    }
+
+    return { boot, archive, notice, effectiveState };
+  }, [storage]);
+
+  const [state, dispatch] = useReducer(
+    workspaceReducer,
+    initial.effectiveState,
+  );
   const [persistenceReady, setPersistenceReady] = useState(false);
   const [bootFindings, setBootFindings] = useState<QualityFinding[]>(
-    boot.findings,
+    initial.boot.findings,
   );
   const [quarantineEntries, setQuarantineEntries] = useState<QuarantineEntry[]>(
-    boot.quarantine,
+    initial.boot.quarantine,
   );
-  const [repairArchive, setRepairArchive] = useState<RepairArchive>(() =>
-    loadRepairArchive(storage),
+  const [repairArchive, setRepairArchive] = useState<RepairArchive>(
+    initial.archive,
   );
-  // 只在工作区发生过显式变更后才持久化。损坏隔离后的空工作区不得自动写回，
-  // 避免覆盖损坏内容；但首次使用（无存储）需要把示例工作区固化一次。
+  const [recoveryNotice, setRecoveryNotice] = useState<RecoveryNotice | null>(
+    initial.notice,
+  );
   const dirtyRef = useRef(false);
 
-  // 每次 dispatch 经过 reducer 后标记脏；"hydrate" 只是同步外部状态，不算用户变更。
-  const dispatchWithTracking = useCallback<Dispatch<WorkspaceAction>>((action) => {
-    if (action.type !== "hydrate") {
-      dirtyRef.current = true;
-    }
-    dispatch(action);
-  }, []);
+  const dispatchWithTracking = useCallback<Dispatch<WorkspaceAction>>(
+    (action) => {
+      if (action.type !== "hydrate") {
+        dirtyRef.current = true;
+      }
+      dispatch(action);
+    },
+    [],
+  );
 
   useEffect(() => {
-    // 首次启动：存储为空，示例工作区来自内存，显式播种一次。
-    if (boot.kind === "sample") {
-      saveWorkspaceState(boot.state, storage);
+    if (initial.boot.kind === "sample") {
+      saveWorkspaceState(initial.boot.state, storage);
     }
     setPersistenceReady(true);
     // 仅在挂载时执行一次。
@@ -93,13 +174,37 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     saveWorkspaceState(state, storage);
   }, [state, storage]);
 
+  const refreshRepairArchive = useCallback(() => {
+    setRepairArchive(loadRepairArchive(storage));
+  }, [storage]);
+
+  // 跨标签页：其他窗口写入工作区或修复会话后同步本页。
+  useEffect(() => {
+    function onStorage(event: StorageEvent) {
+      if (
+        event.key &&
+        !event.key.startsWith("glasshouse-trial-bench:")
+      ) {
+        return;
+      }
+      const envelope = loadWorkspaceEnvelope(storage);
+      if (envelope) {
+        dirtyRef.current = true;
+        dispatch({ type: "hydrate", state: envelope.state });
+      }
+      setRepairArchive(loadRepairArchive(storage));
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [storage]);
+
   const value = useMemo<WorkspaceContextValue>(
     () => ({
       state,
       dispatch: dispatchWithTracking,
       persistenceReady,
       bootFindings,
-      bootKind: boot.kind,
+      bootKind: initial.boot.kind,
       quarantineEntries,
       appendQuarantineEntry: (entry) => {
         const next = appendQuarantine(storage, entry);
@@ -109,7 +214,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       discardQuarantineEntry: (id) => {
         const next = discardQuarantineEntryStorage(storage, id);
         setQuarantineEntries(next);
-        // 隔离区发现随记录清除而消解；非隔离区的引导提示（如封装缺时间戳）保留。
         setBootFindings((current) => {
           const envelope = current.filter(
             (finding) => finding.ruleCode !== "P-QUARANTINE-01",
@@ -119,28 +223,79 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       },
       repairArchive,
       activeRepair: repairArchive.active,
-      saveActiveRepair: (journal: RepairJournal) => {
-        const current = loadRepairArchive(storage);
-        const nextArchive: RepairArchive = { ...current, active: journal };
-        saveRepairArchive(storage, nextArchive);
-        setRepairArchive(nextArchive);
+      recoveryNotice,
+      refreshRepairArchive,
+      runRepairBatch: (plans, expectedFingerprint) => {
+        try {
+          const result = startRepairBatch(storage, plans, {
+            expectedFingerprint,
+          });
+          dirtyRef.current = true;
+          dispatch({ type: "quality/repaired", state: result.state });
+          setRepairArchive(loadRepairArchive(storage));
+          return { ok: true as const };
+        } catch (error) {
+          setRepairArchive(loadRepairArchive(storage));
+          const envelope = loadWorkspaceEnvelope(storage);
+          if (envelope) {
+            dispatch({ type: "hydrate", state: envelope.state });
+          }
+          return {
+            ok: false as const,
+            reason: error instanceof Error ? error.message : "整批修复无法执行",
+          };
+        }
       },
-      finishRepair: (journal: RepairJournal) => {
-        const current = loadRepairArchive(storage);
-        const history = [
-          journal,
-          ...current.history.filter((item) => item.id !== journal.id),
-        ].slice(0, 20);
-        const nextArchive: RepairArchive = { active: null, history };
-        saveRepairArchive(storage, nextArchive);
-        setRepairArchive(nextArchive);
+      resumeRepair: () => {
+        const result = resumeRepairBatch(storage);
+        setRepairArchive(loadRepairArchive(storage));
+        if (!result) {
+          return;
+        }
+        if (result.phase === "conflict") {
+          setRecoveryNotice({
+            tone: "warning",
+            title: "修复会话与当前数据冲突",
+            message: result.detail,
+          });
+          return;
+        }
+        const envelope = loadWorkspaceEnvelope(storage);
+        if (envelope && result.phase !== "already-applied") {
+          dirtyRef.current = true;
+          dispatch({ type: "quality/repaired", state: envelope.state });
+        }
+        setRecoveryNotice({
+          tone: "success",
+          title:
+            result.phase === "already-applied"
+              ? "修复已生效，会话已补全"
+              : "未完成修复已续跑",
+          message: result.detail,
+        });
       },
-      applyRepairedState: (repaired: WorkspaceState) => {
-        // 先同步持久化最终状态，避免同一批处理中归档写入触发的 context 重算
-        // 让自动保存 effect 用旧状态覆盖修复结果。
-        dirtyRef.current = true;
-        saveWorkspaceState(repaired, storage);
-        dispatch({ type: "quality/repaired", state: repaired });
+      rollbackRepair: () => {
+        rollbackRepairBatch(storage);
+        const envelope = loadWorkspaceEnvelope(storage);
+        setRepairArchive(loadRepairArchive(storage));
+        if (envelope) {
+          dirtyRef.current = true;
+          dispatch({ type: "quality/repaired", state: envelope.state });
+        }
+        setRecoveryNotice({
+          tone: "warning",
+          title: "已整批回滚",
+          message: "工作区恢复到修复会话开始前的状态，审计日志已保留。",
+        });
+      },
+      abandonRepair: () => {
+        abandonRepairBatch(storage);
+        setRepairArchive(loadRepairArchive(storage));
+        setRecoveryNotice({
+          tone: "info",
+          title: "修复会话已关闭",
+          message: "当前数据保持不变，会话记录保留在修复历史中。",
+        });
       },
       resetWorkspace: () =>
         dispatch({ type: "reset", state: createSampleWorkspaceState() }),
@@ -157,10 +312,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       dispatchWithTracking,
       persistenceReady,
       bootFindings,
-      boot.kind,
+      initial.boot,
       quarantineEntries,
       repairArchive,
+      recoveryNotice,
       storage,
+      refreshRepairArchive,
     ],
   );
 

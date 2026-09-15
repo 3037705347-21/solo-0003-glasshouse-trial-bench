@@ -7,16 +7,32 @@ import {
   discardQuarantineEntry,
   emptyWorkspaceState,
   loadRepairArchive,
+  loadWorkspaceEnvelope,
   makeQuarantineEntry,
   persistenceFindings,
   saveActiveRepair,
+  saveRepairArchive,
   saveWorkspaceState,
   type QuarantineEntry,
   type StorageLike,
 } from "../src/state/persistence";
 import { createSampleWorkspaceState } from "../src/state/sampleData";
 import { createRepairJournal } from "../src/domain/quality";
+import { resumeRepairBatch } from "../src/state/repairCoordinator";
 import { makeState } from "./fixtures";
+
+function makeBenchImpl(id: string, code: string, assignedIds: string[]) {
+  return {
+    id,
+    code,
+    sector: "x",
+    capacity: 4,
+    assignedIds,
+    lightProfile: "full-sun" as const,
+    irrigationLine: "i",
+    status: "assigned" as const,
+  };
+}
 
 class MemoryStorage implements StorageLike {
   private map = new Map<string, string>();
@@ -86,6 +102,26 @@ describe("bootWorkspace — 持久化版本与损坏隔离", () => {
     assert.equal(boot.quarantine[0].reason, "version-unknown");
     assert.equal(boot.quarantine[0].envelopeVersion, 99);
     assert.ok(boot.findings[0].evidence.some((item) => item.value === "99"));
+  });
+
+  it("无版本封装的旧版（v0）工作区被隔离为 version-legacy，而不是静默升级", () => {
+    const storage = new MemoryStorage();
+    const legacyState = makeState();
+    storage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(legacyState));
+
+    const boot = bootWorkspace(storage);
+    assert.equal(boot.kind, "empty");
+    assert.equal(boot.quarantine[0].reason, "version-legacy");
+    assert.equal(boot.quarantine[0].envelopeVersion, 0);
+    assert.equal(boot.findings[0].severity, "blocking");
+    // 原始旧数据没有被改写或删除
+    assert.equal(
+      storage.getItem(WORKSPACE_STORAGE_KEY),
+      JSON.stringify(legacyState),
+    );
+    // 重新引导不会重复隔离同一份内容
+    const second = bootWorkspace(storage);
+    assert.equal(second.quarantine.length, 1);
   });
 
   it("隔离记录在下次引导时仍然存在（跨会话可追溯），直到人工显式清除", () => {
@@ -192,6 +228,73 @@ describe("修复会话归档", () => {
     const archive = loadRepairArchive(storage);
     assert.equal(archive.active, null);
     assert.deepEqual(archive.history, []);
+  });
+
+  it("旧版 v1 会话（无 version/recoveryLog/指纹）被规范化，仍可参与恢复", () => {
+    const storage = new MemoryStorage();
+    const damaged = makeState({
+      benches: [
+        makeBenchImpl("b1", "B-1", ["ghost-1"]),
+        makeBenchImpl("b2", "B-2", ["ghost-2"]),
+      ],
+    });
+    saveWorkspaceState(damaged, storage);
+    const v1Journal = {
+      id: "rpr_legacy",
+      startedAt: "2026-03-01T08:00:00.000Z",
+      updatedAt: "2026-03-01T08:00:00.000Z",
+      status: "in_progress",
+      stateBefore: damaged,
+      items: [
+        {
+          findingId: "f1",
+          ruleCode: "B-ASSIGN-MISSING-01",
+          severity: "blocking",
+          title: "x",
+          action: "y",
+          fix: {
+            kind: "bench.unassign",
+            action: "y",
+            rationale: "z",
+            context: { benchId: "b1", accessionId: "ghost-1", reason: "missing-accession" },
+          },
+          status: "pending",
+          changes: [],
+        },
+        {
+          findingId: "f2",
+          ruleCode: "B-ASSIGN-MISSING-01",
+          severity: "blocking",
+          title: "x",
+          action: "y",
+          fix: {
+            kind: "bench.unassign",
+            action: "y",
+            rationale: "z",
+            context: { benchId: "b2", accessionId: "ghost-2", reason: "missing-accession" },
+          },
+          status: "pending",
+          changes: [],
+        },
+      ],
+    };
+    saveRepairArchive(storage, { active: v1Journal as never, history: [] });
+
+    const normalized = loadRepairArchive(storage).active;
+    assert.ok(normalized);
+    assert.equal(normalized.version, 1);
+    assert.ok(Array.isArray(normalized.recoveryLog));
+    assert.ok(normalized.stateBeforeFingerprint);
+
+    const result = resumeRepairBatch(storage);
+    assert.ok(result);
+    assert.notEqual(result.phase, "conflict");
+    const restoredState = loadWorkspaceEnvelope(storage)?.state;
+    assert.ok(restoredState);
+    assert.deepEqual(
+      restoredState.benches.map((bench) => bench.assignedIds),
+      [[], []],
+    );
   });
 });
 

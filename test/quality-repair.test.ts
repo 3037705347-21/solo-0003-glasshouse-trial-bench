@@ -203,7 +203,7 @@ describe("修复会话 — 中断恢复", () => {
     );
   });
 
-  it("在已经健康的数据上重放整份会话：全部 already-fixed，不产生重复副作用", () => {
+  it("在工作区已被外部改写时拒绝重放（并发冲突），保持当前状态", () => {
     const damaged = makeState({
       benches: [makeBench({ assignedIds: ["ghost-id"], status: "assigned" })],
     });
@@ -213,7 +213,24 @@ describe("修复会话 — 中断恢复", () => {
 
     const result = advanceRepair(journal, healthy);
     assert.equal(result.applied, 0);
-    assert.equal(result.journal.items.every((item) => item.status === "already-fixed"), true);
+    assert.equal(result.journal.status, "conflicted");
+    assert.deepEqual(result.state, healthy, "冲突时当前工作区必须原样保留");
+    assert.ok(result.journal.conflictReason);
+  });
+
+  it("终态工作区 + 未完成会话：只补写会话，不重复执行修复", () => {
+    const damaged = makeState({
+      benches: [makeBench({ assignedIds: ["ghost-id"], status: "assigned" })],
+    });
+    const plans = selectFixable(scanWorkspace(damaged).findings);
+    const journal = createRepairJournal({ stateBefore: damaged, plans });
+    // 工作区已经是修复后的终态（模拟“工作区已保存、会话未完成”）
+    const fixed = applyFix(damaged, plans[0].fix).state;
+
+    const result = advanceRepair(journal, fixed);
+    assert.equal(result.applied, 0, "终态已存在时不得重复执行");
+    assert.equal(result.journal.status, "completed");
+    assert.deepEqual(result.state, fixed);
   });
 
   it("pendingItems 只返回尚未处理的审计行", () => {

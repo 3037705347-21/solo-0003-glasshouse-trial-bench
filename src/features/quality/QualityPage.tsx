@@ -63,9 +63,10 @@ export function QualityPage() {
     preview,
     applyConfirmed,
     activeRepair,
-    resumeActiveRepair,
-    rollbackActiveRepair,
-    abandonActiveRepair,
+    resumeRepair,
+    rollbackRepair,
+    abandonRepair,
+    recoveryNotice,
   } = useQualityCenter();
   const { quarantineEntries, discardQuarantineEntry, repairArchive } =
     useWorkspace();
@@ -135,18 +136,23 @@ export function QualityPage() {
     if (!dryRun) {
       return;
     }
-    const journal = applyConfirmed(dryRun);
-    const applied = journal.items.filter((item) => item.status === "applied").length;
-    const alreadyFixed = journal.items.filter(
-      (item) => item.status === "already-fixed",
-    ).length;
+    const result = applyConfirmed(dryRun);
     setDialogOpen(false);
-    setDryRun(null);
+    if (!result.ok) {
+      setDryRun(null);
+      pushToast({
+        tone: "error",
+        title: "整批修复未执行",
+        message: result.reason,
+      });
+      return;
+    }
     clearSelection();
     pushToast({
       tone: "success",
-      title: "整批修复完成",
-      message: `执行 ${applied} 项，${alreadyFixed} 项已是目标状态未重复执行；历史记录完整保留。`,
+      title: "整批修复已完成并持久化",
+      message:
+        "修复逐项写入工作区与会话；即使现在关闭页面，审计与恢复状态也已落盘，历史记录完整保留。",
     });
   };
 
@@ -168,24 +174,25 @@ export function QualityPage() {
         <RepairRecoveryBanner
           journal={activeRepair}
           onResume={() => {
-            const journal = resumeActiveRepair(activeRepair);
-            const applied = journal.items.filter(
-              (item) => item.status === "applied",
-            ).length;
-            const conflicts = journal.items.filter(
-              (item) => item.status === "conflict",
-            ).length;
+            resumeRepair();
+            if (activeRepair.status === "conflicted") {
+              pushToast({
+                tone: "error",
+                title: "修复会话与当前数据冲突",
+                message:
+                  activeRepair.conflictReason ??
+                  "工作区相对修复前快照发生变化，自动流程已停止；可整批回滚或放弃后重新扫描。",
+              });
+              return;
+            }
             pushToast({
-              tone: conflicts > 0 ? "warning" : "success",
-              title: conflicts > 0 ? "续跑完成，但存在冲突项" : "未完成修复已继续",
-              message:
-                conflicts > 0
-                  ? `${applied} 项已执行，${conflicts} 项因数据变化需要重新扫描后处理。`
-                  : `续跑完成，新执行 ${applied} 项；已修复的项目未重复执行。`,
+              tone: "success",
+              title: "未完成修复已继续",
+              message: "系统按实际进度对账后续跑，已生效的修复没有重复执行。",
             });
           }}
           onRollback={() => {
-            rollbackActiveRepair(activeRepair);
+            rollbackRepair();
             pushToast({
               tone: "warning",
               title: "已整批回滚",
@@ -193,7 +200,7 @@ export function QualityPage() {
             });
           }}
           onAbandon={() => {
-            abandonActiveRepair(activeRepair);
+            abandonRepair();
             pushToast({
               tone: "info",
               title: "修复会话已关闭",
@@ -201,6 +208,16 @@ export function QualityPage() {
             });
           }}
         />
+      ) : recoveryNotice ? (
+        <section
+          className={`recovery-banner ${recoveryNotice.tone === "warning" ? "" : "recovery-banner-success"}`}
+          data-testid="recovery-notice"
+        >
+          <div className="recovery-banner-copy">
+            <strong>{recoveryNotice.title}</strong>
+            <p>{recoveryNotice.message}</p>
+          </div>
+        </section>
       ) : null}
 
       <QuarantinePanel

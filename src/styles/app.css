@@ -1202,6 +1202,12 @@ button {
   background: var(--amber-100);
 }
 
+.boot-banner-conflict {
+  border-color: #e3b4ad;
+  border-left-color: var(--danger);
+  background: var(--danger-soft);
+}
+
 .boot-banner > svg {
   flex: 0 0 auto;
   color: var(--danger);
@@ -1572,6 +1578,18 @@ button {
   gap: 8px;
   flex-wrap: wrap;
   flex: 0 0 auto;
+}
+
+.recovery-banner-conflict {
+  border-color: #e3b4ad;
+  border-left-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.recovery-banner-success {
+  border-color: #b8d4c0;
+  border-left-color: var(--green-600);
+  background: var(--green-100);
 }
 
 /* 修复预演对话框 */

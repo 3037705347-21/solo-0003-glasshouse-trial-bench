@@ -158,7 +158,7 @@ async function qualityRepairDamage(page) {
   await page.getByText("台架引用了已消失的材料").waitFor();
   await page.getByText("同一材料被分配到多个台架").waitFor();
   // 无法自动判断的问题（此处不存在容量矛盾）以外，可修复项带勾选框
-  await page.getByTestId("select-fix-q-B-ASSIGN-MISSING-01@bench:bench-east-2").waitFor();
+  await page.getByTestId("select-fix-q-B-ASSIGN-MISSING-01@bench:bench-east-2_accession:acc-ghost@acc-ghost").waitFor();
 
   // 逐项勾选 -> 整批预演
   await page.getByTestId("select-all-fixable").click();
@@ -174,7 +174,7 @@ async function qualityRepairDamage(page) {
   await page.getByTestId("repair-acknowledge").check();
   await confirmButton.click();
 
-  await page.getByText("整批修复完成").waitFor();
+  await page.getByText("整批修复已完成并持久化").waitFor();
   await page.getByText("工作区通过全部完整性检查").waitFor();
 
   // 历史记录没有被丢弃或替换成示例数据
@@ -201,13 +201,13 @@ async function qualityRecoveryResume(page) {
   });
 
   // 构造一个“修复中断”的活动会话（pending 修复尚未执行）
-  const findingId = "q-B-ASSIGN-MISSING-01@bench:bench-east-2";
-  const journal = {
-    id: "rpr_interrupted",
+  const findingId = "q-B-ASSIGN-MISSING-01@bench:bench-east-2_accession:acc-ghost@acc-ghost";
+  const buildJournal = (id, stateBefore) => ({
+    id,
     startedAt: "2026-03-01T08:00:00.000Z",
     updatedAt: "2026-03-01T08:00:00.000Z",
     status: "in_progress",
-    stateBefore: damaged,
+    stateBefore,
     items: [
       {
         findingId,
@@ -229,56 +229,81 @@ async function qualityRecoveryResume(page) {
         changes: [],
       },
     ],
-  };
+  });
+
+  // 场景 1：启动时自动对账续跑（不需要用户点击）
   await page.evaluate(
     ({ key, journal }) =>
       window.localStorage.setItem(key, JSON.stringify({ active: journal, history: [] })),
-    { key: REPAIR_ARCHIVE_KEY, journal },
+    { key: REPAIR_ARCHIVE_KEY, journal: buildJournal("rpr_interrupted", damaged) },
   );
   await page.reload({ waitUntil: "networkidle" });
 
-  // 恢复横幅 + 全局横幅
-  await page.getByTestId("repair-recovery-banner").waitFor();
-  await page.getByTestId("boot-recovery-banner").waitFor();
-
-  // 续跑
-  await page.getByTestId("resume-repair").click();
-  await page.getByText("未完成修复已继续").waitFor();
+  // 活动会话被自动续跑并归档：工作区已修复、无恢复横幅
+  await page.waitForFunction(
+    (key) => {
+      const archive = JSON.parse(window.localStorage.getItem(key));
+      return archive.active === null && archive.history[0]?.outcome === "applied";
+    },
+    REPAIR_ARCHIVE_KEY,
+  );
   let state = await loadWorkspaceState(page);
   assert.deepEqual(
     state.benches.find((b) => b.id === "bench-east-2").assignedIds,
     [],
-    "续跑必须完成 pending 修复",
+    "启动自动续跑必须完成 pending 修复",
   );
-  const archiveAfterResume = await page.evaluate(
-    (key) => JSON.parse(window.localStorage.getItem(key)),
-    REPAIR_ARCHIVE_KEY,
-  );
-  assert.equal(archiveAfterResume.active, null, "续跑完成后活动会话关闭");
-  assert.equal(archiveAfterResume.history[0].outcome, "applied");
+  await page
+    .locator("[data-testid='recovery-notice']", {
+      hasText: "未完成的整批修复已自动续跑",
+    })
+    .waitFor();
 
-  // 第二个场景：同样的中断，这次选择整批回滚（在同一浏览器内重置存储）
+  // 场景 2：两边内容不一致（预演后外部写入）：冲突横幅 + 人工整批回滚
   await page.evaluate(() => window.localStorage.clear());
   await page.reload({ waitUntil: "networkidle" });
-  const damaged2 = await injectDamage(page, (state) => {
-    const e2 = state.benches.find((bench) => bench.id === "bench-east-2");
+  const damaged2 = await injectDamage(page, (workspace) => {
+    const e2 = workspace.benches.find((bench) => bench.id === "bench-east-2");
     e2.assignedIds = ["acc-ghost"];
-    return state;
+    return workspace;
   });
-  const journal2 = {
-    ...structuredClone(journal),
-    id: "rpr_interrupted_rollback",
-    stateBefore: damaged2,
-  };
+
+  // 外部写入：工作区既不是修复前，也不是任何修复前缀（多出一个台架）
+  const tampered = structuredClone(damaged2);
+  tampered.benches.push({
+    id: "bench-foreign",
+    code: "B-F",
+    sector: "外部",
+    capacity: 2,
+    assignedIds: ["foreign-write"],
+    lightProfile: "full-sun",
+    irrigationLine: "i",
+    status: "assigned",
+  });
+  await saveWorkspaceState(page, tampered);
+
   await page.evaluate(
     ({ key, journal }) =>
       window.localStorage.setItem(key, JSON.stringify({ active: journal, history: [] })),
-    { key: REPAIR_ARCHIVE_KEY, journal: journal2 },
+    { key: REPAIR_ARCHIVE_KEY, journal: buildJournal("rpr_conflict", damaged2) },
   );
   await page.reload({ waitUntil: "networkidle" });
+
   await page.getByTestId("repair-recovery-banner").waitFor();
+  await page
+    .getByTestId("repair-recovery-banner")
+    .getByText("修复会话与当前工作区冲突")
+    .waitFor();
+  // 冲突时不提供“继续执行”，只能回滚或放弃
+  assert.equal(await page.getByTestId("resume-repair").count(), 0);
+
+  // 工作区保持外部写入后的状态，没有被部分修复
+  state = await loadWorkspaceState(page);
+  assert.equal(state.benches.find((b) => b.id === "bench-foreign") !== undefined, true);
+
+  // 人工整批回滚：恢复修复前快照（悬空引用的损坏工作区）并归档
   await page.getByTestId("rollback-repair").click();
-  await page.getByText("已整批回滚").waitFor();
+  await page.locator(".toast", { hasText: "已整批回滚" }).waitFor();
   const rolledBackState = await page.evaluate(
     (key) => JSON.parse(window.localStorage.getItem(key)).state,
     WORKSPACE_KEY,
@@ -288,8 +313,41 @@ async function qualityRecoveryResume(page) {
     ["acc-ghost"],
     "回滚必须恢复修复前快照",
   );
-}
+  const archiveAfterRollback = await page.evaluate(
+    (key) => JSON.parse(window.localStorage.getItem(key)),
+    REPAIR_ARCHIVE_KEY,
+  );
+  assert.equal(archiveAfterRollback.active, null);
+  assert.equal(archiveAfterRollback.history[0].outcome, "rolled-back");
 
+  // 场景 3：放弃会话：当前数据保持不变
+  await page.evaluate(() => window.localStorage.clear());
+  await page.reload({ waitUntil: "networkidle" });
+  const damaged3 = await injectDamage(page, (workspace) => {
+    const e2 = workspace.benches.find((bench) => bench.id === "bench-east-2");
+    e2.assignedIds = ["acc-ghost"];
+    return workspace;
+  });
+  const tampered3 = structuredClone(damaged3);
+  const east1 = tampered3.benches.find((b) => b.id === "bench-east-1");
+  east1.assignedIds = ["acc-tom-01", "acc-tom-02", "foreign-x"];
+  await saveWorkspaceState(page, tampered3);
+  await page.evaluate(
+    ({ key, journal }) =>
+      window.localStorage.setItem(key, JSON.stringify({ active: journal, history: [] })),
+    { key: REPAIR_ARCHIVE_KEY, journal: buildJournal("rpr_abandon", damaged3) },
+  );
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByTestId("repair-recovery-banner").waitFor();
+  await page.getByTestId("abandon-repair").click();
+  await page.locator(".toast", { hasText: "修复会话已关闭" }).waitFor();
+  const abandonedState = await loadWorkspaceState(page);
+  assert.deepEqual(
+    abandonedState.benches.find((b) => b.id === "bench-east-1").assignedIds,
+    ["acc-tom-01", "acc-tom-02", "foreign-x"],
+    "放弃会话必须保留当前数据",
+  );
+}
 async function qualityCorruptPersistence(page) {
   // 直接写入无法解析的存储内容：系统必须隔离，而不是回退示例数据
   const corrupt = "{ broken json, do not replace with samples";

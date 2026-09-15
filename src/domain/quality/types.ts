@@ -116,16 +116,43 @@ export interface RepairItemRecord {
 }
 
 export type RepairOutcome = "applied" | "rolled-back" | "abandoned";
+
+/**
+ * 修复会话持久化格式版本。v1：无指纹；v2：携带修复前状态指纹，
+ * 用于预演后并发写入冲突检测。
+ */
+export type RepairJournalVersion = 1 | 2;
+
+export type RepairPhase =
+  | "none"
+  | "completed"
+  | "already-applied"
+  | "resumed"
+  | "conflict";
+
 export interface RepairJournal {
+  version: RepairJournalVersion;
   id: string;
   startedAt: string;
   updatedAt: string;
-  status: "in_progress" | "completed";
+  /**
+   * in_progress：仍有待执行项或工作区尚未落盘；
+   * completed：会话标记完成（工作区是否已落盘需通过指纹对账判断）；
+   * conflicted：工作区相对修复计划发生偏离，自动流程停止，等待人工决定。
+   */
+  status: "in_progress" | "completed" | "conflicted";
   outcome?: RepairOutcome;
   stateBefore: WorkspaceState;
+  /** 修复前工作区的稳定指纹，用于检测预演后的外部写入。 */
+  stateBeforeFingerprint?: string;
+  /** 创建会话时工作区的指纹；与执行时重新读取的状态不一致即判定并发冲突。 */
+  previewFingerprint?: string;
   stateAfter?: WorkspaceState;
   items: RepairItemRecord[];
   completedAt?: string;
+  conflictReason?: string;
+  /** 自动/人工恢复历史，每次续跑、完成、回滚或冲突判定都追加一行可追溯记录。 */
+  recoveryLog: Array<{ at: string; event: string; detail?: string }>;
 }
 
 export interface RepairArchive {

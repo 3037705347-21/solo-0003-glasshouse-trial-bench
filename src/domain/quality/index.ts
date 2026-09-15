@@ -13,7 +13,9 @@ export type {
   RepairArchive,
   RepairItemRecord,
   RepairJournal,
+  RepairJournalVersion,
   RepairOutcome,
+  RepairPhase,
 } from "./types";
 export {
   DOMAIN_LABELS,
@@ -27,6 +29,8 @@ export {
   objectRef,
 } from "./catalog";
 export { scanWorkspace } from "./checks";
+export { parseCollections } from "./structure";
+export { fingerprintState } from "./fingerprint";
 export {
   applyFix,
   applyFixPlan,
@@ -50,5 +54,8 @@ export {
   createRepairJournal,
   pendingItems,
   reconcilePendingPlans,
+  resolveRepairRecovery,
   rollbackRepair,
 } from "./repair";
+export type { RecoveryResult } from "./repair";
+

@@ -13,6 +13,7 @@ const reasonLabels: Record<QuarantineEntry["reason"], string> = {
   "parse-error": "JSON 解析失败",
   "schema-mismatch": "结构不符合工作区模式",
   "version-unknown": "版本号无法识别",
+  "version-legacy": "无版本封装的旧版数据",
 };
 
 function exportEntry(entry: QuarantineEntry) {

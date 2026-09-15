@@ -92,15 +92,22 @@ export interface BuildFindingInput {
   evidence?: QualityEvidence[];
   fix?: FixSpec;
   manual?: ManualRoute;
+  /**
+   * 区分同一对象、同一规则下的多个字段问题（例如一个对象缺多个必填字段）。
+   * 参与稳定 id 计算，但不影响对象引用。
+   */
+  idKey?: string;
 }
 
 export function buildFinding(input: BuildFindingInput): QualityFinding {
   const refsKey = (input.objectRefs ?? [])
     .map((ref) => `${ref.kind}:${ref.id}`)
     .join("|");
-  const stablePart = [input.ruleCode, refsKey].filter(Boolean).join("@");
+  const stablePart = [input.ruleCode, refsKey, input.idKey ?? ""]
+    .filter((part) => part.length > 0)
+    .join("@");
   return {
-    id: `q-${stablePart}`.replace(/[^a-zA-Z0-9@:_-]/g, "_"),
+    id: `q-${stablePart}`.replace(/[^a-zA-Z0-9@:_.\-]/g, "_"),
     ruleCode: input.ruleCode,
     domain: input.domain,
     severity: input.severity,

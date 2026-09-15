@@ -19,12 +19,23 @@ export function BootQualityBanner() {
   }
 
   if (activeRepair) {
+    const conflicted = activeRepair.status === "conflicted";
     return (
-      <div className="boot-banner boot-banner-recovery" role="status" data-testid="boot-recovery-banner">
+      <div
+        className={`boot-banner boot-banner-recovery${conflicted ? " boot-banner-conflict" : ""}`}
+        role="status"
+        data-testid="boot-recovery-banner"
+      >
         <AlertTriangle size={18} aria-hidden="true" />
         <div className="boot-banner-copy">
-          <strong>检测到未完成的整批修复</strong>
-          <span>继续执行、整批回滚或放弃会话都可以在数据质量中心处理，审计记录不会丢失。</span>
+          <strong>
+            {conflicted ? "修复会话与当前工作区冲突" : "存在需要处理的修复会话"}
+          </strong>
+          <span>
+            {conflicted
+              ? "工作区相对修复前快照发生了计划外变化，自动流程已停止以避免只应用部分修复。可在数据质量中心整批回滚或放弃会话。"
+              : "未完成的整批修复可在数据质量中心继续执行、整批回滚或放弃，审计记录不会丢失。"}
+          </span>
         </div>
         <Link className="button button-primary button-sm" to="/quality">
           查看恢复选项
