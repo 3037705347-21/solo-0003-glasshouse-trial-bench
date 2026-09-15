@@ -7,6 +7,8 @@ import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import type { ObservationPass } from "../../domain/types";
 import { isAccessionRetired } from "../../domain/accession";
+import { sessionEntryCounts } from "../../domain/observationSession";
+import { findOpenSessionForTrial } from "../../state/observationSessions";
 import {
   openFlagsForTrial,
   passesForTrial,
@@ -22,6 +24,14 @@ export function ObservationPage() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const passes = passesForTrial(state, trialId);
   const flags = openFlagsForTrial(state, trialId);
+  // 对话框每次开关后重新读取会话存储，让入口按钮反映最新的可恢复会话。
+  const pendingSession = useMemo(
+    () => (trialId ? findOpenSessionForTrial(trialId) : undefined),
+    [trialId, dialogOpen],
+  );
+  const pendingCounts = pendingSession
+    ? sessionEntryCounts(pendingSession)
+    : null;
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -57,7 +67,9 @@ export function ObservationPage() {
         actions={
           <Button onClick={() => setDialogOpen(true)} data-testid="open-observation-form">
             <Plus size={16} />
-            新建观测
+            {pendingSession && pendingCounts
+              ? `继续观测录入（${pendingCounts.open + pendingCounts.skipped} 条待处理）`
+              : "新建观测"}
           </Button>
         }
       />

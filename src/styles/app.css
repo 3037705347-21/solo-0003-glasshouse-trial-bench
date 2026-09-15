@@ -977,17 +977,128 @@ button {
 
 .entry-row {
   display: grid;
-  grid-template-columns: 1.5fr repeat(3, minmax(90px, 1fr)) 1.2fr 36px;
   gap: 10px;
-  align-items: end;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fcfdfb;
 }
 
+.entry-row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.entry-row-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.entry-row-fields {
+  display: grid;
+  grid-template-columns: 1.5fr repeat(3, minmax(90px, 1fr)) 1.2fr;
+  gap: 10px;
+  align-items: end;
+}
+
+.entry-row-skipped {
+  opacity: 0.75;
+}
+
+.entry-row-stale {
+  border-style: dashed;
+  border-color: var(--amber-700);
+  background: #fdf8ec;
+}
+
+.entry-row-committed {
+  border-color: var(--green-600);
+  background: #f2f8f3;
+}
+
+.entry-stale-reason {
+  color: var(--amber-700);
+  font-size: 12px;
+}
+
+.entry-committed-ref {
+  color: var(--text-muted);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.entry-static-value {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  font-size: 14px;
+}
+
+.session-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.session-banner-copy {
+  display: grid;
+  gap: 5px;
+}
+
+.session-banner-copy strong {
+  font-size: 14px;
+}
+
+.session-banner-copy > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.session-counts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.session-notice {
+  margin: 0;
+  padding: 11px 12px;
+  border-radius: 7px;
+  background: var(--green-100);
+  color: var(--green-700);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.session-discard-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 7px;
+  background: var(--danger-soft);
+}
+
+.session-discard-confirm span {
+  flex: 1;
+  color: #6b2d26;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .entry-remove {
-  margin-bottom: 4px;
+  flex: 0 0 auto;
 }
 
 .form-level-error {
@@ -1209,7 +1320,7 @@ button {
   }
 
   .form-grid,
-  .entry-row {
+  .entry-row-fields {
     grid-template-columns: 1fr;
   }
 

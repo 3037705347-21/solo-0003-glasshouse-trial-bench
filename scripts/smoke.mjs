@@ -14,6 +14,7 @@ const scenarios = {
   "curate-accession-roster": curateAccessionRoster,
   "assign-accession-bench": assignAccessionBench,
   "record-observation-pass": recordObservationPass,
+  "resume-observation-session": resumeObservationSession,
   "advance-trial-clearance": advanceTrialClearance,
   "retire-accession-replacement": retireAccessionReplacement,
 };
@@ -22,6 +23,7 @@ const scenarioPaths = {
   "curate-accession-roster": "/roster",
   "assign-accession-bench": "/layout",
   "record-observation-pass": "/observations",
+  "resume-observation-session": "/observations",
   "advance-trial-clearance": "/clearance",
   "retire-accession-replacement": "/roster",
 };
@@ -82,6 +84,118 @@ async function recordObservationPass(page) {
   await page.waitForFunction(
     (count) => document.querySelectorAll('[data-testid^="pass-"]').length > count,
     before,
+  );
+}
+
+async function resumeObservationSession(page) {
+  // 开始录入会话：填写观测人和第一行，再添加第二行选择另一份材料。
+  await page.getByTestId("open-observation-form").click();
+  await page.getByTestId("session-banner").getByText("新的录入会话").waitFor();
+  await page.getByTestId("observer-input").fill("A. Linden");
+  await page
+    .locator(".entry-row")
+    .nth(0)
+    .locator('input[type="number"]')
+    .nth(0)
+    .fill("54");
+  await page.getByRole("button", { name: "添加行" }).click();
+  await page.locator(".entry-row").nth(1).locator("select").selectOption("acc-tom-02");
+  await page
+    .locator(".entry-row")
+    .nth(1)
+    .locator('input[type="number"]')
+    .nth(0)
+    .fill("66");
+
+  // 关闭对话框并刷新页面：会话应原样恢复。
+  await page.getByRole("button", { name: "取消" }).click();
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByText("继续观测录入").first().waitFor();
+  await page.getByTestId("open-observation-form").click();
+  await page
+    .getByTestId("session-banner")
+    .getByText("已恢复未完成的录入会话")
+    .waitFor();
+  const observer = await page.getByTestId("observer-input").inputValue();
+  if (observer !== "A. Linden") {
+    throw new Error(`session observer not restored: "${observer}"`);
+  }
+  await assertCount(page.locator(".entry-row"), 2, "resumed entry rows");
+
+  // 巡场期间，第二行的材料在登记页被停用。
+  await page.getByRole("button", { name: "取消" }).click();
+  await page.goto(`${baseUrl}/#/roster`, { waitUntil: "networkidle" });
+  await page.getByTestId("retire-accession-acc-tom-02").click();
+  await page.getByTestId("retire-replacement-select").selectOption("acc-tom-01");
+  await page
+    .getByTestId("retire-accession-reason")
+    .fill("巡场期间该批次被替换停用。");
+  await page.getByTestId("confirm-retire-accession").click();
+  await page.getByText("材料已停用", { exact: true }).waitFor();
+
+  // 恢复会话：第二行必须标记失效并说明原因，而不是假装仍然有效。
+  await page.goto(`${baseUrl}/#/observations`, { waitUntil: "networkidle" });
+  await page.getByTestId("open-observation-form").click();
+  const staleRow = page.locator(".entry-row").nth(1);
+  await staleRow.getByText("已失效", { exact: true }).waitFor();
+  await staleRow
+    .getByText("ACC-0002 已停用，不能进入新观测", { exact: true })
+    .waitFor();
+
+  // 部分提交：只写入有效行，会话保持打开并明确归属。
+  await page.getByTestId("save-observation-button").click();
+  await page.getByTestId("session-notice").waitFor();
+  await page
+    .locator(".entry-row")
+    .nth(0)
+    .getByText("已提交", { exact: true })
+    .waitFor();
+  await page.getByRole("button", { name: "取消" }).click();
+  await assertCount(
+    page.locator('[data-testid^="pass-"]'),
+    2,
+    "passes after partial commit",
+  );
+  const firstPass = page.locator('[data-testid^="pass-"]').first();
+  await firstPass.getByText("1 条测量记录", { exact: true }).waitFor();
+  if ((await firstPass.innerText()).includes("ACC-0002")) {
+    throw new Error("stale entry leaked into committed pass");
+  }
+
+  // 刷新后恢复：已提交与已失效的归属保留，重复提交被拒绝且不重复写入。
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByTestId("open-observation-form").click();
+  await page
+    .locator(".entry-row")
+    .nth(0)
+    .getByText("已提交", { exact: true })
+    .waitFor();
+  await page
+    .locator(".entry-row")
+    .nth(1)
+    .getByText("已失效", { exact: true })
+    .waitFor();
+  await page.getByTestId("save-observation-button").click();
+  await page.getByText("没有可提交的测量记录").first().waitFor();
+  await page.getByRole("button", { name: "取消" }).click();
+  await assertCount(
+    page.locator('[data-testid^="pass-"]'),
+    2,
+    "passes after rejected resubmit",
+  );
+
+  // 移除失效行后会话完成并清除，入口回到新会话状态。
+  await page.getByTestId("open-observation-form").click();
+  await page.getByRole("button", { name: "移除第 2 行" }).click();
+  await page.getByText("新建观测", { exact: true }).waitFor();
+  await page.getByTestId("open-observation-form").click();
+  await page.getByTestId("session-banner").getByText("新的录入会话").waitFor();
+  await assertCount(page.locator(".entry-row"), 1, "fresh session entry rows");
+  await page.getByRole("button", { name: "取消" }).click();
+  await assertCount(
+    page.locator('[data-testid^="pass-"]'),
+    2,
+    "passes after session completion",
   );
 }
 

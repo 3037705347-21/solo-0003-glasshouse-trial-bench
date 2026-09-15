@@ -15,6 +15,7 @@ import {
   saveWorkspaceState,
   clearWorkspaceStorage,
 } from "./persistence";
+import { clearObservationSessionStorage } from "./observationSessions";
 import { workspaceReducer } from "./reducer";
 import type { WorkspaceAction } from "./types";
 
@@ -43,9 +44,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       state,
       dispatch,
       persistenceReady,
-      resetWorkspace: () =>
-        dispatch({ type: "reset", state: createSampleWorkspaceState() }),
+      resetWorkspace: () => {
+        clearObservationSessionStorage();
+        dispatch({ type: "reset", state: createSampleWorkspaceState() });
+      },
       clearWorkspace: () => {
+        clearObservationSessionStorage();
         clearWorkspaceStorage();
         dispatch({
           type: "reset",

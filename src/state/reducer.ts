@@ -1,5 +1,9 @@
-import type { WorkspaceState } from "../domain/types";
+import type { Flag, WorkspaceState } from "../domain/types";
 import type { WorkspaceAction } from "./types";
+
+function flagKey(flag: Flag): string {
+  return `${flag.observationPassId}:${flag.accessionId}:${flag.code}`;
+}
 
 export function workspaceReducer(
   state: WorkspaceState,
@@ -40,12 +44,24 @@ export function workspaceReducer(
           bench.id === action.bench.id ? action.bench : bench,
         ),
       };
-    case "observation/recorded":
+    case "observation/recorded": {
+      // 录入会话使用确定性观测编号作为幂等键：恢复后重试或重复提交
+      // 同一编号时直接忽略，保证不会重复写入。
+      if (
+        state.observationPasses.some((pass) => pass.id === action.pass.id)
+      ) {
+        return state;
+      }
+      const existingFlags = new Set(state.flags.map(flagKey));
       return {
         ...state,
         observationPasses: [...state.observationPasses, action.pass],
-        flags: [...state.flags, ...action.flags],
+        flags: [
+          ...state.flags,
+          ...action.flags.filter((flag) => !existingFlags.has(flagKey(flag))),
+        ],
       };
+    }
     case "flag/transitioned":
       return {
         ...state,

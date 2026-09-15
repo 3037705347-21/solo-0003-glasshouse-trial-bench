@@ -2,6 +2,8 @@
 
 温室试验台是一个离线优先的 React 工作台，用于管理作物试验。它把材料登记、台架分配、生长观测和放行检查集中到一个本地浏览器工具中。材料支持停用、替代和恢复，停用后保留历史观测、标记、台架与放行引用，但不会继续出现在新分配或新观测的选择器中。
 
+观测录入是可恢复会话：巡场途中关闭对话框或刷新页面都不会丢失已填写内容。每条测量行有明确归属（待提交、已跳过、已失效、已提交），恢复或部分提交时会对照当前工作区重新对账——被停用或同日已被记录的材料行会标记失效并说明原因，重复提交由确定性观测编号幂等拦截，不会重复写入。
+
 ## 本地运行
 
 ```bash
@@ -27,6 +29,7 @@ npm run build
 node scripts/smoke.mjs curate-accession-roster
 node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
+node scripts/smoke.mjs resume-observation-session
 node scripts/smoke.mjs advance-trial-clearance
 node scripts/smoke.mjs retire-accession-replacement
 ```
