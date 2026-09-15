@@ -157,8 +157,16 @@ export function plansForTrial(
 }
 
 export function allPlans(state: WorkspaceState): AllocationPlan[] {
-  return [...state.allocationPlans]
+  // 草稿在前（最新优先），已应用与已废弃作为只读历史保留在后。
+  const draftPlans = state.allocationPlans
+    .filter((plan) => plan.lifecycle === "draft")
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const historyPlans = state.allocationPlans
+    .filter((plan) => plan.lifecycle !== "draft")
+    .sort((a, b) =>
+      (b.appliedAt ?? b.createdAt).localeCompare(a.appliedAt ?? a.createdAt),
+    );
+  return [...draftPlans, ...historyPlans];
 }
 
 export function defaultPlanningPolicy(

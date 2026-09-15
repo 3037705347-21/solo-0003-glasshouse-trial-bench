@@ -45,23 +45,37 @@ export function workspaceReducer(
         ...state,
         allocationPlans: [...state.allocationPlans, action.plan],
       };
-    case "plan/updated":
+    case "plan/updated": {
+      // 已应用/已废弃是终态，拒绝人工改派覆盖。
+      const existing = state.allocationPlans.find(
+        (plan) => plan.id === action.plan.id,
+      );
+      if (existing && existing.lifecycle !== "draft") {
+        return state;
+      }
       return {
         ...state,
         allocationPlans: state.allocationPlans.map((plan) =>
           plan.id === action.plan.id ? action.plan : plan,
         ),
       };
+    }
     case "plan/discarded":
       return {
         ...state,
         allocationPlans: state.allocationPlans.map((plan) =>
-          plan.id === action.planId
+          plan.id === action.planId && plan.lifecycle === "draft"
             ? { ...plan, lifecycle: "discarded" }
             : plan,
         ),
       };
-    case "plan/applied":
+    case "plan/applied": {
+      const target = state.allocationPlans.find(
+        (plan) => plan.id === action.plan.id,
+      );
+      if (target && target.lifecycle !== "draft") {
+        return state;
+      }
       return {
         ...state,
         benches: action.benches,
@@ -69,6 +83,7 @@ export function workspaceReducer(
           plan.id === action.plan.id ? action.plan : plan,
         ),
       };
+    }
     case "observation/recorded":
       return {
         ...state,

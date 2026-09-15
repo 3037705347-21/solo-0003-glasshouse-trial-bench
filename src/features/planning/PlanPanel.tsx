@@ -105,7 +105,9 @@ export function PlanPanel({
     pinned: plan.items.filter((item) => item.pinned).length,
   };
 
+  const readOnly = plan.lifecycle !== "draft";
   const applied = plan.lifecycle === "applied";
+  const discarded = plan.lifecycle === "discarded";
 
   const benchOptions = (accession: Accession): Bench[] =>
     state.benches
@@ -122,15 +124,33 @@ export function PlanPanel({
       return <span className="muted-copy">—</span>;
     }
     const accession = accessionById.get(item.accessionId);
-    const options = accession ? benchOptions(accession) : [];
+    const feasibleOptions = accession ? benchOptions(accession) : [];
+    // 当前目标（如关闭提前迁移后留在维修台架上）即便不可作为新目标，
+    // 也必须出现在下拉中以正确回显；选项标注“仅原位保留”。
+    const currentTarget = item.targetBenchId
+      ? benchById.get(item.targetBenchId)
+      : undefined;
+    const options =
+      currentTarget &&
+      accession &&
+      !feasibleOptions.some((bench) => bench.id === currentTarget.id) &&
+      isLightCompatible(accession, currentTarget)
+        ? [...feasibleOptions, currentTarget]
+        : feasibleOptions;
     const validation = verdictByAccession.get(item.accessionId);
 
-    if (applied) {
+    if (readOnly) {
       const target = item.targetBenchId ? benchById.get(item.targetBenchId) : undefined;
       return (
         <span>
-          {target ? `${target.code}（${target.sector}）` : "—"}
-          {item.status === "stays" && target ? <span className="muted-copy"> · 原位</span> : null}
+          {target
+            ? `${target.code}（${target.sector}）`
+            : item.status === "unplaced"
+              ? "未放置"
+              : "—"}
+          {item.status === "stays" && target ? (
+            <span className="muted-copy"> · 原位</span>
+          ) : null}
         </span>
       );
     }
@@ -145,11 +165,15 @@ export function PlanPanel({
           aria-label={`为 ${accession?.accessionNo ?? ""} 选择目标台架`}
         >
           <option value="">未放置（交人工裁决）</option>
-          {options.map((bench) => (
-            <option key={bench.id} value={bench.id}>
-              {bench.code} · {bench.sector} · 光照 {lightLabel(bench.lightProfile)}
-            </option>
-          ))}
+          {options.map((bench) => {
+            const maintenanceOnly = benchUnderMaintenance(bench, plan.policy).active;
+            return (
+              <option key={bench.id} value={bench.id}>
+                {bench.code} · {bench.sector} · 光照 {lightLabel(bench.lightProfile)}
+                {maintenanceOnly ? " · 维修中（仅原位保留，不接收迁入）" : ""}
+              </option>
+            );
+          })}
         </select>
         {item.pinned ? (
           <span className="plan-pin" title="人工修改：规划器重算时保留该选择">
@@ -189,7 +213,7 @@ export function PlanPanel({
             输入指纹 <code>{plan.inputFingerprint}</code>
           </p>
         </div>
-        {!applied ? (
+        {!readOnly ? (
           <div className="plan-heading-actions">
             <Button tone="ghost" size="sm" onClick={onClearEdits} data-testid={`plan-clear-edits-${plan.id}`}>
               <RotateCcw size={14} /> 恢复规划器建议
@@ -207,8 +231,12 @@ export function PlanPanel({
               <Send size={14} /> 应用到现场
             </Button>
           </div>
-        ) : plan.appliedAt ? (
+        ) : applied && plan.appliedAt ? (
           <span className="muted-copy">应用于 {plan.appliedAt.slice(0, 10)}</span>
+        ) : discarded ? (
+          <span className="plan-terminal-note" data-testid={`plan-terminal-${plan.id}`}>
+            已废弃 · 终态只读，不能再应用或改动现场
+          </span>
         ) : null}
       </div>
 
@@ -229,7 +257,7 @@ export function PlanPanel({
         />
       </div>
 
-      {!applied && report.summary.length > 0 ? (
+      {!readOnly && report.summary.length > 0 ? (
         <div
           className={`plan-revalidation ${
             report.applicable
@@ -291,7 +319,7 @@ export function PlanPanel({
                 : undefined;
               const validation = verdictByAccession.get(item.accessionId);
               const isInvalid =
-                !applied && validation && validation.verdict === "invalid";
+                !readOnly && validation && validation.verdict === "invalid";
               return (
                 <tr
                   key={item.accessionId}
@@ -343,14 +371,14 @@ export function PlanPanel({
                           ⚠ {entry.message}
                         </li>
                       ))}
-                      {!applied && validation
+                      {!readOnly && validation
                         ? validation.violations.map((entry) => (
                             <li key={`v-${entry.code}`} className="plan-violation">
                               ✕ {entry.message}
                             </li>
                           ))
                         : null}
-                      {!applied &&
+                      {!readOnly &&
                       validation &&
                       validation.verdict !== "valid" &&
                       validation.verdict !== "ignored" ? (

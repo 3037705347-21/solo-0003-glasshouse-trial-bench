@@ -100,20 +100,45 @@ async function planMultiBatchAllocation(page) {
   await page.getByText("已恢复规划器建议", { exact: true }).waitFor();
   await page.getByText("全部建议当前仍有效，可直接应用").waitFor();
 
-  // 5. Apply: W-2 loses Chioggia, W-1 gains it; live layout reflects the plan.
-  await planPanel.getByTestId(/plan-apply-/).click();
-  await page.getByText("计划已应用到现场", { exact: true }).waitFor();
-  await page.getByTestId("bench-card-bench-west-2").getByText("Chioggia").waitFor({
-    state: "detached",
-  });
-  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
-  await page.getByTestId("bench-card-bench-west-1").getByText("Chioggia").waitFor();
+  // 5. Discard this draft: it enters a terminal, read-only state with no
+  //    apply or edit controls, and must not be able to touch the field.
+  await planPanel.getByTestId(/plan-discard-/).click();
+  await planPanel.getByText("已废弃 · 终态只读").waitFor();
+  await assertCount(planPanel.getByTestId(/plan-apply-/), 0, "apply control on discarded");
+  await assertCount(planPanel.locator("select"), 0, "editable targets on discarded");
 
-  // 6. Determinism: regenerating the same scope yields the same item targets.
-  await page.goto(`${baseUrl}/#/planning`, { waitUntil: "networkidle" });
+  // 6. Toggle off "relocate before maintenance" and regenerate. Chioggia,
+  //    physically on the maintenance bench W-2, is retained in place and the
+  //    plan remains applicable; W-2 still must not accept new placement.
+  await page.getByTestId("planning-maintenance-toggle").uncheck();
   await page.getByTestId("generate-plan").click();
-  const secondPanel = page.locator('[data-testid^="plan-panel-"]').first();
-  await secondPanel.getByText("PLAN-002").waitFor();
+  const retainedPanel = page.locator('[data-testid^="plan-panel-"]').first();
+  await retainedPanel.getByText("PLAN-002").waitFor();
+  const retainedRow = page.getByTestId("plan-item-acc-bee-03");
+  await retainedRow.getByText("保持原位").waitFor();
+  await retainedRow.getByText(/已关闭“维修期提前迁移”/).waitFor();
+  const retainedApply = retainedPanel.getByTestId(/plan-apply-/);
+  await retainedApply.isEnabled().then((enabled) => {
+    if (!enabled) throw new Error("retained-on-maintenance plan must still apply");
+  });
+  // W-2 is offered in the selector only as the in-place retention for Chioggia,
+  // never as a feasible target for the other partial-shade accessions.
+  const kaleTarget = page
+    .getByTestId("plan-item-acc-kale-01")
+    .locator("select option[value='bench-west-2']");
+  await assertCount(kaleTarget, 0, "maintenance bench offered as fresh target");
+
+  // 7. Apply the retained plan: Chioggia stays on W-2, occupancy stays within
+  //    capacity, and the live layout confirms the field was not disrupted.
+  await retainedPanel.getByTestId(/plan-apply-/).click();
+  await page.getByText("计划已应用到现场", { exact: true }).waitFor();
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  const westTwo = page.getByTestId("bench-card-bench-west-2");
+  await westTwo.getByText("Chioggia").waitFor();
+  const freeAfter = await westTwo.locator("dd").nth(2).innerText();
+  if (freeAfter !== "4") {
+    throw new Error(`W-2 free slots should be 4 after retained apply, got ${freeAfter}`);
+  }
 }
 
 async function recordObservationPass(page) {

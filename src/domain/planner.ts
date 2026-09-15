@@ -328,6 +328,7 @@ export function planAllocations(
     const trial = trialById.get(accession.trialId);
     const priority = trial ? effectivePriority(trial, policy) : "normal";
     if (source && stayFeasible(source, accession, policy)) {
+      const retainedThroughMaintenance = benchUnderMaintenance(source, policy);
       items.push({
         accessionId: accession.id,
         trialId: accession.trialId,
@@ -335,12 +336,19 @@ export function planAllocations(
         targetBenchId: source.id,
         status: "stays",
         pinned: false,
-        reasons: [
-          reason(
-            "KEPT",
-            `${accession.cultivar} 已在 ${describeBench(source)}，现场保持原位，不搬动`,
-          ),
-        ],
+        reasons: retainedThroughMaintenance.active
+          ? [
+              reason(
+                "KEPT_MAINTENANCE",
+                `${describeBench(source)} 在规划期内维修（${retainedThroughMaintenance.reason ?? "未记录原因"}），但已关闭“维修期提前迁移”，${accession.cultivar} 保持原位；该台架不会接收迁移或新分配`,
+              ),
+            ]
+          : [
+              reason(
+                "KEPT",
+                `${accession.cultivar} 已在 ${describeBench(source)}，现场保持原位，不搬动`,
+              ),
+            ],
         warnings: [],
       });
       return;
@@ -785,11 +793,15 @@ export function validatePlan(
         );
       }
       const maintenance = benchUnderMaintenance(target, plan.policy);
-      if (maintenance.active) {
+      const staysOnBench = item.sourceBenchId === item.targetBenchId;
+      if (
+        maintenance.active &&
+        !(staysOnBench && !plan.policy.relocateFromMaintenance)
+      ) {
         violations.push(
           reason(
             "MAINTENANCE",
-            `台架 ${target.code} 在规划期内维修（${maintenance.reason ?? "未记录原因"}）`,
+            `台架 ${target.code} 在规划期内维修（${maintenance.reason ?? "未记录原因"}），不能接收${staysOnBench ? "" : "迁移或"}新分配`,
           ),
         );
       }
@@ -946,6 +958,9 @@ export function applyPlan(
   if (plan.lifecycle === "applied") {
     return fail([fieldError("plan", "already_applied", "该计划已经应用过")]);
   }
+  if (plan.lifecycle === "discarded") {
+    return fail([fieldError("plan", "discarded", "该计划已废弃，处于终态，不能再应用或改动现场")]);
+  }
   const report = validatePlan(state, plan);
   if (!report.applicable) {
     return fail([
@@ -1019,6 +1034,10 @@ export function retargetPlanItem(
   accessionId: string,
   targetBenchId: string | undefined,
 ): AllocationPlan {
+  if (plan.lifecycle !== "draft") {
+    // 已应用或已废弃的计划是终态，人工改派不能改动它。
+    return plan;
+  }
   return {
     ...plan,
     items: plan.items.map((item) => {
