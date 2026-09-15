@@ -1,4 +1,4 @@
-import type { Accession, WorkspaceState } from "../domain/types";
+import type { Accession, Bench, WorkspaceState } from "../domain/types";
 import { isWorkspaceState } from "./types";
 import { createSampleWorkspaceState } from "./sampleData";
 
@@ -16,13 +16,29 @@ function normalizeAccession(accession: Accession): Accession {
   };
 }
 
+function normalizeBench(bench: Bench): Bench {
+  return {
+    ...bench,
+    reservedSlots:
+      typeof bench.reservedSlots === "number"
+        ? Math.min(bench.reservedSlots, bench.capacity)
+        : 0,
+    maintenance: Array.isArray(bench.maintenance) ? bench.maintenance : [],
+  };
+}
+
 export function normalizeWorkspaceState(
   state: WorkspaceState,
 ): WorkspaceState {
-  return {
+  const normalized: WorkspaceState = {
     ...state,
     accessions: state.accessions.map(normalizeAccession),
+    benches: state.benches.map(normalizeBench),
   };
+  if (!Array.isArray(normalized.allocationPlans)) {
+    normalized.allocationPlans = [];
+  }
+  return normalized;
 }
 
 export interface StoredWorkspace {

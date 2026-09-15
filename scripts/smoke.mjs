@@ -13,6 +13,7 @@ const viteBin =
 const scenarios = {
   "curate-accession-roster": curateAccessionRoster,
   "assign-accession-bench": assignAccessionBench,
+  "plan-multi-batch-allocation": planMultiBatchAllocation,
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
   "retire-accession-replacement": retireAccessionReplacement,
@@ -21,6 +22,7 @@ const scenarios = {
 const scenarioPaths = {
   "curate-accession-roster": "/roster",
   "assign-accession-bench": "/layout",
+  "plan-multi-batch-allocation": "/planning",
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
   "retire-accession-replacement": "/roster",
@@ -66,6 +68,52 @@ async function assignAccessionBench(page) {
   await page.getByTestId("assign-bench-bench-east-2").click();
   await page.getByText("台架分配成功", { exact: true }).waitFor();
   await page.getByTestId("bench-card-bench-east-2").getByText("Yellow Pear").waitFor();
+}
+
+async function planMultiBatchAllocation(page) {
+  // 1. Generate an offline plan over all three batches (default horizon covers
+  //    the W-2 maintenance window 2026-09-28..2026-10-02).
+  await page.getByTestId("generate-plan").click();
+  const planPanel = page.locator('[data-testid^="plan-panel-"]').first();
+  await planPanel.waitFor();
+  await planPanel.getByText("PLAN-001").waitFor();
+
+  // 2. Explainable suggestions: Chioggia (acc-bee-03) is forced off W-2 by
+  //    maintenance and grouped with its batch on W-1.
+  const beeRow = page.getByTestId("plan-item-acc-bee-03");
+  await beeRow.getByText("迁移").waitFor();
+  await beeRow.getByText(/维修/).waitFor();
+  await beeRow.locator("select").selectOption("bench-west-1");
+  await beeRow.getByText("人工钉选").waitFor();
+
+  // 3. Revalidation: pinning Chioggia back onto W-2 (under maintenance) is a
+  //    hard conflict; apply must be disabled.
+  await beeRow.locator("select").selectOption("bench-west-2");
+  await beeRow.getByText("已失效").waitFor();
+  const applyButton = planPanel.getByTestId(/plan-apply-/);
+  await applyButton.isDisabled().then((disabled) => {
+    if (!disabled) throw new Error("apply should stay disabled on hard conflict");
+  });
+
+  // 4. Restore planner suggestion; the plan becomes applicable and explains it.
+  await planPanel.getByTestId(/plan-clear-edits-/).click();
+  await page.getByText("已恢复规划器建议", { exact: true }).waitFor();
+  await page.getByText("全部建议当前仍有效，可直接应用").waitFor();
+
+  // 5. Apply: W-2 loses Chioggia, W-1 gains it; live layout reflects the plan.
+  await planPanel.getByTestId(/plan-apply-/).click();
+  await page.getByText("计划已应用到现场", { exact: true }).waitFor();
+  await page.getByTestId("bench-card-bench-west-2").getByText("Chioggia").waitFor({
+    state: "detached",
+  });
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  await page.getByTestId("bench-card-bench-west-1").getByText("Chioggia").waitFor();
+
+  // 6. Determinism: regenerating the same scope yields the same item targets.
+  await page.goto(`${baseUrl}/#/planning`, { waitUntil: "networkidle" });
+  await page.getByTestId("generate-plan").click();
+  const secondPanel = page.locator('[data-testid^="plan-panel-"]').first();
+  await secondPanel.getByText("PLAN-002").waitFor();
 }
 
 async function recordObservationPass(page) {

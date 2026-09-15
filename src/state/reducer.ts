@@ -40,6 +40,35 @@ export function workspaceReducer(
           bench.id === action.bench.id ? action.bench : bench,
         ),
       };
+    case "plan/generated":
+      return {
+        ...state,
+        allocationPlans: [...state.allocationPlans, action.plan],
+      };
+    case "plan/updated":
+      return {
+        ...state,
+        allocationPlans: state.allocationPlans.map((plan) =>
+          plan.id === action.plan.id ? action.plan : plan,
+        ),
+      };
+    case "plan/discarded":
+      return {
+        ...state,
+        allocationPlans: state.allocationPlans.map((plan) =>
+          plan.id === action.planId
+            ? { ...plan, lifecycle: "discarded" }
+            : plan,
+        ),
+      };
+    case "plan/applied":
+      return {
+        ...state,
+        benches: action.benches,
+        allocationPlans: state.allocationPlans.map((plan) =>
+          plan.id === action.plan.id ? action.plan : plan,
+        ),
+      };
     case "observation/recorded":
       return {
         ...state,

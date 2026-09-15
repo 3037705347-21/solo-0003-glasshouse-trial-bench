@@ -1,5 +1,6 @@
 import type {
   Accession,
+  AllocationPlan,
   Bench,
   ClearanceSnapshot,
   Flag,
@@ -18,6 +19,10 @@ export type WorkspaceAction =
   | { type: "accession/updated"; accession: Accession }
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
+  | { type: "plan/generated"; plan: AllocationPlan }
+  | { type: "plan/updated"; plan: AllocationPlan }
+  | { type: "plan/applied"; plan: AllocationPlan; benches: Bench[] }
+  | { type: "plan/discarded"; planId: string }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
   | { type: "flag/transitioned"; flag: Flag }
   | {

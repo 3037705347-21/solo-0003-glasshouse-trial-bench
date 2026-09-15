@@ -1411,3 +1411,230 @@ button {
     justify-content: flex-start;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* 离线分配规划                                                         */
+/* ------------------------------------------------------------------ */
+
+.planning-controls {
+  margin-bottom: 20px;
+}
+
+.planning-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 16px 0;
+}
+
+.planning-toggle {
+  justify-content: flex-start;
+}
+
+.planning-toggle .field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-weight: 600;
+}
+
+.planning-toggle .field-label small {
+  font-weight: 400;
+  color: var(--muted, #6b7280);
+}
+
+.field-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.planning-trial-family {
+  color: var(--muted, #6b7280);
+  font-weight: 400;
+}
+
+.planning-check-col {
+  width: 48px;
+}
+
+.plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.plan-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.plan-heading-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.plan-target-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.plan-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.plan-verdict {
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.plan-verdict-valid {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.plan-verdict-suboptimal {
+  color: #075985;
+  background: #e0f2fe;
+}
+
+.plan-verdict-invalid {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.plan-verdict-incomplete {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.plan-verdict-ignored {
+  color: #4b5563;
+  background: #f3f4f6;
+}
+
+.plan-row-invalid {
+  background: rgba(254, 226, 226, 0.45);
+}
+
+.plan-row-pin {
+  display: inline;
+  margin-left: 4px;
+}
+
+.plan-reason-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+}
+
+.plan-reason {
+  color: #374151;
+}
+
+.plan-warning,
+.plan-violation {
+  color: #92400e;
+}
+
+.plan-violation {
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.plan-tradeoffs {
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 14px 0;
+}
+
+.plan-tradeoffs h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #92400e;
+}
+
+.plan-tradeoffs ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #78350f;
+}
+
+.plan-revalidation {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 14px 0;
+  font-size: 13px;
+}
+
+.plan-revalidation svg {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.plan-revalidation ul {
+  margin: 0;
+  padding-left: 4px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.plan-revalidation-ok {
+  border: 1px solid #86efac;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.plan-revalidation-error {
+  border: 1px solid #fca5a5;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.plan-items-table td {
+  vertical-align: top;
+}
+
+@media (max-width: 980px) {
+  .planning-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

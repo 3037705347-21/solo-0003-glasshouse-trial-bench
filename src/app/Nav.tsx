@@ -1,6 +1,7 @@
 import {
   ClipboardCheck,
   LayoutGrid,
+  ListChecks,
   ListTree,
   NotebookPen,
 } from "lucide-react";
@@ -9,6 +10,7 @@ import { NavLink } from "react-router-dom";
 const navItems = [
   { to: "/roster", label: "材料登记", icon: ListTree },
   { to: "/layout", label: "台架布局", icon: LayoutGrid },
+  { to: "/planning", label: "分配规划", icon: ListChecks },
   { to: "/observations", label: "生长观测", icon: NotebookPen },
   { to: "/clearance", label: "试验放行", icon: ClipboardCheck },
 ];

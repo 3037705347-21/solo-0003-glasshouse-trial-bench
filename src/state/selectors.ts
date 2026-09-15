@@ -1,9 +1,11 @@
 import type {
   Accession,
+  AllocationPlan,
   Bench,
   ClearanceSnapshot,
   Flag,
   ObservationPass,
+  PlanningPolicy,
   Trial,
   WorkspaceState,
 } from "../domain/types";
@@ -132,4 +134,49 @@ export function accessionStatus(
   return bench.status === "blocked" || bench.status === "quarantine"
     ? "blocked"
     : "assigned";
+}
+
+export function planById(
+  state: WorkspaceState,
+  planId: string,
+): AllocationPlan | undefined {
+  return state.allocationPlans.find((plan) => plan.id === planId);
+}
+
+export function plansForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): AllocationPlan[] {
+  return [...state.allocationPlans]
+    .filter(
+      (plan) =>
+        plan.lifecycle !== "discarded" &&
+        plan.policy.scopeTrialIds.includes(trialId),
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function allPlans(state: WorkspaceState): AllocationPlan[] {
+  return [...state.allocationPlans]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function defaultPlanningPolicy(
+  state: WorkspaceState,
+  today: string,
+): PlanningPolicy {
+  const horizonFrom = today;
+  const futureEnds = state.trials
+    .map((trial) => trial.endDate)
+    .filter((date) => date >= today)
+    .sort();
+  const horizonTo = futureEnds[futureEnds.length - 1];
+  return {
+    scopeTrialIds: state.trials.map((trial) => trial.id),
+    horizonFrom,
+    horizonTo: horizonTo && horizonTo >= today ? horizonTo : today,
+    reservedSlotsEnabled: true,
+    relocateFromMaintenance: true,
+    priorityOverrides: {},
+  };
 }

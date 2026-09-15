@@ -43,6 +43,12 @@ export interface Accession {
 
 export type BenchStatus = "available" | "assigned" | "blocked" | "quarantine";
 
+export interface MaintenanceWindow {
+  from: string;
+  to: string;
+  reason: string;
+}
+
 export interface Bench {
   id: string;
   code: string;
@@ -53,6 +59,8 @@ export interface Bench {
   irrigationLine: string;
   status: BenchStatus;
   blockedReason?: string;
+  reservedSlots?: number;
+  maintenance?: MaintenanceWindow[];
 }
 
 export interface ObservationEntry {
@@ -89,7 +97,6 @@ export interface Flag {
 }
 
 export type ClearanceStatus = "ready" | "blocked";
-
 export interface ClearanceMetric {
   label: string;
   value: number;
@@ -112,6 +119,67 @@ export interface ClearanceSnapshot {
   blockers: ClearanceBlocker[];
 }
 
+export type PlanItemStatus =
+  | "stays"
+  | "moved"
+  | "new"
+  | "unplaced"
+  | "excluded";
+
+export type PlanLifecycle = "draft" | "applied" | "discarded";
+export type PriorityOverride = "high" | "normal" | "low";
+
+export interface PlanningPolicy {
+  scopeTrialIds: string[];
+  horizonFrom: string;
+  horizonTo: string;
+  reservedSlotsEnabled: boolean;
+  relocateFromMaintenance: boolean;
+  priorityOverrides: Record<string, PriorityOverride>;
+}
+
+export interface PlanItemReason {
+  code: string;
+  message: string;
+}
+
+export interface AllocationPlanItem {
+  accessionId: string;
+  trialId: string;
+  sourceBenchId?: string;
+  targetBenchId?: string;
+  status: PlanItemStatus;
+  pinned: boolean;
+  reasons: PlanItemReason[];
+  warnings: PlanItemReason[];
+}
+
+export interface PlanUnplaced {
+  accessionId: string;
+  trialId: string;
+  code: string;
+  message: string;
+}
+
+export interface PlanTradeoff {
+  code: string;
+  message: string;
+}
+
+export interface AllocationPlan {
+  id: string;
+  code: string;
+  algorithmVersion: number;
+  createdAt: string;
+  lifecycle: PlanLifecycle;
+  policy: PlanningPolicy;
+  inputFingerprint: string;
+  items: AllocationPlanItem[];
+  unplaced: PlanUnplaced[];
+  tradeoffs: PlanTradeoff[];
+  appliedAt?: string;
+}
+
 export interface WorkspaceState {
   trials: Trial[];
   accessions: Accession[];
@@ -119,4 +187,5 @@ export interface WorkspaceState {
   observationPasses: ObservationPass[];
   flags: Flag[];
   clearanceSnapshots: ClearanceSnapshot[];
+  allocationPlans: AllocationPlan[];
 }

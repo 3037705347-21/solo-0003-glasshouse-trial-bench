@@ -1,5 +1,6 @@
 import type {
   Accession,
+  AllocationPlan,
   Bench,
   ClearanceSnapshot,
   Flag,
@@ -194,6 +195,7 @@ const benches: Bench[] = [
     lightProfile: "partial-shade",
     irrigationLine: "IR-2",
     status: "assigned",
+    reservedSlots: 1,
   },
   {
     id: "bench-west-2",
@@ -204,6 +206,14 @@ const benches: Bench[] = [
     lightProfile: "partial-shade",
     irrigationLine: "IR-2",
     status: "assigned",
+    reservedSlots: 1,
+    maintenance: [
+      {
+        from: "2026-09-28",
+        to: "2026-10-02",
+        reason: "滴灌管路年度检修",
+      },
+    ],
   },
   {
     id: "bench-north-1",
@@ -316,6 +326,8 @@ const flags: Flag[] = [
 
 const clearanceSnapshots: ClearanceSnapshot[] = [];
 
+const allocationPlans: AllocationPlan[] = [];
+
 export function createSampleWorkspaceState(): WorkspaceState {
   return {
     trials,
@@ -324,5 +336,6 @@ export function createSampleWorkspaceState(): WorkspaceState {
     observationPasses,
     flags,
     clearanceSnapshots,
+    allocationPlans,
   };
 }
