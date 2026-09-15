@@ -24,7 +24,8 @@ export type WorkspaceAction =
       type: "clearance/generated";
       snapshot: ClearanceSnapshot;
       trials: Trial[];
-    };
+    }
+  | { type: "quality/repaired"; state: WorkspaceState };
 
 export function isWorkspaceState(value: unknown): value is WorkspaceState {
   if (!value || typeof value !== "object") {

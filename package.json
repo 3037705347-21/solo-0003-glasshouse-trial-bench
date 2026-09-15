@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4177",
+    "test:unit": "tsc -p test/tsconfig.json && node scripts/run-unit-tests.mjs",
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
@@ -19,6 +20,7 @@
     "vite": "latest"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "playwright": "latest"

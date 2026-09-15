@@ -53,6 +53,8 @@ export function workspaceReducer(
           flag.id === action.flag.id ? action.flag : flag,
         ),
       };
+    case "quality/repaired":
+      return action.state;
     case "clearance/generated":
       return {
         ...state,
