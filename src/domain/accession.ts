@@ -189,6 +189,11 @@ export function updateAccession(
 export function replacementTargetFor(
   accession: Accession,
 ): string | undefined {
+  // 替代关系只对当前处于停用态的材料有效。恢复使用后历史停用记录仅保留在
+  // retirementHistory 中供审计回看，不能再作为当前关系参与循环检测或页面展示。
+  if (!isAccessionRetired(accession)) {
+    return undefined;
+  }
   if (accession.replacementId) {
     return accession.replacementId;
   }

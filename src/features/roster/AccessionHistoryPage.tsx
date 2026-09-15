@@ -143,7 +143,7 @@ export function AccessionHistoryPage() {
           <small>
             {replacement
               ? `当前替代材料：${replacement.cultivar}`
-              : "没有记录替代材料"}
+              : "当前没有替代材料，历史停用记录见下方时间线"}
           </small>
         </article>
       </section>

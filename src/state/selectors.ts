@@ -9,7 +9,7 @@ import type {
 } from "../domain/types";
 import {
   isAccessionRetired,
-  latestRetirementRecord,
+  replacementTargetFor,
 } from "../domain/accession";
 
 export function trialById(
@@ -41,8 +41,7 @@ export function replacementForAccession(
   state: WorkspaceState,
   accession: Accession,
 ): Accession | undefined {
-  const replacementId =
-    accession.replacementId ?? latestRetirementRecord(accession)?.replacementId;
+  const replacementId = replacementTargetFor(accession);
   return replacementId
     ? state.accessions.find((item) => item.id === replacementId)
     : undefined;
@@ -52,13 +51,13 @@ export function replacedByAccessions(
   state: WorkspaceState,
   accessionId: string,
 ): Accession[] {
-  return state.accessions.filter((accession) => {
-    const latest = latestRetirementRecord(accession);
-    return (
-      accession.replacementId === accessionId ||
-      latest?.replacementId === accessionId
-    );
-  });
+  // 只有当前仍处于停用态的材料才会把另一材料指向为现行替代对象；
+  // 已恢复使用的材料不再出现在任何人的“被替代材料”列表里。
+  return state.accessions.filter(
+    (accession) =>
+      isAccessionRetired(accession) &&
+      replacementTargetFor(accession) === accessionId,
+  );
 }
 
 export function accessionById(

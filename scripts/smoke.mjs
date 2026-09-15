@@ -178,7 +178,6 @@ async function retireAccessionReplacement(page) {
     { waitUntil: "networkidle" },
   );
   await page.getByText("被替代材料", { exact: true }).waitFor();
-  await page.locator(".relation-list").getByText("ACC-0001", { exact: false }).waitFor();
   await page.locator(".relation-list").getByText("ACC-0003", { exact: false }).waitFor();
 
   await page.goto(`${baseUrl}/#/roster`, { waitUntil: "networkidle" });
@@ -192,6 +191,8 @@ async function retireAccessionReplacement(page) {
   await page.getByText("材料已恢复", { exact: true }).waitFor();
   const restoredRow = page.locator("tr").filter({ hasText: "ACC-0001" });
   await restoredRow.getByText("已分配", { exact: true }).waitFor();
+  // 恢复后历史停用快照仍在时间线里，但当前替代关系必须清空。
+  await restoredRow.getByText("未指定", { exact: true }).first().waitFor();
   await page.goto(
     `${baseUrl}/#/accessions/acc-tom-01/history`,
     { waitUntil: "networkidle" },
@@ -214,6 +215,19 @@ async function retireAccessionReplacement(page) {
   );
   await page.getByRole("button", { name: "取消" }).click();
 
+  await page.goto(
+    `${baseUrl}/#/accessions/acc-tom-02/history`,
+    { waitUntil: "networkidle" },
+  );
+  // acc-tom-01 已恢复，它与 acc-tom-02 的历史替代关系只留在各自时间线，
+  // acc-tom-02 的“被替代材料”现在只剩仍停用的 acc-tom-03。
+  await page.locator(".relation-list").getByText("ACC-0003", { exact: false }).waitFor();
+  await assertCount(
+    page.locator(".relation-list").getByText("ACC-0001", { exact: false }),
+    0,
+    "restored material removed from replaced-by list",
+  );
+
   await page.goto(`${baseUrl}/#/roster`, { waitUntil: "networkidle" });
   await page.getByTestId("retire-accession-acc-tom-02").click();
   await assertCount(
@@ -221,10 +235,12 @@ async function retireAccessionReplacement(page) {
     0,
     "self replacement option",
   );
+  // 恢复后的 acc-tom-01 不再携带陈旧替代链接，应重新成为合法替代候选，
+  // 而不会因为历史记录被误判为循环。
   await assertCount(
     page.getByTestId("retire-replacement-select").locator('option[value="acc-tom-01"]'),
-    0,
-    "cycle-producing replacement option",
+    1,
+    "restored material is a valid replacement candidate again",
   );
   await page.getByRole("button", { name: "取消" }).click();
 
