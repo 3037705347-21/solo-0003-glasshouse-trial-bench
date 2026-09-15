@@ -3,6 +3,10 @@ import { SelectField } from "../../components/fields";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { Accession, Bench } from "../../domain/types";
 import {
+  evaluateReadiness,
+  READINESS_STATUS_LABELS,
+} from "../../domain/readiness";
+import {
   accessionStatus,
   activeAccessionsForTrial,
 } from "../../state/selectors";
@@ -29,6 +33,9 @@ export function AssignmentPanel({
   const compatibleBenches = selected
     ? state.benches.filter((bench) => canAssignAccession(selected, bench))
     : [];
+  const assignVerdict = selected
+    ? evaluateReadiness(state, selected, "assign")
+    : undefined;
 
   return (
     <aside className="assignment-panel">
@@ -65,12 +72,30 @@ export function AssignmentPanel({
             </StatusBadge>
           </div>
           <p>{selected.genotypeNote}</p>
-          <div className="assignment-compatible">
-            <ArrowRight size={16} aria-hidden="true" />
-            <span>
-              可分配到 {compatibleBenches.length} 个台架
-            </span>
-          </div>
+          {assignVerdict && assignVerdict.status !== "ready" ? (
+            <div
+              className="assignment-readiness"
+              data-testid="assignment-readiness"
+            >
+              <StatusBadge
+                tone={assignVerdict.status === "blocked" ? "critical" : "neutral"}
+              >
+                {READINESS_STATUS_LABELS[assignVerdict.status]}
+              </StatusBadge>
+              <ul>
+                {assignVerdict.reasons.map((reason, index) => (
+                  <li key={`${reason.code}-${index}`}>{reason.message}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="assignment-compatible">
+              <ArrowRight size={16} aria-hidden="true" />
+              <span>
+                可分配到 {compatibleBenches.length} 个台架
+              </span>
+            </div>
+          )}
         </div>
       ) : (
         <p className="muted-copy">选择材料后查看可分配的台架。</p>

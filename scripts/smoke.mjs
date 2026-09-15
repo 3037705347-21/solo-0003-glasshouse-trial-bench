@@ -16,6 +16,7 @@ const scenarios = {
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
   "retire-accession-replacement": retireAccessionReplacement,
+  "readiness-across-workflows": readinessAcrossWorkflows,
 };
 
 const scenarioPaths = {
@@ -24,6 +25,7 @@ const scenarioPaths = {
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
   "retire-accession-replacement": "/roster",
+  "readiness-across-workflows": "/roster",
 };
 
 async function waitForServer() {
@@ -100,6 +102,90 @@ async function assertCount(locator, expected, label) {
   if (actual !== expected) {
     throw new Error(`${label}: expected ${expected}, got ${actual}`);
   }
+}
+
+async function assertBadgeTitle(locator, expected, label) {
+  const title = await locator.getAttribute("title");
+  if (!title || !title.includes(expected)) {
+    throw new Error(`${label}: expected title to include "${expected}", got "${title}"`);
+  }
+}
+
+async function readinessAcrossWorkflows(page) {
+  // 材料登记：同一材料在不同动作下得到不同结论。
+  // acc-tom-01 已分配到 E-1 且有未处理标记：
+  // 分配=不适用、观测=可推进（标记不影响观测）、放行=受阻。
+  const assignBadge = page.getByTestId("readiness-badge-assign-acc-tom-01");
+  await assignBadge.waitFor();
+  await assertBadgeTitle(assignBadge, "已分配到台架 E-1", "assign readiness");
+  await assertBadgeTitle(
+    page.getByTestId("readiness-badge-observe-acc-tom-01"),
+    "不影响观测",
+    "observe readiness",
+  );
+  const clearBadge = page.getByTestId("readiness-badge-clear-acc-tom-01");
+  await assertBadgeTitle(clearBadge, "未处理标记", "clear readiness");
+
+  // 依据弹窗：每个动作的结论和理由都可以展开查看。
+  await clearBadge.click();
+  await page.getByTestId("readiness-dialog").waitFor();
+  await page
+    .getByTestId("readiness-item-clear")
+    .getByText("未处理标记 HT_UNDER", { exact: false })
+    .waitFor();
+  await page
+    .getByTestId("readiness-item-observe")
+    .getByText("可推进", { exact: true })
+    .waitFor();
+  await page.getByRole("button", { name: "关闭对话框" }).click();
+
+  // 台架布局：选中材料后显示与分配动作相关的就地结论。
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  await page.getByTestId("assignment-accession-select").selectOption("acc-tom-01");
+  await page
+    .getByTestId("assignment-readiness")
+    .getByText("已分配到台架 E-1", { exact: false })
+    .waitFor();
+  await page.getByTestId("assignment-accession-select").selectOption("acc-tom-03");
+  await page.getByText("可分配到", { exact: false }).waitFor();
+
+  // 生长观测：观测准备度汇总覆盖试验内全部材料。
+  await page.goto(`${baseUrl}/#/observations`, { waitUntil: "networkidle" });
+  const observeSummary = page.getByTestId("observe-readiness-summary");
+  await observeSummary.waitFor();
+  await observeSummary.getByText("可推进 3", { exact: true }).waitFor();
+
+  // 试验放行：生成快照后，保存的快照仍然有效。
+  await page.goto(`${baseUrl}/#/clearance`, { waitUntil: "networkidle" });
+  await page.getByTestId("generate-clearance").click();
+  await page.getByText("放行被阻止", { exact: true }).waitFor();
+  const freshness = page.getByTestId("snapshot-freshness");
+  await freshness.waitFor();
+  if ((await freshness.getAttribute("data-stale")) !== "false") {
+    throw new Error("freshly generated snapshot should be valid");
+  }
+  await freshness.getByText("快照仍然有效", { exact: false }).waitFor();
+  await page.getByTestId("clear-readiness-summary").waitFor();
+
+  // 解决一个未处理标记，使已保存快照过期。
+  await page.goto(`${baseUrl}/#/observations`, { waitUntil: "networkidle" });
+  await page
+    .getByTestId("flag-resolution-note")
+    .fill("已复查水肥并恢复滴灌，株高回升。");
+  await page.getByTestId("resolve-flag").click();
+  await page.getByText("该试验没有未处理的标记。", { exact: true }).waitFor();
+
+  // 回到放行页：快照被识别为过期，并列出具体变化作为依据。
+  await page.goto(`${baseUrl}/#/clearance`, { waitUntil: "networkidle" });
+  const staleFreshness = page.getByTestId("snapshot-freshness");
+  await staleFreshness.waitFor();
+  if ((await staleFreshness.getAttribute("data-stale")) !== "true") {
+    throw new Error("snapshot should be stale after flag resolution");
+  }
+  await staleFreshness.getByText("快照已过期", { exact: false }).waitFor();
+  await page
+    .getByText("阻止项已消除 FLAG_HT_UNDER", { exact: false })
+    .waitFor();
 }
 
 async function retireAccessionReplacement(page) {

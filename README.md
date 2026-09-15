@@ -2,6 +2,8 @@
 
 温室试验台是一个离线优先的 React 工作台，用于管理作物试验。它把材料登记、台架分配、生长观测和放行检查集中到一个本地浏览器工具中。材料支持停用、替代和恢复，停用后保留历史观测、标记、台架与放行引用，但不会继续出现在新分配或新观测的选择器中。
 
+跨页面的准备度判定让每个工作流得到与自身动作相关的结论：同一材料在分配、观测、恢复、放行四个动作下分别实时推导为可推进、受阻或不适用，并附带判定依据（例如未处理标记只阻止放行、不影响观测）。放行以不可变快照为准，快照保存输入指纹；相关数据变化后快照会被标记为已过期，并列出具体变化。
+
 ## 本地运行
 
 ```bash
@@ -29,6 +31,7 @@ node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
 node scripts/smoke.mjs advance-trial-clearance
 node scripts/smoke.mjs retire-accession-replacement
+node scripts/smoke.mjs readiness-across-workflows
 ```
 
 每条命令都会启动并关闭一个本地 Vite 预览服务，端口为 `4177`。检查过程不调用外部服务，也不依赖在线数据库。
@@ -45,6 +48,7 @@ src/
     layout/               台架分配工作区
     observations/         观测记录和标记处理
     clearance/            放行快照工作区
+    readiness/            跨页面准备度徽章、判定清单和快照时效横幅
   components/             共享 UI 原语
   styles/                 应用样式
 scripts/

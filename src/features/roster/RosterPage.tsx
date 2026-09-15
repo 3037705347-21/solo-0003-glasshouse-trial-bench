@@ -14,6 +14,11 @@ import {
   isAccessionRetired,
   nextAccessionNumber,
 } from "../../domain/accession";
+import {
+  evaluateAccessionReadiness,
+  evaluateReadiness,
+  type ReadinessAction,
+} from "../../domain/readiness";
 import type { Accession } from "../../domain/types";
 import {
   accessionStatus,
@@ -21,6 +26,8 @@ import {
   replacementForAccession,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { ReadinessBadges } from "../readiness/ReadinessBadges";
+import { ReadinessDialog } from "../readiness/ReadinessDialog";
 import {
   RestoreAccessionDialog,
   RetireAccessionDialog,
@@ -28,6 +35,13 @@ import {
 import { RosterForm } from "./RosterForm";
 
 type RosterSegment = "all" | "active" | "assigned" | "unassigned" | "retired";
+
+/** 行内重点动作：停用材料关注恢复，其他关注推进路径。 */
+function rowActions(accession: Accession): ReadinessAction[] {
+  return isAccessionRetired(accession)
+    ? ["restore", "observe", "clear"]
+    : ["assign", "observe", "clear"];
+}
 
 export function RosterPage() {
   const { state } = useWorkspace();
@@ -39,6 +53,7 @@ export function RosterPage() {
   const [editingAccession, setEditingAccession] = useState<Accession | undefined>();
   const [retiringAccession, setRetiringAccession] = useState<Accession | undefined>();
   const [restoringAccession, setRestoringAccession] = useState<Accession | undefined>();
+  const [readinessAccession, setReadinessAccession] = useState<Accession | undefined>();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
@@ -134,6 +149,19 @@ export function RosterPage() {
           </StatusBadge>
         );
       },
+    },
+    {
+      key: "readiness",
+      header: "准备度",
+      render: (accession) => (
+        <ReadinessBadges
+          accessionId={accession.id}
+          verdicts={rowActions(accession).map((action) =>
+            evaluateReadiness(state, accession, action),
+          )}
+          onOpen={() => setReadinessAccession(accession)}
+        />
+      ),
     },
     {
       key: "replacement",
@@ -297,6 +325,13 @@ export function RosterPage() {
           <p>请先创建试验，再添加材料。</p>
         )}
       </Dialog>
+      {readinessAccession ? (
+        <ReadinessDialog
+          accession={readinessAccession}
+          verdicts={evaluateAccessionReadiness(state, readinessAccession)}
+          onClose={() => setReadinessAccession(undefined)}
+        />
+      ) : null}
       {retiringAccession ? (
         <RetireAccessionDialog
           accession={retiringAccession}

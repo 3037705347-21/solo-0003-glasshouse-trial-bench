@@ -110,6 +110,11 @@ export interface ClearanceSnapshot {
   status: ClearanceStatus;
   metrics: ClearanceMetric[];
   blockers: ClearanceBlocker[];
+  /**
+   * 生成快照时全部输入（试验状态、材料生命周期、台架占用、开放标记）
+   * 的确定性指纹。用于事后识别快照是否已经过期；旧版本快照可能缺失。
+   */
+  inputFingerprint?: string;
 }
 
 export interface WorkspaceState {

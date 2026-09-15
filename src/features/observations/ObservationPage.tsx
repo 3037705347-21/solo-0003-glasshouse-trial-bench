@@ -7,11 +7,13 @@ import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import type { ObservationPass } from "../../domain/types";
 import { isAccessionRetired } from "../../domain/accession";
+import { readinessForTrialAction } from "../../domain/readiness";
 import {
   openFlagsForTrial,
   passesForTrial,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { ReadinessSummary } from "../readiness/ReadinessSummary";
 import { FlagPanel } from "./FlagPanel";
 import { PassForm } from "./PassForm";
 
@@ -22,6 +24,10 @@ export function ObservationPage() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const passes = passesForTrial(state, trialId);
   const flags = openFlagsForTrial(state, trialId);
+  const observeReadiness = useMemo(
+    () => readinessForTrialAction(state, trialId, "observe"),
+    [state, trialId],
+  );
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -76,6 +82,11 @@ export function ObservationPage() {
           ))}
         </select>
       </section>
+      <ReadinessSummary
+        action="observe"
+        items={observeReadiness}
+        testId="observe-readiness-summary"
+      />
       <div className="observation-workspace">
         <section className="pass-list">
           <div className="pass-list-heading">

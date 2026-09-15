@@ -6,10 +6,14 @@ import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import {
   applyClearance,
   buildClearanceSnapshot,
+  evaluateSnapshotFreshness,
 } from "../../domain/clearance";
+import { readinessForTrialAction } from "../../domain/readiness";
 import { transitionTrial } from "../../domain/trial";
 import { latestSnapshotForTrial } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { ReadinessSummary } from "../readiness/ReadinessSummary";
+import { SnapshotFreshnessBanner } from "../readiness/SnapshotFreshnessBanner";
 import { SnapshotCard } from "./SnapshotCard";
 
 export function ClearancePage() {
@@ -22,6 +26,16 @@ export function ClearancePage() {
   const liveSnapshot = useMemo(
     () => buildClearanceSnapshot(state, trialId),
     [state, trialId],
+  );
+
+  const clearReadiness = useMemo(
+    () => readinessForTrialAction(state, trialId, "clear"),
+    [state, trialId],
+  );
+
+  const snapshotFreshness = useMemo(
+    () => (latest ? evaluateSnapshotFreshness(state, latest) : undefined),
+    [state, latest],
   );
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
@@ -125,15 +139,25 @@ export function ClearancePage() {
           <ShieldCheck size={20} className="panel-icon" aria-hidden="true" />
         </div>
         <SnapshotCard snapshot={liveSnapshot} />
+        <ReadinessSummary
+          action="clear"
+          items={clearReadiness}
+          testId="clear-readiness-summary"
+        />
       </section>
       {latest ? (
         <section className="clearance-preview">
           <div className="panel-heading">
             <div>
               <span className="panel-title">已保存快照</span>
-              <span className="panel-subtitle">最近生成的放行快照</span>
+              <span className="panel-subtitle">
+                最近生成的放行快照；若相关数据已变化会标记为过期
+              </span>
             </div>
           </div>
+          {snapshotFreshness ? (
+            <SnapshotFreshnessBanner freshness={snapshotFreshness} />
+          ) : null}
           <SnapshotCard snapshot={latest} />
         </section>
       ) : null}

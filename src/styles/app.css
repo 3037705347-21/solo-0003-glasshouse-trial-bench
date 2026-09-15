@@ -1389,6 +1389,256 @@ button {
   border: 1px solid var(--line);
 }
 
+/* 跨页面准备度判定 */
+
+.readiness-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.readiness-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.readiness-badge-ready {
+  background: var(--green-100);
+  color: var(--green-700);
+}
+
+.readiness-badge-blocked {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.readiness-badge-excluded {
+  background: var(--surface-soft);
+  color: var(--text-muted);
+}
+
+.readiness-badge:hover {
+  border-color: currentColor;
+}
+
+.readiness-dialog-intro {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.readiness-panel-body {
+  padding: 16px 18px;
+}
+
+.readiness-verdict-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.readiness-verdict-item {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fcfdfb;
+}
+
+.readiness-verdict-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.readiness-verdict-head strong {
+  font-size: 14px;
+}
+
+.readiness-ready-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.readiness-reasons {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.readiness-reasons li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.readiness-advisories {
+  color: var(--text-muted);
+}
+
+.reason-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+}
+
+.reason-dot-critical {
+  background: var(--danger);
+}
+
+.reason-dot-warning {
+  background: var(--amber-700);
+}
+
+.reason-dot-info {
+  background: var(--blue-700);
+}
+
+.readiness-summary {
+  display: grid;
+  gap: 10px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.clearance-preview > .readiness-summary {
+  margin: 0 20px 20px;
+}
+
+.readiness-summary-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.readiness-summary-title {
+  font-size: 14px;
+  font-weight: 750;
+  margin-right: auto;
+}
+
+.readiness-summary-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.readiness-summary-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.readiness-summary-list strong {
+  flex: none;
+  color: var(--green-700);
+}
+
+.readiness-summary-list span {
+  color: var(--text-muted);
+}
+
+.readiness-summary-clear {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.freshness-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 16px 20px 0;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.freshness-banner-fresh {
+  background: var(--green-100);
+  color: var(--green-700);
+}
+
+.freshness-banner-fresh svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.freshness-banner-stale {
+  flex-direction: column;
+  background: var(--amber-100);
+  color: var(--amber-700);
+}
+
+.freshness-banner-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+}
+
+.freshness-banner-head svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.freshness-drift-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 24px;
+}
+
+.freshness-banner-foot {
+  margin: 0;
+  font-weight: 700;
+}
+
+.assignment-readiness {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  font-size: 13px;
+}
+
+.assignment-readiness ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 760px) {
+  .readiness-summary-list li {
+    flex-direction: column;
+    gap: 2px;
+  }
+}
+
 @media (max-width: 1100px) {
   .history-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

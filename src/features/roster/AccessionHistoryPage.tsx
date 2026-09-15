@@ -1,11 +1,12 @@
 import { useMemo } from "react";
-import { ArrowLeft, History, Link2 } from "lucide-react";
+import { ArrowLeft, Gauge, History, Link2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
 import { PageHeader } from "../../components/PageHeader";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { isAccessionRetired } from "../../domain/accession";
+import { evaluateAccessionReadiness } from "../../domain/readiness";
 import type {
   AccessionRetirementRecord,
   ObservationEntry,
@@ -17,6 +18,7 @@ import {
   trialById,
 } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { ReadinessVerdictList } from "../readiness/ReadinessVerdictList";
 
 interface ObservationHistoryRow {
   passId: string;
@@ -100,6 +102,7 @@ export function AccessionHistoryPage() {
   const replacement = replacementForAccession(state, accession);
   const replacedBy = replacedByAccessions(state, accession.id);
   const retired = isAccessionRetired(accession);
+  const readinessVerdicts = evaluateAccessionReadiness(state, accession);
 
   return (
     <div className="page" data-testid="accession-history-page">
@@ -146,6 +149,21 @@ export function AccessionHistoryPage() {
               : "没有记录替代材料"}
           </small>
         </article>
+      </section>
+
+      <section className="content-panel" data-testid="history-readiness-panel">
+        <div className="panel-heading">
+          <div>
+            <span className="panel-title">当前准备度</span>
+            <span className="panel-subtitle">
+              按当前数据实时推导：同一材料在不同动作下的结论与依据
+            </span>
+          </div>
+          <Gauge size={20} className="panel-icon" aria-hidden="true" />
+        </div>
+        <div className="readiness-panel-body">
+          <ReadinessVerdictList verdicts={readinessVerdicts} />
+        </div>
       </section>
 
       <section className="content-panel">
