@@ -1411,3 +1411,228 @@ button {
     justify-content: flex-start;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   升级与恢复机制
+--------------------------------------------------------------------------- */
+.app-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.migration-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.migration-banner > span {
+  flex: 1;
+}
+
+.migration-banner-info {
+  background: var(--green-100);
+  color: var(--green-700);
+}
+
+.migration-badge-warning,
+.migration-banner {
+  background: var(--amber-100);
+  color: var(--amber-700);
+}
+
+.migration-banner-error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.issue-dialog-intro {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.issue-list {
+  display: grid;
+  gap: 12px;
+  max-height: 56vh;
+  overflow-y: auto;
+}
+
+.issue-card {
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  background: var(--surface);
+  display: grid;
+  gap: 8px;
+}
+
+.issue-critical {
+  border-left-color: var(--rust-700);
+}
+
+.issue-warning {
+  border-left-color: var(--amber-700);
+}
+
+.issue-resolved {
+  opacity: 0.62;
+}
+
+.issue-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.issue-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.issue-badge-critical {
+  background: var(--rust-100);
+  color: var(--rust-700);
+}
+
+.issue-badge-warning {
+  background: var(--amber-100);
+  color: var(--amber-700);
+}
+
+.issue-code {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.issue-status {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--green-700);
+}
+
+.issue-message {
+  margin: 0;
+  font-size: 14px;
+}
+
+.issue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.issue-keep {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.issue-keep input {
+  min-width: 220px;
+}
+
+.issue-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.issue-resolution-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* 恢复模式全屏页 */
+.recovery-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+  background: var(--canvas);
+}
+
+.recovery-panel {
+  max-width: 820px;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--danger);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px;
+  display: grid;
+  gap: 18px;
+}
+
+.recovery-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.recovery-header h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+
+.recovery-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.recovery-detail {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.recovery-reason {
+  margin: 0;
+}
+
+.recovery-raw {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  background: #1f2a20;
+  color: #d7e0d2;
+  border-radius: var(--radius);
+  padding: 12px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.recovery-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recovery-footnote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}

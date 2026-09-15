@@ -5,8 +5,16 @@ import { RosterPage } from "../features/roster/RosterPage";
 import { LayoutPage } from "../features/layout/LayoutPage";
 import { ObservationPage } from "../features/observations/ObservationPage";
 import { ClearancePage } from "../features/clearance/ClearancePage";
+import { RecoveryScreen } from "../features/recovery/RecoveryScreen";
+import { useWorkspace } from "../state/store";
 
 export function App() {
+  const { recovery } = useWorkspace();
+
+  if (recovery) {
+    return <RecoveryScreen />;
+  }
+
   return (
     <AppShell>
       <Routes>
