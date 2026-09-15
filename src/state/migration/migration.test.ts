@@ -497,3 +497,136 @@ test("不可清空的引用（flag/观测材料）不能通过 clear 清空", ()
   const cleared = resolveDanglingByClear(result.state, result.issues, issue);
   assert.equal(cleared.ok, false);
 });
+
+// ---------------------------------------------------------------------------
+// 替换 vs 新增、台架状态重算、观测同次去重
+// ---------------------------------------------------------------------------
+
+function benchFixture(overrides: any = {}) {
+  return minimalState({
+    trials: [{ id: "t1" } as any],
+    accessions: [
+      { id: "acc-a", trialId: "t1", lifecycleStatus: "active", preferredLight: "full-sun" } as any,
+      { id: "acc-b", trialId: "t1", lifecycleStatus: "active", preferredLight: "full-sun" } as any,
+    ],
+    benches: [
+      {
+        id: "b1",
+        code: "B1",
+        capacity: 1,
+        status: "assigned",
+        lightProfile: "full-sun",
+        assignedIds: ["acc-a"],
+        ...overrides,
+      } as any,
+    ],
+  });
+}
+
+test("台架悬空槽是替换而非新增：容量已满但仅有的占用是悬空槽时允许重关联", () => {
+  // capacity 1，唯一槽位悬空（没有任何合法占用）——重关联应合法，不能按新增被容量拒绝
+  const state = benchFixture({ assignedIds: ["acc-vanished"] });
+  const result = migrateWorkspace(v1Envelope(state), NOW);
+  if (!result.ok) throw new Error("expected ok");
+  const issue = result.issues.find(
+    (i) => i.ownerCollection === "benches",
+  ) as DanglingReferenceIssue;
+
+  const fixed = resolveDanglingByRelink(result.state, result.issues, issue, "acc-b");
+  assert.equal(fixed.ok, true);
+  if (!fixed.ok) throw new Error(JSON.stringify(fixed.errors));
+  const bench: any = fixed.value.state.benches[0];
+  assert.deepEqual(bench.assignedIds, ["acc-b"]);
+  assert.equal(bench.status, "assigned");
+});
+
+test("移除悬空槽后仍真满位（合法占用已占满）时，重关联才按容量拒绝", () => {
+  // capacity 1，合法占用 acc-a 已占满，另有一条悬空引用（异常超额）：
+  // 移除悬空后仍满，重关联必须被容量规则拒绝。
+  const state = benchFixture({ assignedIds: ["acc-a", "acc-vanished"] });
+  const result = migrateWorkspace(v1Envelope(state), NOW);
+  if (!result.ok) throw new Error("expected ok");
+  const issue = result.issues.find(
+    (i) => i.ownerCollection === "benches",
+  ) as DanglingReferenceIssue;
+  const fixed = resolveDanglingByRelink(result.state, result.issues, issue, "acc-b");
+  assert.equal(fixed.ok, false);
+  if (!fixed.ok) assert.equal(fixed.errors[0].code, "capacity");
+});
+
+test("清空台架悬空槽后按剩余占用重算状态：清空最后一个槽位变为 available", () => {
+  // 台架只有一个悬空槽（无合法占用），清空后应为 available 而非仍显示已分配
+  const state = benchFixture({ assignedIds: ["acc-vanished"] });
+  const result = migrateWorkspace(v1Envelope(state), NOW);
+  if (!result.ok) throw new Error("expected ok");
+  const issue = result.issues.find(
+    (i) => i.ownerCollection === "benches",
+  ) as DanglingReferenceIssue;
+  const cleared = resolveDanglingByClear(result.state, result.issues, issue);
+  assert.equal(cleared.ok, true);
+  if (!cleared.ok) throw new Error("expected ok");
+  const bench: any = cleared.value.state.benches[0];
+  assert.deepEqual(bench.assignedIds, []);
+  assert.equal(bench.status, "available");
+});
+
+test("清空悬空槽但仍有其它合法占用时，台架保持 assigned", () => {
+  const state = benchFixture({ capacity: 4, assignedIds: ["acc-a", "acc-vanished"] });
+  const result = migrateWorkspace(v1Envelope(state), NOW);
+  if (!result.ok) throw new Error("expected ok");
+  const issue = result.issues.find(
+    (i) => i.ownerCollection === "benches",
+  ) as DanglingReferenceIssue;
+  const cleared = resolveDanglingByClear(result.state, result.issues, issue);
+  assert.equal(cleared.ok, true);
+  if (!cleared.ok) throw new Error("expected ok");
+  const bench: any = cleared.value.state.benches[0];
+  assert.deepEqual(bench.assignedIds, ["acc-a"]);
+  assert.equal(bench.status, "assigned");
+});
+
+test("观测条目重关联拒绝同一次观测中已存在的材料（去重）", () => {
+  const state = minimalState({
+    trials: [{ id: "t1" } as any],
+    accessions: [
+      { id: "acc-dup", trialId: "t1", lifecycleStatus: "active" } as any,
+      { id: "acc-free", trialId: "t1", lifecycleStatus: "active" } as any,
+    ],
+    observationPasses: [
+      {
+        id: "pass-1",
+        trialId: "t1",
+        entries: [
+          { accessionId: "acc-dup", heightMm: 50, leafCount: 6, ecMs: 1.5, notes: "已存在" },
+          { accessionId: "acc-gone", heightMm: 70, leafCount: 7, ecMs: 1.6, notes: "悬空行" },
+        ],
+      } as any,
+    ],
+  });
+  const result = migrateWorkspace(v1Envelope(state), NOW);
+  if (!result.ok) throw new Error("expected ok");
+  const issue = result.issues.find(
+    (i) =>
+      i.ownerCollection === "observationPasses" &&
+      i.field === "entries.1.accessionId",
+  ) as DanglingReferenceIssue;
+
+  // 关联到同次观测已有的 acc-dup：拒绝 duplicate，数据不变
+  const dup = resolveDanglingByRelink(result.state, result.issues, issue, "acc-dup");
+  assert.equal(dup.ok, false);
+  if (!dup.ok) assert.equal(dup.errors[0].code, "duplicate");
+  assert.equal(
+    result.state.observationPasses[0].entries[1].accessionId,
+    "acc-gone",
+  );
+
+  // 关联到空闲材料 acc-free：成功，且两条记录分别保留
+  const fixed = resolveDanglingByRelink(result.state, result.issues, issue, "acc-free");
+  assert.equal(fixed.ok, true);
+  if (!fixed.ok) throw new Error("expected ok");
+  const entries = fixed.value.state.observationPasses[0].entries;
+  assert.deepEqual(
+    entries.map((e) => e.accessionId),
+    ["acc-dup", "acc-free"],
+  );
+});

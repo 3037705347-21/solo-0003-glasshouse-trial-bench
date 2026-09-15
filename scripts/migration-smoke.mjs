@@ -132,6 +132,34 @@ function buildLegacyV1Workspace() {
           genotypeNote: "相邻台架上的材料，任何修复都不应改动它。",
           labels: [],
         },
+        // 满载悬空槽位的替换目标（空闲、全日照）
+        {
+          id: "acc-full-target",
+          trialId: "trial-legacy",
+          accessionNo: "ACC-9006",
+          cultivar: "Full Replace Target",
+          source: "Legacy Seed House",
+          propagatedOn: "2026-06-03",
+          quantity: 40,
+          trayCells: 72,
+          preferredLight: "full-sun",
+          genotypeNote: "用于满载台架悬空槽位替换的在用空闲材料。",
+          labels: [],
+        },
+        // 悬空观测条目的合法重关联目标（不在同次观测中）
+        {
+          id: "acc-obs-target",
+          trialId: "trial-legacy",
+          accessionNo: "ACC-9007",
+          cultivar: "Observation Target",
+          source: "Legacy Seed House",
+          propagatedOn: "2026-06-03",
+          quantity: 40,
+          trayCells: 72,
+          preferredLight: "full-sun",
+          genotypeNote: "用于悬空观测条目重新关联的在用材料。",
+          labels: [],
+        },
       ],
       benches: [
         // 待修复台架：一个合法相邻槽位 + 一个悬空槽位
@@ -156,6 +184,29 @@ function buildLegacyV1Workspace() {
           irrigationLine: "IR-T",
           status: "assigned",
         },
+        // 满载替换台架：capacity 1，唯一槽位悬空（无合法占用）。
+        // 重关联必须被当作“替换”而允许（移除悬空后为空），而不是按新增被容量拒绝。
+        {
+          id: "bench-full-replace",
+          code: "B-FULL",
+          sector: "测试翼",
+          capacity: 1,
+          assignedIds: ["acc-full-gone"],
+          lightProfile: "full-sun",
+          irrigationLine: "IR-T",
+          status: "assigned",
+        },
+        // 清空变可用台架：唯一槽位悬空，清空最后一个槽位后应显示“可用”而非“已分配”。
+        {
+          id: "bench-clear",
+          code: "B-CLR",
+          sector: "测试翼",
+          capacity: 3,
+          assignedIds: ["acc-clear-gone"],
+          lightProfile: "full-sun",
+          irrigationLine: "IR-T",
+          status: "assigned",
+        },
       ],
       observationPasses: [
         {
@@ -164,6 +215,14 @@ function buildLegacyV1Workspace() {
           observedOn: "2026-06-10",
           observer: "Legacy Observer",
           entries: [
+            // 已存在的有效条目：悬空条目不允许重关联到该材料（同次观测去重）
+            {
+              accessionId: "acc-rel",
+              heightMm: 60,
+              leafCount: 7,
+              ecMs: 1.9,
+              notes: "同次观测里已有的材料",
+            },
             // 悬空观测材料：必须进入待处理清单且测量值保留
             {
               accessionId: "acc-observation-gone",
@@ -312,6 +371,98 @@ async function scenarioNeighboursUntouched(page) {
   await neighbourBench.locator("dd").filter({ hasText: "3" }).first().waitFor();
 }
 
+/** 在核对对话框里按缺失引用值定位问题卡片（多个台架场景共用）。 */
+function issueCardByMissingRef(page, missingRef) {
+  return page
+    .getByTestId("issue-list")
+    .locator(".issue-card", { hasText: `（${missingRef}）` })
+    .first();
+}
+
+// 替换语义：capacity 已满但唯一占用是悬空槽时，重关联应被允许
+async function scenarioFullBenchRelinkIsReplacement(page) {
+  await openIssueDialog(page);
+  const card = issueCardByMissingRef(page, "acc-full-gone");
+  await card.locator("select").selectOption("acc-full-target");
+  await card.getByRole("button", { name: "重新关联" }).click();
+  // 不出现容量错误，卡片复检后消失
+  await assertPoll(
+    async () =>
+      (await page
+        .locator(".issue-domain-error", { hasText: "没有空位" })
+        .count()) === 0,
+    "替换悬空槽位不应按新增占用触发容量拒绝",
+  );
+  await page
+    .getByTestId("issue-list")
+    .locator(".issue-card", { hasText: "acc-full-gone" })
+    .waitFor({ state: "detached" });
+  await page.getByTestId("close-issue-dialog").click();
+
+  // 台架 B-FULL 现在占用该目标且状态仍是“已分配”，空位数为 0
+  const bench = page.getByTestId("bench-card-bench-full-replace");
+  await bench.getByText("Full Replace Target").waitFor();
+  await bench.getByText("已分配").waitFor();
+}
+
+// 清空最后一个悬空槽位后台架应变“可用”，刷新后仍一致
+async function scenarioClearLastSlotMakesAvailable(page) {
+  await openIssueDialog(page);
+  const card = issueCardByMissingRef(page, "acc-clear-gone");
+  await card.getByRole("button", { name: "清空该引用" }).click();
+  await page
+    .getByTestId("issue-list")
+    .locator(".issue-card", { hasText: "acc-clear-gone" })
+    .waitFor({ state: "detached" });
+  await page.getByTestId("close-issue-dialog").click();
+
+  const bench = page.getByTestId("bench-card-bench-clear");
+  await bench.getByText("可用").waitFor();
+  await bench.getByText("暂无分配材料。").waitFor();
+
+  // 刷新后状态保持一致
+  await page.reload({ waitUntil: "networkidle" });
+  const reloaded = page.getByTestId("bench-card-bench-clear");
+  await reloaded.getByText("可用").waitFor();
+  await reloaded.getByText("暂无分配材料。").waitFor();
+  const stored = JSON.parse(await readPrimaryKey(page));
+  const storedBench = stored.state.benches.find((b) => b.id === "bench-clear");
+  await assert.deepEqual(storedBench.assignedIds, []);
+  await assert.equal(storedBench.status, "available");
+}
+
+// 观测条目不能重关联到同一次观测里已有的材料；可关联到未出现的材料
+async function scenarioObservationDedupe(page) {
+  await openIssueDialog(page);
+  // 悬空观测条目卡片
+  const card = issueCardByMissingRef(page, "acc-observation-gone");
+
+  // 尝试关联到同次观测已有的 acc-rel：被去重规则拒绝
+  await card.locator("select").selectOption("acc-rel");
+  await card.getByRole("button", { name: "重新关联" }).click();
+  await card
+    .locator(".issue-domain-error", { hasText: "同一材料在单次观测中只能出现一次" })
+    .waitFor();
+
+  // 悬空测量事实仍保留
+  await card.waitFor();
+
+  // 关联到未在该次观测出现的 acc-obs-target：成功
+  await card.locator("select").selectOption("acc-obs-target");
+  await card.getByRole("button", { name: "重新关联" }).click();
+  await page
+    .getByTestId("issue-list")
+    .locator(".issue-card", { hasText: "acc-observation-gone" })
+    .waitFor({ state: "detached" });
+  await page.getByTestId("close-issue-dialog").click();
+
+  // 持久化的观测条目两条都在且材料不同
+  const stored = JSON.parse(await readPrimaryKey(page));
+  const pass = stored.state.observationPasses.find((p) => p.id === "pass-legacy");
+  const ids = pass.entries.map((e) => e.accessionId);
+  await assert.deepEqual(ids, ["acc-rel", "acc-obs-target"]);
+}
+
 async function scenarioPersistsAcrossReload(browser, legacy) {
   const { page, context } = await freshPageWithStorage(browser, legacy);
   await upgradeBannerAppears(page);
@@ -397,6 +548,13 @@ const assert = {
       throw new Error(`expected ${String(expected)}, got ${String(actual)}`);
     }
   },
+  deepEqual(actual, expected) {
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      throw new Error(
+        `expected deep ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+      );
+    }
+  },
 };
 
 async function run() {
@@ -450,6 +608,30 @@ async function run() {
       await neighbourBench.locator("dd").filter({ hasText: "3" }).first().waitFor();
       await context.close();
       console.log("✅ migration: 相邻台架/槽位/材料不被污染");
+    }
+
+    // 满载台架的悬空槽重关联是替换，不按新增占用拒绝
+    {
+      const { page, context } = await freshPageWithStorage(browser, legacy);
+      await scenarioFullBenchRelinkIsReplacement(page);
+      await context.close();
+      console.log("✅ migration: 满载悬空槽按替换处理（不被容量拒绝）");
+    }
+
+    // 清空最后一个悬空槽后台架变可用，刷新后持久一致
+    {
+      const { page, context } = await freshPageWithStorage(browser, legacy);
+      await scenarioClearLastSlotMakesAvailable(page);
+      await context.close();
+      console.log("✅ migration: 清空最后槽位后台架变可用且持久一致");
+    }
+
+    // 观测条目重关联遵循同次观测去重
+    {
+      const { page, context } = await freshPageWithStorage(browser, legacy);
+      await scenarioObservationDedupe(page);
+      await context.close();
+      console.log("✅ migration: 观测重关联遵循同次去重");
     }
 
     // 刷新恢复：完成修复后整页重载，结果与处理状态持久保留

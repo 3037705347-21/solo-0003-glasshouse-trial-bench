@@ -43,6 +43,19 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * 按槽位占用重算台架运行状态（仅对 assigned/available 两种由占用决定的状态生效）：
+ * 清空最后一个槽位后应变为 available，仍有占用则为 assigned。
+ * blocked / quarantine 是人为/运维状态，与占用无关，绝不被覆盖。
+ */
+function recomputeBenchStatus(record: StateBag): void {
+  if (record.status === "blocked" || record.status === "quarantine") {
+    return;
+  }
+  const assigned = Array.isArray(record.assignedIds) ? record.assignedIds : [];
+  record.status = assigned.length > 0 ? "assigned" : "available";
+}
+
 function updateOwner(
   state: WorkspaceState,
   issue: { ownerCollection: string; ownerId: string },
@@ -92,7 +105,8 @@ function validateRelink(
 
   const target = state.accessions.find((item) => item.id === newRef);
 
-  // 观测条目重关联：材料必须属于同一试验且在用（与新建观测的规则一致）。
+  // 观测条目重关联：材料必须属于同一试验、在用，且同一次观测中不能已经有
+  // 同一材料（与新建观测的 duplicate 规则一致）。
   if (issue.ownerCollection === "observationPasses") {
     const pass = state.observationPasses.find(
       (item) => item.id === issue.ownerId,
@@ -110,10 +124,25 @@ function validateRelink(
         fieldError("newRef", "retired", "不能把测量记录关联到已停用材料"),
       ]);
     }
+    const alreadyObserved = (pass?.entries ?? []).some(
+      (entry) => entry.accessionId === newRef,
+    );
+    if (alreadyObserved) {
+      return fail([
+        fieldError(
+          "newRef",
+          "duplicate",
+          "同一材料在单次观测中只能出现一次",
+        ),
+      ]);
+    }
     return ok(true);
   }
 
-  // 台架槽位重关联：完整复用正常分配规则。
+  // 台架槽位重关联：这是“替换一个悬空槽位”，而不是新增占用——槽位总数不变。
+  // 因此先把待修复的悬空引用从占用列表移除，再在腾出的槽位上复用正常分配规则
+  // （重复、容量、光照、台架状态）。容量已满但其中一个槽位悬空时替换是合法的；
+  // 真正满位（移除悬空后仍满）才拒绝。
   if (issue.ownerCollection === "benches") {
     const bench = state.benches.find((item) => item.id === issue.ownerId);
     if (!bench) {
@@ -133,7 +162,11 @@ function validateRelink(
         ),
       ]);
     }
-    const assignment = validateBenchAssignment(target, bench);
+    const benchWithFreedSlot: typeof bench = {
+      ...bench,
+      assignedIds: bench.assignedIds.filter((id) => id !== issue.missingRef),
+    };
+    const assignment = validateBenchAssignment(target, benchWithFreedSlot);
     if (!assignment.ok) {
       return assignment;
     }
@@ -237,6 +270,8 @@ export function resolveDanglingByRelink(
         ? record.assignedIds
         : []
       ).map((id) => (id === issue.missingRef ? newRef : id));
+      // 替换不改变占用数，但仍按占用重算状态（覆盖旧数据里自相矛盾的状态）。
+      recomputeBenchStatus(record);
       return;
     }
     if (issue.field.startsWith("retirementHistory.")) {
@@ -294,6 +329,8 @@ export function resolveDanglingByClear(
         ? record.assignedIds
         : []
       ).filter((id) => id !== issue.missingRef);
+      // 清空悬空槽位后按剩余占用重算：清空最后一个槽位即变为 available。
+      recomputeBenchStatus(record);
       return;
     }
     if (issue.field.startsWith("retirementHistory.")) {
