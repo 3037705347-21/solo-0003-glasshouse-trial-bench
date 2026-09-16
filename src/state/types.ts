@@ -1,6 +1,7 @@
 import type {
   Accession,
   Bench,
+  BenchInspection,
   ClearanceSnapshot,
   Flag,
   ObservationPass,
@@ -18,6 +19,9 @@ export type WorkspaceAction =
   | { type: "accession/updated"; accession: Accession }
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
+  | { type: "benchInspection/recorded"; inspection: BenchInspection }
+  | { type: "benchInspection/resolved"; inspection: BenchInspection }
+  | { type: "benchInspection/followUpCompleted"; inspection: BenchInspection }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
   | { type: "flag/transitioned"; flag: Flag }
   | {

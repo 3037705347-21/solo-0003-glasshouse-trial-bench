@@ -3,6 +3,10 @@ import { AppShell } from "./AppShell";
 import { AccessionHistoryPage } from "../features/roster/AccessionHistoryPage";
 import { RosterPage } from "../features/roster/RosterPage";
 import { LayoutPage } from "../features/layout/LayoutPage";
+import {
+  BenchInspectionHistoryPage,
+} from "../features/inspections/BenchInspectionHistoryPage";
+import { InspectionsPage } from "../features/inspections/InspectionsPage";
 import { ObservationPage } from "../features/observations/ObservationPage";
 import { ClearancePage } from "../features/clearance/ClearancePage";
 
@@ -17,6 +21,11 @@ export function App() {
           element={<AccessionHistoryPage />}
         />
         <Route path="/layout" element={<LayoutPage />} />
+        <Route path="/inspections" element={<InspectionsPage />} />
+        <Route
+          path="/benches/:benchId/inspections"
+          element={<BenchInspectionHistoryPage />}
+        />
         <Route path="/observations" element={<ObservationPage />} />
         <Route path="/clearance" element={<ClearancePage />} />
         <Route path="*" element={<Navigate to="/roster" replace />} />

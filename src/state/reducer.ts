@@ -40,6 +40,21 @@ export function workspaceReducer(
           bench.id === action.bench.id ? action.bench : bench,
         ),
       };
+    case "benchInspection/recorded":
+      return {
+        ...state,
+        benchInspections: [...state.benchInspections, action.inspection],
+      };
+    case "benchInspection/resolved":
+    case "benchInspection/followUpCompleted":
+      return {
+        ...state,
+        benchInspections: state.benchInspections.map((inspection) =>
+          inspection.id === action.inspection.id
+            ? action.inspection
+            : inspection,
+        ),
+      };
     case "observation/recorded":
       return {
         ...state,

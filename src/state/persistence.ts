@@ -1,4 +1,4 @@
-import type { Accession, WorkspaceState } from "../domain/types";
+import type { Accession, BenchInspection, WorkspaceState } from "../domain/types";
 import { isWorkspaceState } from "./types";
 import { createSampleWorkspaceState } from "./sampleData";
 
@@ -16,12 +16,25 @@ function normalizeAccession(accession: Accession): Accession {
   };
 }
 
+function normalizeInspection(
+  inspection: BenchInspection,
+): BenchInspection {
+  return {
+    ...inspection,
+    anomalyDescription: inspection.anomalyDescription ?? "",
+    handlingSuggestion: inspection.handlingSuggestion ?? "",
+  };
+}
+
 export function normalizeWorkspaceState(
   state: WorkspaceState,
 ): WorkspaceState {
   return {
     ...state,
     accessions: state.accessions.map(normalizeAccession),
+    benchInspections: Array.isArray(state.benchInspections)
+      ? state.benchInspections.map(normalizeInspection)
+      : [],
   };
 }
 

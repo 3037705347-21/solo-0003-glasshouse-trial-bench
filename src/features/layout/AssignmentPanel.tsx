@@ -1,10 +1,12 @@
-import { ArrowRight, ListPlus } from "lucide-react";
+import { ArrowRight, ListPlus, TriangleAlert } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { SelectField } from "../../components/fields";
 import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { Accession, Bench } from "../../domain/types";
 import {
   accessionStatus,
   activeAccessionsForTrial,
+  blockingInspectionsForBenchState,
 } from "../../state/selectors";
 import type { WorkspaceState } from "../../domain/types";
 import { canAssignAccession } from "../../domain/bench";
@@ -22,12 +24,27 @@ export function AssignmentPanel({
   selectedAccessionId,
   onSelectAccession,
 }: AssignmentPanelProps) {
+  const navigate = useNavigate();
   const accessions = activeAccessionsForTrial(state, trialId);
   const selected = accessions.find(
     (accession) => accession.id === selectedAccessionId,
   );
   const compatibleBenches = selected
-    ? state.benches.filter((bench) => canAssignAccession(selected, bench))
+    ? state.benches.filter((bench) =>
+        canAssignAccession(
+          selected,
+          bench,
+          (state.benchInspections ?? []).filter(
+            (inspection) => inspection.benchId === bench.id,
+          ),
+        ),
+      )
+    : [];
+  const blockingBenches: Bench[] = selected
+    ? state.benches.filter(
+        (bench) =>
+          blockingInspectionsForBenchState(state, bench.id).length > 0,
+      )
     : [];
 
   return (
@@ -71,6 +88,30 @@ export function AssignmentPanel({
               可分配到 {compatibleBenches.length} 个台架
             </span>
           </div>
+          {blockingBenches.length > 0 ? (
+            <div
+              className="assignment-inspection-warning"
+              data-testid="assignment-inspection-warning"
+            >
+              <TriangleAlert size={15} aria-hidden="true" />
+              <span>
+                {blockingBenches.map((bench) => bench.code).join("、")}
+                {" "}
+                有未解除的影响使用巡检异常，暂时不能分配。
+              </span>
+              <button
+                type="button"
+                className="assignment-inspection-link"
+                onClick={() =>
+                  navigate(
+                    `/benches/${blockingBenches[0].id}/inspections`,
+                  )
+                }
+              >
+                查看巡检
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <p className="muted-copy">选择材料后查看可分配的台架。</p>

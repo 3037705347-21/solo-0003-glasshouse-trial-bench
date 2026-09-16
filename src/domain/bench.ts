@@ -1,13 +1,30 @@
-import type { Accession, Bench, PreferredLight } from "./types";
+import type { Accession, Bench, BenchInspection, PreferredLight } from "./types";
 import { BENCH_LIGHT_COMPATIBILITY } from "./rules";
 import { fail, fieldError, ok, type Result } from "./result";
 import { isAccessionRetired } from "./accession";
+import { blockingInspectionsForBench } from "./benchInspection";
 
-export function canAssignAccession(accession: Accession, bench: Bench): boolean {
+export function benchHasBlockingInspection(
+  bench: Bench,
+  inspections: BenchInspection[] = [],
+): boolean {
+  return (
+    blockingInspectionsForBench(inspections, bench.id).length > 0
+  );
+}
+
+export function canAssignAccession(
+  accession: Accession,
+  bench: Bench,
+  inspections: BenchInspection[] = [],
+): boolean {
   if (isAccessionRetired(accession)) {
     return false;
   }
   if (bench.status === "blocked" || bench.status === "quarantine") {
+    return false;
+  }
+  if (benchHasBlockingInspection(bench, inspections)) {
     return false;
   }
   if (bench.assignedIds.includes(accession.id)) {
@@ -24,6 +41,7 @@ export function canAssignAccession(accession: Accession, bench: Bench): boolean 
 export function validateBenchAssignment(
   accession: Accession,
   bench: Bench,
+  inspections: BenchInspection[] = [],
 ): Result<{ accessionId: string; benchId: string }> {
   if (isAccessionRetired(accession)) {
     return fail([
@@ -49,6 +67,16 @@ export function validateBenchAssignment(
         "benchId",
         "quarantine",
         `台架 ${bench.code} 正在隔离`,
+      ),
+    ]);
+  }
+  const blocking = blockingInspectionsForBench(inspections, bench.id);
+  if (blocking.length > 0) {
+    return fail([
+      fieldError(
+        "benchId",
+        "inspection_blocking",
+        `台架 ${bench.code} 有 ${blocking.length} 项巡检异常未解除，暂不能分配新材料`,
       ),
     ]);
   }
@@ -89,8 +117,9 @@ export function validateBenchAssignment(
 export function assignAccession(
   accession: Accession,
   bench: Bench,
+  inspections: BenchInspection[] = [],
 ): Result<Bench> {
-  const validated = validateBenchAssignment(accession, bench);
+  const validated = validateBenchAssignment(accession, bench, inspections);
   if (!validated.ok) {
     return validated;
   }

@@ -1,15 +1,24 @@
 import { useMemo, useState } from "react";
-import { Grid3X3 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Grid3X3, TriangleAlert } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
+import { StatusBadge } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import { assignAccession, releaseAccession } from "../../domain/bench";
-import { accessionById, accessionsForTrial } from "../../state/selectors";
+import { isBlockingBenchInspection } from "../../domain/benchInspection";
+import {
+  accessionById,
+  accessionsForTrial,
+  benchesWithOpenInspections,
+  openInspectionMap,
+} from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { AssignmentPanel } from "./AssignmentPanel";
 import { BenchCard } from "./BenchCard";
 
 export function LayoutPage() {
   const { state, dispatch } = useWorkspace();
+  const navigate = useNavigate();
   const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
   const [selectedAccessionId, setSelectedAccessionId] = useState("");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -33,13 +42,26 @@ export function LayoutPage() {
     [state.benches],
   );
 
+  const inspectionMap = useMemo(
+    () => openInspectionMap(state),
+    [state],
+  );
+  const attentionBenches = useMemo(
+    () => benchesWithOpenInspections(state),
+    [state],
+  );
+
   const handleAssign = (accessionId: string, benchId: string) => {
     const accession = accessionById(state, accessionId);
     const bench = state.benches.find((item) => item.id === benchId);
     if (!accession || !bench) {
       return;
     }
-    const result = assignAccession(accession, bench);
+    const result = assignAccession(
+      accession,
+      bench,
+      state.benchInspections ?? [],
+    );
     if (!result.ok) {
       pushToast({
         tone: "error",
@@ -83,7 +105,7 @@ export function LayoutPage() {
       <PageHeader
         eyebrow="台架规划"
         title="台架布局"
-        description="根据光照、容量和隔离约束，将材料分配到可用台架。"
+        description="根据光照、容量、隔离和未解除巡检异常等约束，将材料分配到可用台架。"
       />
       <section className="control-strip">
         <select
@@ -103,6 +125,49 @@ export function LayoutPage() {
           ))}
         </select>
       </section>
+      {attentionBenches.length > 0 ? (
+        <section
+          className="layout-inspection-banner"
+          data-testid="layout-inspection-banner"
+        >
+          <div className="inspection-alert-heading">
+            <TriangleAlert size={17} aria-hidden="true" />
+            <strong>
+              {attentionBenches.length} 个台架有未解除的巡检异常
+            </strong>
+            <span>
+              影响使用的台架已暂停新材料分配；已有在架材料不会被自动移出
+            </span>
+          </div>
+          <div className="inspection-alert-benches">
+            {attentionBenches.map(({ bench, inspections, blocking }) => (
+              <button
+                type="button"
+                key={bench.id}
+                className={`inspection-alert-chip inspection-alert-chip-${
+                  blocking ? "blocking" : "caution"
+                }`}
+                onClick={() =>
+                  navigate(`/benches/${bench.id}/inspections`)
+                }
+                data-testid={`layout-inspection-chip-${bench.id}`}
+              >
+                <strong>{bench.code}</strong>
+                <StatusBadge tone={blocking ? "critical" : "warning"}>
+                  {`${blocking ? "影响使用" : "需留意"} · ${inspections.length}`}
+                </StatusBadge>
+                <span className="inspection-chip-summary">
+                  {inspections
+                    .filter(isBlockingBenchInspection)
+                    .length > 0
+                    ? "未解除前不能分配"
+                    : "可分配但请查看提示"}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <div className="layout-workspace">
         <AssignmentPanel
           state={state}
@@ -123,6 +188,7 @@ export function LayoutPage() {
                 bench={bench}
                 accessions={accessions}
                 selectedAccession={selectedAccession}
+                openInspections={inspectionMap.get(bench.id) ?? []}
                 onAssign={handleAssign}
                 onRelease={handleRelease}
               />

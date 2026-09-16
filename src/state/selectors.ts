@@ -1,6 +1,7 @@
 import type {
   Accession,
   Bench,
+  BenchInspection,
   ClearanceSnapshot,
   Flag,
   ObservationPass,
@@ -11,6 +12,14 @@ import {
   isAccessionRetired,
   latestRetirementRecord,
 } from "../domain/accession";
+import {
+  blockingInspectionsForBench,
+  compareInspections,
+  inspectionsForBench,
+  isBlockingBenchInspection,
+  isOpenBenchInspection,
+  openInspectionsForBench,
+} from "../domain/benchInspection";
 
 export function trialById(
   state: WorkspaceState,
@@ -75,6 +84,72 @@ export function benchForAccession(
   return state.benches.find((bench) =>
     bench.assignedIds.includes(accessionId),
   );
+}
+
+export function benchById(
+  state: WorkspaceState,
+  benchId: string,
+): Bench | undefined {
+  return state.benches.find((bench) => bench.id === benchId);
+}
+
+export function allBenchInspections(
+  state: WorkspaceState,
+): BenchInspection[] {
+  return [...(state.benchInspections ?? [])].sort(compareInspections);
+}
+
+export function inspectionsForBenchState(
+  state: WorkspaceState,
+  benchId: string,
+): BenchInspection[] {
+  return inspectionsForBench(state.benchInspections ?? [], benchId);
+}
+
+export function openInspectionsForBenchState(
+  state: WorkspaceState,
+  benchId: string,
+): BenchInspection[] {
+  return openInspectionsForBench(state.benchInspections ?? [], benchId);
+}
+
+export function blockingInspectionsForBenchState(
+  state: WorkspaceState,
+  benchId: string,
+): BenchInspection[] {
+  return blockingInspectionsForBench(state.benchInspections ?? [], benchId);
+}
+
+export function openInspectionMap(
+  state: WorkspaceState,
+): Map<string, BenchInspection[]> {
+  const map = new Map<string, BenchInspection[]>();
+  (state.benchInspections ?? [])
+    .filter(isOpenBenchInspection)
+    .forEach((inspection) => {
+      const list = map.get(inspection.benchId) ?? [];
+      list.push(inspection);
+      map.set(inspection.benchId, list);
+    });
+  map.forEach((list) => list.sort(compareInspections));
+  return map;
+}
+
+export function benchesWithOpenInspections(
+  state: WorkspaceState,
+): Array<{ bench: Bench; inspections: BenchInspection[]; blocking: boolean }> {
+  const map = openInspectionMap(state);
+  return state.benches
+    .filter((bench) => (map.get(bench.id)?.length ?? 0) > 0)
+    .sort((left, right) => left.code.localeCompare(right.code))
+    .map((bench) => {
+      const inspections = map.get(bench.id) ?? [];
+      return {
+        bench,
+        inspections,
+        blocking: inspections.some(isBlockingBenchInspection),
+      };
+    });
 }
 
 export function openFlagsForTrial(

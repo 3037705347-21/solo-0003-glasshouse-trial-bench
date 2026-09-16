@@ -1411,3 +1411,365 @@ button {
     justify-content: flex-start;
   }
 }
+
+/* ===== 台架巡检 ===== */
+
+.inspection-alert-strip,
+.layout-inspection-banner {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.layout-inspection-banner {
+  border-color: var(--amber-700);
+  background: var(--amber-100);
+}
+
+.inspection-alert-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--amber-700);
+}
+
+.inspection-alert-heading strong {
+  color: var(--text);
+}
+
+.inspection-alert-heading span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.inspection-alert-benches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inspection-alert-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.inspection-alert-chip-blocking {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.inspection-alert-chip-caution {
+  border-color: var(--amber-700);
+  background: var(--amber-100);
+}
+
+.inspection-chip-summary {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.inspection-list {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px 18px;
+}
+
+.inspection-entry {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: #fcfdfb;
+}
+
+.inspection-entry-open {
+  border-left-color: var(--amber-700);
+}
+
+.inspection-entry-open.inspection-entry-blocking {
+  border-left-color: var(--danger);
+}
+
+.inspection-entry-resolved {
+  border-left-color: var(--green-600);
+  opacity: 0.92;
+}
+
+.inspection-entry-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inspection-entry-head > div {
+  display: grid;
+  gap: 4px;
+}
+
+.inspection-entry-head strong {
+  font-size: 15px;
+}
+
+.inspection-bench-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green-700);
+  font-size: 13px;
+  text-decoration: underline;
+}
+
+.inspection-entry-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.inspection-entry-meta dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.inspection-entry-meta dd {
+  margin: 3px 0 0;
+  font-size: 13px;
+}
+
+.inspection-entry-body {
+  display: grid;
+  gap: 6px;
+}
+
+.inspection-entry-body p,
+.inspection-entry-resolution p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.inspection-entry-body span,
+.inspection-entry-resolution span {
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.inspection-entry-resolution {
+  display: grid;
+  gap: 5px;
+  padding: 11px 12px;
+  border-radius: 7px;
+  background: var(--surface-soft);
+}
+
+.inspection-entry-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.inspection-bench-switch {
+  margin-bottom: 14px;
+}
+
+.inspection-bench-switch label {
+  display: grid;
+  gap: 6px;
+}
+
+.inspection-status-drift {
+  display: grid;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid var(--amber-700);
+  border-radius: 7px;
+  background: var(--amber-100);
+}
+
+.inspection-status-drift > strong {
+  color: var(--amber-700);
+}
+
+.inspection-status-drift dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.inspection-status-drift dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.inspection-status-drift dd {
+  margin: 3px 0 0;
+  font-size: 13px;
+}
+
+.inspection-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 13px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+}
+
+.inspection-banner strong {
+  font-size: 14px;
+}
+
+.inspection-banner p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.inspection-banner-blocking {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.inspection-banner-caution {
+  border-color: var(--amber-700);
+  background: var(--amber-100);
+  color: var(--amber-700);
+}
+
+.bench-card-inspection-blocking {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgba(181, 58, 50, 0.14);
+}
+
+.bench-card-inspection-caution {
+  border-color: var(--amber-700);
+  box-shadow: 0 0 0 2px rgba(154, 106, 22, 0.12);
+}
+
+.inspection-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.inspection-chip-blocking {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.inspection-chip-caution {
+  border-color: var(--amber-700);
+  background: var(--amber-100);
+  color: var(--amber-700);
+}
+
+.bench-inspection-lines {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bench-inspection-lines li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bench-inspection-line-blocking {
+  background: var(--danger-soft);
+}
+
+.bench-inspection-line-caution {
+  background: var(--amber-100);
+}
+
+.bench-inspection-lines li span {
+  color: var(--text-muted);
+}
+
+.bench-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.assignment-inspection-warning {
+  display: grid;
+  gap: 6px;
+  padding: 10px 11px;
+  border: 1px solid var(--danger);
+  border-radius: 7px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.assignment-inspection-link,
+.inspection-inline-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green-700);
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+.inspection-inline-link {
+  justify-self: start;
+  color: var(--danger);
+}
+
+@media (max-width: 760px) {
+  .inspection-entry-meta,
+  .inspection-status-drift dl {
+    grid-template-columns: 1fr;
+  }
+
+  .inspection-entry-head,
+  .inspection-entry-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

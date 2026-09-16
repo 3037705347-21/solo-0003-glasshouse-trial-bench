@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ArrowLeft, History, Link2 } from "lucide-react";
+import { ArrowLeft, History, Link2, TriangleAlert } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { EmptyState } from "../../components/EmptyState";
@@ -12,6 +12,7 @@ import type {
 } from "../../domain/types";
 import {
   benchForAccession,
+  openInspectionsForBenchState,
   replacedByAccessions,
   replacementForAccession,
   trialById,
@@ -97,6 +98,9 @@ export function AccessionHistoryPage() {
 
   const trial = trialById(state, accession.trialId);
   const bench = benchForAccession(state, accession.id);
+  const benchOpenInspections = bench
+    ? openInspectionsForBenchState(state, bench.id)
+    : [];
   const replacement = replacementForAccession(state, accession);
   const replacedBy = replacedByAccessions(state, accession.id);
   const retired = isAccessionRetired(accession);
@@ -136,6 +140,19 @@ export function AccessionHistoryPage() {
               ? `${bench.sector} · ${bench.lightProfile === "full-sun" ? "全日照" : bench.lightProfile === "partial-shade" ? "半阴" : "遮阴"}`
               : "没有当前台架占用记录"}
           </small>
+          {benchOpenInspections.length > 0 ? (
+            <button
+              type="button"
+              className="inspection-inline-link"
+              onClick={() =>
+                navigate(`/benches/${bench!.id}/inspections`)
+              }
+              data-testid="accession-history-bench-inspections"
+            >
+              <TriangleAlert size={14} aria-hidden="true" />
+              {benchOpenInspections.length} 项巡检异常未解除
+            </button>
+          ) : null}
         </article>
         <article className="history-summary-card">
           <span>替代关系</span>

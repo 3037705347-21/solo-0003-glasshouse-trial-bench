@@ -43,9 +43,11 @@ export function SnapshotCard({ snapshot }: SnapshotCardProps) {
             accent={
               metric.label === "未处理标记" && metric.value > 0
                 ? "critical"
-                : metric.label === "已分配" && metric.value > 0
-                  ? "positive"
-                  : "neutral"
+                : metric.label === "未解除巡检异常" && metric.value > 0
+                  ? "critical"
+                  : metric.label === "已分配" && metric.value > 0
+                    ? "positive"
+                    : "neutral"
             }
           />
         ))}

@@ -7,6 +7,10 @@ import type {
 } from "./types";
 import { createId } from "./id";
 import { isAccessionRetired } from "./accession";
+import {
+  benchInspectionCategoryLabel,
+  isBlockingBenchInspection,
+} from "./benchInspection";
 
 export function buildClearanceSnapshot(
   state: WorkspaceState,
@@ -31,6 +35,10 @@ export function buildClearanceSnapshot(
       flag.state === "open" &&
       activeAccessionIds.has(flag.accessionId),
   );
+  const inspections = state.benchInspections ?? [];
+  const openBlockingInspections = inspections.filter(
+    isBlockingBenchInspection,
+  );
   const blockers: ClearanceBlocker[] = [];
   activeAccessions.forEach((accession) => {
     if (!assignedIds.has(accession.id)) {
@@ -50,6 +58,25 @@ export function buildClearanceSnapshot(
         benchId: bench.id,
       });
     });
+  state.benches.forEach((bench) => {
+    const holdsTrialMaterial = bench.assignedIds.some((id) =>
+      activeAccessionIds.has(id),
+    );
+    if (!holdsTrialMaterial) {
+      return;
+    }
+    openBlockingInspections
+      .filter((inspection) => inspection.benchId === bench.id)
+      .forEach((inspection) => {
+        blockers.push({
+          code: "BENCH_INSPECTION_OPEN",
+          message: `台架 ${bench.code} 存在未解除的巡检异常（${benchInspectionCategoryLabel(
+            inspection.category,
+          )}），在架材料处置前不能放行`,
+          benchId: bench.id,
+        });
+      });
+  });
   openFlags.forEach((flag) => {
     blockers.push({
       code: `FLAG_${flag.code}`,
@@ -89,6 +116,19 @@ export function buildClearanceSnapshot(
       label: "未处理标记",
       value: openFlags.length,
       detail: "未解决的观测标记",
+    },
+    {
+      label: "未解除巡检异常",
+      value: inspections
+        .filter((inspection) => inspection.state === "open")
+        .filter((inspection) =>
+          state.benches.some(
+            (bench) =>
+              bench.id === inspection.benchId &&
+              bench.assignedIds.some((id) => activeAccessionIds.has(id)),
+          ),
+        ).length,
+      detail: "承载本试验材料的台架上仍未解除的巡检异常数",
     },
     {
       label: "在用台架",

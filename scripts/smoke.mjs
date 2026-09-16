@@ -16,6 +16,7 @@ const scenarios = {
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
   "retire-accession-replacement": retireAccessionReplacement,
+  "record-bench-inspection": recordBenchInspection,
 };
 
 const scenarioPaths = {
@@ -24,6 +25,7 @@ const scenarioPaths = {
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
   "retire-accession-replacement": "/roster",
+  "record-bench-inspection": "/inspections",
 };
 
 async function waitForServer() {
@@ -237,6 +239,122 @@ async function retireAccessionReplacement(page) {
   if (savedSnapshotAfter !== savedSnapshotBefore) {
     throw new Error("saved clearance snapshot changed after material retirement");
   }
+}
+
+async function recordBenchInspection(page) {
+  // Initial sample data: W-2 carries an open caution inspection, N-1 an open blocking one.
+  await page.getByText("个台架存在未解除巡检异常", { exact: false }).first().waitFor();
+  await page.getByTestId("inspection-alert-bench-west-2").waitFor();
+  await page.getByTestId("inspection-alert-bench-north-1").waitFor();
+
+  // Same bench can be inspected multiple times; records are append-only history.
+  await page.getByTestId("open-inspection-form").click();
+  await page.getByTestId("inspection-bench-select").selectOption("bench-east-2");
+  await page.getByTestId("inspection-inspector").fill("K. Mori");
+  await page.getByTestId("inspection-category").selectOption("cleanliness");
+  await page.getByTestId("inspection-anomaly").fill("架面残留旧基质，需要在下批材料上架前清洁。");
+  await page.getByTestId("inspection-impact").selectOption("caution");
+  await page.getByTestId("inspection-maintenance").selectOption("cleaning");
+  await page.getByTestId("inspection-suggestion").fill("安排清洁并复检，暂不需要停用台架。");
+  await page.getByTestId("save-inspection-button").click();
+  await page.getByText("巡检已记录", { exact: true }).waitFor();
+
+  await page.getByTestId("inspection-bench-filter").selectOption("bench-east-2");
+  await page.getByText("架面残留旧基质，需要在下批材料上架前清洁。").waitFor();
+
+  // Caution-level anomaly must not stop a new assignment, but the warning stays visible.
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  await page.getByTestId("layout-inspection-banner").waitFor();
+  await page.getByTestId("bench-inspection-chip-bench-east-2").waitFor();
+  await page.getByTestId("assignment-accession-select").selectOption("acc-tom-03");
+  await page.getByTestId("assign-bench-bench-east-2").click();
+  await page.getByText("台架分配成功", { exact: true }).waitFor();
+
+  // A blocking inspection on E-2 blocks continued allocation to that bench.
+  await page.goto(`${baseUrl}/#/benches/bench-east-2/inspections`, { waitUntil: "networkidle" });
+  await page.getByTestId("bench-inspection-page").waitFor();
+  await page.getByTestId("open-bench-inspection-form").click();
+  await page.getByTestId("inspection-inspector").fill("K. Mori");
+  await page.getByTestId("inspection-category").selectOption("equipment");
+  await page.getByTestId("inspection-anomaly").fill("灌溉支管接头开裂漏水，地面有积水。");
+  await page.getByTestId("inspection-impact").selectOption("blocking");
+  await page.getByTestId("inspection-maintenance").selectOption("repair");
+  await page.getByTestId("inspection-suggestion").fill("停用台架并更换接头，维修完成复检后再恢复分配。");
+  await page.getByTestId("save-inspection-button").click();
+  await page.getByText("巡检已记录", { exact: true }).waitFor();
+  await page.getByTestId("bench-inspection-banner").waitFor();
+  // Existing assignment is preserved untouched.
+  await page.getByText("Yellow Pear", { exact: true }).waitFor();
+
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  const blockingChip = page.getByTestId("bench-inspection-chip-bench-east-2");
+  await blockingChip.getByText("影响使用").waitFor();
+  await page.getByTestId("assignment-accession-select").selectOption("acc-tom-02");
+  if (await page.getByTestId("assign-bench-bench-east-2").isEnabled()) {
+    throw new Error("assign button should stay disabled while blocking inspection is open");
+  }
+  // The assignment panel calls out benches blocked by open inspections.
+  await page.getByTestId("assignment-inspection-warning").waitFor();
+
+  // Clearance is blocked by the open inspection while trial material is on the bench.
+  await page.goto(`${baseUrl}/#/clearance`, { waitUntil: "networkidle" });
+  await page.getByTestId("clearance-trial-select").selectOption("trial-sol-01");
+  await page.getByTestId("generate-clearance").click();
+  await page.getByText("BENCH_INSPECTION_OPEN", { exact: true }).first().waitFor();
+
+  // Follow-up maintenance can be recorded independently of the anomaly resolution.
+  await page.goto(`${baseUrl}/#/benches/bench-east-2/inspections`, { waitUntil: "networkidle" });
+  const blockingInspection = page
+    .locator(".inspection-entry")
+    .filter({ hasText: "灌溉支管接头开裂漏水" });
+  await blockingInspection.getByTestId(/^followup-inspection-/).click();
+  await page.getByTestId("confirm-followup-inspection").click();
+  await blockingInspection.getByText("待处理").waitFor({ state: "hidden" });
+  // Anomaly is still open after maintenance registration.
+  await page.getByTestId("bench-inspection-banner").waitFor();
+
+  // Resolving the blocking record: bench state matches its snapshot, so no recheck prompt.
+  await blockingInspection.getByRole("button", { name: "解除异常" }).click();
+  await page.getByTestId("inspection-resolution-note").fill("接头已更换并试水压 30 分钟无渗漏，恢复分配。");
+  await page.getByTestId("confirm-resolve-inspection").click();
+  await blockingInspection.getByText("已解除").waitFor();
+
+  // The earlier caution inspection is still open; resolving it detects that the bench
+  // changed since the inspection (available -> assigned after Yellow Pear was placed).
+  const cautionInspection = page
+    .locator(".inspection-entry")
+    .filter({ hasText: "架面残留旧基质" });
+  await cautionInspection.getByRole("button", { name: "解除异常" }).click();
+  await page.getByTestId("inspection-status-drift").waitFor();
+  await page.getByTestId("inspection-resolution-note").fill("架面已清洁消毒，在架材料不受影响。");
+  await page.getByTestId("confirm-resolve-inspection").click();
+  await page.getByText("请先核对当前台架情况", { exact: false }).waitFor();
+  await page.getByTestId("inspection-recheck-confirm").check();
+  await page.getByTestId("confirm-resolve-inspection").click();
+
+  // Banner clears but full history (normal, caution, blocking) remains reviewable.
+  await assertCount(
+    page.getByTestId("bench-inspection-banner"),
+    0,
+    "bench banner after resolution",
+  );
+  await page.getByText("解除时已重新核对台架状态", { exact: false }).first().waitFor();
+  await page.getByText("架面残留旧基质，需要在下批材料上架前清洁。").waitFor();
+  const historyCount = await page.locator(".inspection-entry").count();
+  if (historyCount < 3) {
+    throw new Error(`expected at least 3 inspection history entries, got ${historyCount}`);
+  }
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByText("接头已更换并试水压 30 分钟无渗漏，恢复分配。").waitFor();
+  await assertCount(
+    page.getByTestId("bench-inspection-banner"),
+    0,
+    "bench banner after reload",
+  );
+
+  // The sample blocking inspection on N-1 still gates assignment after resolution above.
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  await page.getByTestId("bench-inspection-chip-bench-north-1").getByText("影响使用").waitFor();
 }
 
 async function runScenario(scenarioName) {

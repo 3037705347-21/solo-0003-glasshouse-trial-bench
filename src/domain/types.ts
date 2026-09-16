@@ -55,6 +55,24 @@ export interface Bench {
   blockedReason?: string;
 }
 
+export type BenchInspectionCategory =
+  | "cleanliness"
+  | "equipment"
+  | "lighting"
+  | "environment";
+
+export type BenchInspectionImpact = "none" | "caution" | "blocking";
+
+export type BenchInspectionState = "open" | "resolved";
+
+export type BenchMaintenanceAction =
+  | "cleaning"
+  | "repair"
+  | "replacement"
+  | "relocation"
+  | "recalibration"
+  | "other";
+
 export interface ObservationEntry {
   accessionId: string;
   heightMm: number;
@@ -90,6 +108,29 @@ export interface Flag {
 
 export type ClearanceStatus = "ready" | "blocked";
 
+export interface BenchInspection {
+  id: string;
+  benchId: string;
+  inspectedOn: string;
+  inspector: string;
+  category: BenchInspectionCategory;
+  result: "normal" | "issue";
+  anomalyDescription: string;
+  impact: BenchInspectionImpact;
+  handlingSuggestion: string;
+  maintenanceAction: BenchMaintenanceAction;
+  state: BenchInspectionState;
+  createdAt: string;
+  benchStatusAtInspection: BenchStatus;
+  blockedReasonAtInspection?: string;
+  occupiedCountAtInspection: number;
+  lightProfileAtInspection: PreferredLight;
+  resolutionNote?: string;
+  resolvedAt?: string;
+  statusRecheckedAtResolution?: boolean;
+  followUpCompletedAt?: string;
+}
+
 export interface ClearanceMetric {
   label: string;
   value: number;
@@ -116,6 +157,7 @@ export interface WorkspaceState {
   trials: Trial[];
   accessions: Accession[];
   benches: Bench[];
+  benchInspections: BenchInspection[];
   observationPasses: ObservationPass[];
   flags: Flag[];
   clearanceSnapshots: ClearanceSnapshot[];
