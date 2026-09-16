@@ -2,6 +2,7 @@ import type {
   Accession,
   Bench,
   ClearanceSnapshot,
+  ConsumptionEvent,
   Flag,
   ObservationPass,
   Trial,
@@ -11,6 +12,15 @@ import {
   isAccessionRetired,
   latestRetirementRecord,
 } from "../domain/accession";
+import {
+  consumedQuantity,
+  eventsForAccession,
+  remainingQuantity,
+  stockLevel,
+  transferredInQuantity,
+  transferredOutQuantity,
+  type StockLevel,
+} from "../domain/consumption";
 
 export function trialById(
   state: WorkspaceState,
@@ -66,6 +76,46 @@ export function accessionById(
   accessionId: string,
 ): Accession | undefined {
   return state.accessions.find((accession) => accession.id === accessionId);
+}
+
+export function consumptionEventsFor(
+  state: WorkspaceState,
+  accessionId: string,
+): ConsumptionEvent[] {
+  return eventsForAccession(state.consumptionEvents, accessionId);
+}
+
+export function accessionRemaining(
+  state: WorkspaceState,
+  accession: Accession,
+): number {
+  return remainingQuantity(accession, state.consumptionEvents);
+}
+
+export interface AccessionStock {
+  registered: number;
+  remaining: number;
+  consumed: number;
+  transferredIn: number;
+  transferredOut: number;
+  level: StockLevel;
+}
+
+export function accessionStock(
+  state: WorkspaceState,
+  accession: Accession,
+): AccessionStock {
+  const events = consumptionEventsFor(state, accession.id);
+  return {
+    registered: accession.quantity,
+    remaining: remainingQuantity(accession, state.consumptionEvents),
+    consumed: consumedQuantity(
+      events.filter((event) => event.kind !== "transfer"),
+    ),
+    transferredIn: transferredInQuantity(events),
+    transferredOut: transferredOutQuantity(events),
+    level: stockLevel(remainingQuantity(accession, state.consumptionEvents)),
+  };
 }
 
 export function benchForAccession(

@@ -32,6 +32,31 @@ export function workspaceReducer(
           accession.id === action.accession.id ? action.accession : accession,
         ),
       };
+    case "consumption/recorded":
+      return {
+        ...state,
+        consumptionEvents: [...state.consumptionEvents, action.event],
+      };
+    case "accessions/merged":
+      return {
+        ...state,
+        accessions: state.accessions.map((accession) => {
+          if (accession.id === action.source.id) {
+            return action.source;
+          }
+          if (accession.id === action.target.id) {
+            return action.target;
+          }
+          return accession;
+        }),
+        consumptionEvents: [...state.consumptionEvents, ...action.events],
+      };
+    case "accession/copied":
+      return {
+        ...state,
+        accessions: [...state.accessions, action.accession],
+        consumptionEvents: [...state.consumptionEvents, action.sourceEvent],
+      };
     case "bench/assigned":
     case "bench/released":
       return {

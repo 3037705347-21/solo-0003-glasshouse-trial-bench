@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { Ban, History, Plus, RotateCcw, Sprout } from "lucide-react";
+import {
+  Ban,
+  ClipboardPlus,
+  History,
+  Plus,
+  RotateCcw,
+  Sprout,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { DataTable, type DataColumn } from "../../components/DataTable";
@@ -14,9 +21,11 @@ import {
   isAccessionRetired,
   nextAccessionNumber,
 } from "../../domain/accession";
+import { stockLevelLabel } from "../../domain/consumption";
 import type { Accession } from "../../domain/types";
 import {
   accessionStatus,
+  accessionStock,
   benchForAccession,
   replacementForAccession,
 } from "../../state/selectors";
@@ -25,9 +34,23 @@ import {
   RestoreAccessionDialog,
   RetireAccessionDialog,
 } from "./AccessionLifecycleDialogs";
+import { RecordConsumptionDialog } from "./RecordConsumptionDialog";
 import { RosterForm } from "./RosterForm";
 
 type RosterSegment = "all" | "active" | "assigned" | "unassigned" | "retired";
+
+function stockTone(level: string): "positive" | "warning" | "critical" | "neutral" {
+  if (level === "in-stock") {
+    return "positive";
+  }
+  if (level === "low") {
+    return "warning";
+  }
+  if (level === "empty" || level === "negative") {
+    return "critical";
+  }
+  return "neutral";
+}
 
 export function RosterPage() {
   const { state } = useWorkspace();
@@ -39,6 +62,7 @@ export function RosterPage() {
   const [editingAccession, setEditingAccession] = useState<Accession | undefined>();
   const [retiringAccession, setRetiringAccession] = useState<Accession | undefined>();
   const [restoringAccession, setRestoringAccession] = useState<Accession | undefined>();
+  const [consumingAccession, setConsumingAccession] = useState<Accession | undefined>();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
@@ -96,6 +120,32 @@ export function RosterPage() {
       render: (accession) =>
         state.trials.find((trial) => trial.id === accession.trialId)?.code ??
         "未知",
+    },
+    {
+      key: "stock",
+      header: "余量 / 登记",
+      render: (accession) => {
+        const stock = accessionStock(state, accession);
+        return (
+          <div className="stock-cell" data-testid={`stock-${accession.id}`}>
+            <strong
+              className={
+                stock.level === "empty" || stock.level === "negative"
+                  ? "stock-number stock-number-critical"
+                  : stock.level === "low"
+                    ? "stock-number stock-number-warning"
+                    : "stock-number"
+              }
+            >
+              {stock.remaining}
+            </strong>
+            <span className="stock-registered">/ {stock.registered}</span>
+            <StatusBadge tone={stockTone(stock.level)}>
+              {stockLevelLabel(stock.level)}
+            </StatusBadge>
+          </div>
+        );
+      },
     },
     {
       key: "light",
@@ -161,6 +211,17 @@ export function RosterPage() {
             <History size={15} />
             历史
           </Button>
+          {!isAccessionRetired(accession) ? (
+            <Button
+              tone="ghost"
+              size="sm"
+              onClick={() => setConsumingAccession(accession)}
+              data-testid={`consume-accession-${accession.id}`}
+            >
+              <ClipboardPlus size={15} />
+              耗用
+            </Button>
+          ) : null}
           {isAccessionRetired(accession) ? (
             <Button
               tone="ghost"
@@ -323,6 +384,22 @@ export function RosterPage() {
               tone: "success",
               title: "材料已恢复",
               message: `${accession.accessionNo} 已重新进入在用范围。`,
+            });
+          }}
+        />
+      ) : null}
+      {consumingAccession ? (
+        <RecordConsumptionDialog
+          accession={consumingAccession}
+          state={state}
+          onCancel={() => setConsumingAccession(undefined)}
+          onSaved={(event) => {
+            const label = consumingAccession.accessionNo;
+            setConsumingAccession(undefined);
+            pushToast({
+              tone: "success",
+              title: "耗用已登记",
+              message: `${label} 记录 ${-event.delta} 单位耗用，余量已按流水更新。`,
             });
           }}
         />

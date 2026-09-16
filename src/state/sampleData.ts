@@ -2,6 +2,7 @@ import type {
   Accession,
   Bench,
   ClearanceSnapshot,
+  ConsumptionEvent,
   Flag,
   ObservationPass,
   Trial,
@@ -314,6 +315,82 @@ const flags: Flag[] = [
   },
 ];
 
+const consumptionEvents: ConsumptionEvent[] = [
+  {
+    id: "use-tom-01-01",
+    accessionId: "acc-tom-01",
+    delta: -12,
+    kind: "use",
+    usedOn: "2026-02-24",
+    recordedAt: "2026-02-24T08:30:00.000Z",
+    recordedBy: "M. Ikeda",
+    destination: "trial",
+    ref: { id: "trial-sol-01", label: "SOL-01 · 早期坐果比较" },
+    note: "定植前选苗，剔除穴盘边缘弱苗后上盆。",
+  },
+  {
+    id: "use-tom-01-02",
+    accessionId: "acc-tom-01",
+    delta: -4,
+    kind: "use",
+    usedOn: "2026-03-02",
+    recordedAt: "2026-03-02T07:50:00.000Z",
+    recordedBy: "M. Ikeda",
+    destination: "waste",
+    ref: { label: "猝倒病剔除" },
+    note: "穴盘角落出现猝倒迹象，按区组拔除并销毁。",
+  },
+  {
+    id: "cor-tom-01-01",
+    accessionId: "acc-tom-01",
+    delta: 2,
+    kind: "correction",
+    usedOn: "2026-03-03",
+    recordedAt: "2026-03-03T01:10:00.000Z",
+    recordedBy: "K. Sato",
+    destination: "waste",
+    ref: { label: "猝倒病剔除" },
+    note: "复核监控记录，实际销毁 2 株而非 4 株，冲销差额。",
+    supersedesId: "use-tom-01-02",
+  },
+  {
+    id: "use-tom-03-01",
+    accessionId: "acc-tom-03",
+    delta: -40,
+    kind: "use",
+    usedOn: "2026-03-05",
+    recordedAt: "2026-03-05T09:05:00.000Z",
+    recordedBy: "M. Ikeda",
+    destination: "activity",
+    ref: { label: "品比展示移栽" },
+    note: "为开放日品比展示移栽到展示区，现场分两批取苗。",
+  },
+  {
+    id: "use-tom-03-02",
+    accessionId: "acc-tom-03",
+    delta: -12,
+    kind: "use",
+    usedOn: "2026-03-10",
+    recordedAt: "2026-03-10T08:00:00.000Z",
+    recordedBy: "M. Ikeda",
+    destination: "waste",
+    ref: { label: "运输损伤" },
+    note: "转运展示区途中折断，剩余作损耗登记。",
+  },
+  {
+    id: "use-bee-03-01",
+    accessionId: "acc-bee-03",
+    delta: -8,
+    kind: "use",
+    usedOn: "2026-04-06",
+    recordedAt: "2026-04-06T07:30:00.000Z",
+    recordedBy: "R. Ono",
+    destination: "trial",
+    ref: { id: "trial-ama-02", label: "AMA-02 · 限水叶菜评估" },
+    note: "限水处理组取样，测定鲜重与叶面积。",
+  },
+];
+
 const clearanceSnapshots: ClearanceSnapshot[] = [];
 
 export function createSampleWorkspaceState(): WorkspaceState {
@@ -324,5 +401,6 @@ export function createSampleWorkspaceState(): WorkspaceState {
     observationPasses,
     flags,
     clearanceSnapshots,
+    consumptionEvents,
   };
 }

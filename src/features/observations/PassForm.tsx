@@ -6,6 +6,7 @@ import type { ObservationEntry } from "../../domain/types";
 import type { ObservationDraft } from "../../domain/observation";
 import type { FieldError } from "../../domain/result";
 import { createObservationPass, deriveFlags } from "../../domain/observation";
+import { remainingQuantity, stockLevelLabel } from "../../domain/consumption";
 import { todayDateOnly } from "../../domain/rules";
 import { activeAccessionsForTrial } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
@@ -134,13 +135,43 @@ export function PassForm({ trialId, onSaved, onCancel }: PassFormProps) {
                 updateEntry(index, "accessionId", event.target.value)
               }
               error={errorFor(`entries.${index}.accessionId`)}
+              hint={
+                entry.accessionId
+                  ? (() => {
+                      const selected = accessions.find(
+                        (item) => item.id === entry.accessionId,
+                      );
+                      if (!selected) {
+                        return undefined;
+                      }
+                      const remaining = remainingQuantity(
+                        selected,
+                        state.consumptionEvents,
+                      );
+                      return `当前余量 ${remaining}（${stockLevelLabel(
+                        remaining <= 0
+                          ? "empty"
+                          : remaining <= 10
+                            ? "low"
+                            : "in-stock",
+                      )}）；观测不受余量限制`;
+                    })()
+                  : undefined
+              }
             >
               <option value="">请选择材料</option>
-              {accessions.map((accession) => (
-                <option value={accession.id} key={accession.id}>
-                  {accession.accessionNo} - {accession.cultivar}
-                </option>
-              ))}
+              {accessions.map((accession) => {
+                const remaining = remainingQuantity(
+                  accession,
+                  state.consumptionEvents,
+                );
+                return (
+                  <option value={accession.id} key={accession.id}>
+                    {accession.accessionNo} - {accession.cultivar}（余量 {remaining}
+                    {remaining <= 0 ? "，已用尽" : ""}）
+                  </option>
+                );
+              })}
             </SelectField>
             <TextField
               label="株高（毫米）"

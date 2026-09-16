@@ -94,6 +94,25 @@ export function validateAccessionDraft(
       ),
     );
   }
+  // 编辑既有批次时，登记数量下调不能使按流水派生的余量变成负数；
+  // 需要修正账面请走耗用更正或盘点，而不是直接覆盖批次事实。
+  if (currentId && !Number.isNaN(draft.quantity)) {
+    const current = state.accessions.find((item) => item.id === currentId);
+    if (current) {
+      const deltaSum = state.consumptionEvents
+        .filter((event) => event.accessionId === currentId)
+        .reduce((sum, event) => sum + event.delta, 0);
+      if (draft.quantity + deltaSum < 0) {
+        errors.push(
+          fieldError(
+            "quantity",
+            "below_consumed",
+            `登记数量不能低于已净耗用 ${-deltaSum}，否则余量为负；如需冲销请更正耗用记录`,
+          ),
+        );
+      }
+    }
+  }
   if (![32, 50, 72, 104, 128, 200, 288].includes(draft.trayCells)) {
     errors.push(
       fieldError("trayCells", "invalid", "请选择支持的穴盘规格"),

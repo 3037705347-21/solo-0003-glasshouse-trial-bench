@@ -5,11 +5,16 @@ import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import type { Accession, Bench } from "../../domain/types";
 import { canAssignAccession } from "../../domain/bench";
 import { isAccessionRetired } from "../../domain/accession";
+import { remainingQuantity } from "../../domain/consumption";
+import type { WorkspaceState } from "../../domain/types";
 
 interface BenchCardProps {
   bench: Bench;
   accessions: Accession[];
+  state: WorkspaceState;
   selectedAccession?: Accession;
+  /** 计划用量超过所选批次余量时为 true，仅禁用分配，不改写台架状态。 */
+  selectedBlockedByStock?: boolean;
   onAssign: (accessionId: string, benchId: string) => void;
   onRelease: (accessionId: string, benchId: string) => void;
 }
@@ -17,7 +22,9 @@ interface BenchCardProps {
 export function BenchCard({
   bench,
   accessions,
+  state,
   selectedAccession,
+  selectedBlockedByStock = false,
   onAssign,
   onRelease,
 }: BenchCardProps) {
@@ -26,7 +33,9 @@ export function BenchCard({
   );
   const freeSlots = Math.max(0, bench.capacity - assigned.length);
   const compatible = Boolean(
-    selectedAccession && canAssignAccession(selectedAccession, bench),
+    selectedAccession &&
+      canAssignAccession(selectedAccession, bench) &&
+      !selectedBlockedByStock,
   );
 
   return (
@@ -78,26 +87,36 @@ export function BenchCard({
         {assigned.length === 0 ? (
           <p className="muted-copy">暂无分配材料。</p>
         ) : (
-          assigned.map((accession) => (
-            <div className="bench-accession-row" key={accession.id}>
-              <div>
-                <strong>{accession.cultivar}</strong>
-                <span>
-                  {accession.accessionNo}
-                  {isAccessionRetired(accession) ? " · 已停用" : ""}
-                </span>
+          assigned.map((accession) => {
+            const remaining = remainingQuantity(
+              accession,
+              state.consumptionEvents,
+            );
+            return (
+              <div className="bench-accession-row" key={accession.id}>
+                <div>
+                  <strong>{accession.cultivar}</strong>
+                  <span>
+                    {accession.accessionNo}
+                    {isAccessionRetired(accession)
+                      ? " · 已停用"
+                      : remaining <= 0
+                        ? " · 余量为零"
+                        : ` · 余量 ${remaining}`}
+                  </span>
+                </div>
+                <Button
+                  tone="ghost"
+                  size="sm"
+                  className="icon-button"
+                  onClick={() => onRelease(accession.id, bench.id)}
+                  aria-label={`将 ${accession.cultivar} 从台架 ${bench.code} 移出`}
+                >
+                  <X size={16} />
+                </Button>
               </div>
-              <Button
-                tone="ghost"
-                size="sm"
-                className="icon-button"
-                onClick={() => onRelease(accession.id, bench.id)}
-                aria-label={`将 ${accession.cultivar} 从台架 ${bench.code} 移出`}
-              >
-                <X size={16} />
-              </Button>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
       <footer className="bench-card-footer">

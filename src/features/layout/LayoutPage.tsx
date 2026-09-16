@@ -3,7 +3,11 @@ import { Grid3X3 } from "lucide-react";
 import { PageHeader } from "../../components/PageHeader";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import { assignAccession, releaseAccession } from "../../domain/bench";
-import { accessionById, accessionsForTrial } from "../../state/selectors";
+import {
+  accessionById,
+  accessionRemaining,
+  accessionsForTrial,
+} from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
 import { AssignmentPanel } from "./AssignmentPanel";
 import { BenchCard } from "./BenchCard";
@@ -12,6 +16,7 @@ export function LayoutPage() {
   const { state, dispatch } = useWorkspace();
   const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
   const [selectedAccessionId, setSelectedAccessionId] = useState("");
+  const [plannedQuantity, setPlannedQuantity] = useState(1);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
@@ -39,6 +44,24 @@ export function LayoutPage() {
     if (!accession || !bench) {
       return;
     }
+    // 计划流程的余量核对：只阻止超量计划，不自动耗用、不改写任何状态。
+    if (!Number.isInteger(plannedQuantity) || plannedQuantity < 1) {
+      pushToast({
+        tone: "error",
+        title: "计划数量无效",
+        message: "请填写不小于 1 的整数计划使用数量。",
+      });
+      return;
+    }
+    const remaining = accessionRemaining(state, accession);
+    if (plannedQuantity > remaining) {
+      pushToast({
+        tone: "error",
+        title: "计划数量超过余量",
+        message: `${accession.accessionNo} 当前余量 ${remaining}，计划使用 ${plannedQuantity}，请先调减计划或补充库存。`,
+      });
+      return;
+    }
     const result = assignAccession(accession, bench);
     if (!result.ok) {
       pushToast({
@@ -52,7 +75,7 @@ export function LayoutPage() {
     pushToast({
       tone: "success",
         title: "台架分配成功",
-        message: `${accession.cultivar} 已分配到 ${bench.code}`,
+        message: `${accession.cultivar} 已分配到 ${bench.code}（计划用量 ${plannedQuantity}，余量 ${remaining} 未被扣减）`,
     });
   };
 
@@ -108,7 +131,12 @@ export function LayoutPage() {
           state={state}
           trialId={trialId}
           selectedAccessionId={selectedAccessionId}
-          onSelectAccession={setSelectedAccessionId}
+          plannedQuantity={plannedQuantity}
+          onSelectAccession={(accessionId) => {
+            setSelectedAccessionId(accessionId);
+            setPlannedQuantity(1);
+          }}
+          onPlannedQuantityChange={setPlannedQuantity}
         />
         <section className="bench-grid" aria-label="台架网格">
           <div className="bench-grid-heading">
@@ -122,7 +150,13 @@ export function LayoutPage() {
                 key={bench.id}
                 bench={bench}
                 accessions={accessions}
+                state={state}
                 selectedAccession={selectedAccession}
+                selectedBlockedByStock={
+                  Boolean(selectedAccession) &&
+                  plannedQuantity >
+                    accessionRemaining(state, selectedAccession!)
+                }
                 onAssign={handleAssign}
                 onRelease={handleRelease}
               />

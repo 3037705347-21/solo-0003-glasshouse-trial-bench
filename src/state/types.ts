@@ -2,6 +2,7 @@ import type {
   Accession,
   Bench,
   ClearanceSnapshot,
+  ConsumptionEvent,
   Flag,
   ObservationPass,
   Trial,
@@ -16,6 +17,18 @@ export type WorkspaceAction =
   | { type: "trial/transitioned"; trialId: string; state: TrialState }
   | { type: "accession/created"; accession: Accession }
   | { type: "accession/updated"; accession: Accession }
+  | { type: "consumption/recorded"; event: ConsumptionEvent }
+  | {
+      type: "accessions/merged";
+      source: Accession;
+      target: Accession;
+      events: ConsumptionEvent[];
+    }
+  | {
+      type: "accession/copied";
+      accession: Accession;
+      sourceEvent: ConsumptionEvent;
+    }
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
@@ -31,6 +44,7 @@ export function isWorkspaceState(value: unknown): value is WorkspaceState {
     return false;
   }
   const candidate = value as Partial<WorkspaceState>;
+  // consumptionEvents 为后增字段：旧版本存储缺失时由归一化补空数组。
   return (
     Array.isArray(candidate.trials) &&
     Array.isArray(candidate.accessions) &&

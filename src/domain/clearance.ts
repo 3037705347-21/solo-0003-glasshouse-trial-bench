@@ -7,6 +7,7 @@ import type {
 } from "./types";
 import { createId } from "./id";
 import { isAccessionRetired } from "./accession";
+import { remainingQuantity } from "./consumption";
 
 export function buildClearanceSnapshot(
   state: WorkspaceState,
@@ -37,6 +38,17 @@ export function buildClearanceSnapshot(
       blockers.push({
         code: "UNASSIGNED",
         message: `${accession.accessionNo} has no bench assignment`,
+        accessionId: accession.id,
+      });
+    }
+    const remaining = remainingQuantity(
+      accession,
+      state.consumptionEvents,
+    );
+    if (remaining <= 0) {
+      blockers.push({
+        code: "STOCK_EXHAUSTED",
+        message: `${accession.accessionNo} 当前余量为 ${remaining}，无法支持后续试验使用`,
         accessionId: accession.id,
       });
     }
@@ -89,6 +101,14 @@ export function buildClearanceSnapshot(
       label: "未处理标记",
       value: openFlags.length,
       detail: "未解决的观测标记",
+    },
+    {
+      label: "余量用尽批次",
+      value: activeAccessions.filter(
+        (accession) =>
+          remainingQuantity(accession, state.consumptionEvents) <= 0,
+      ).length,
+      detail: "在用但当前余量为零或为负的材料批次数",
     },
     {
       label: "在用台架",

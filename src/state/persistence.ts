@@ -1,4 +1,8 @@
-import type { Accession, WorkspaceState } from "../domain/types";
+import type {
+  Accession,
+  ConsumptionEvent,
+  WorkspaceState,
+} from "../domain/types";
 import { isWorkspaceState } from "./types";
 import { createSampleWorkspaceState } from "./sampleData";
 
@@ -16,12 +20,52 @@ function normalizeAccession(accession: Accession): Accession {
   };
 }
 
+function normalizeConsumptionEvent(
+  event: ConsumptionEvent,
+): ConsumptionEvent | null {
+  if (
+    !event ||
+    typeof event.id !== "string" ||
+    typeof event.accessionId !== "string" ||
+    typeof event.delta !== "number" ||
+    typeof event.usedOn !== "string" ||
+    typeof event.note !== "string"
+  ) {
+    return null;
+  }
+  return {
+    ...event,
+    kind: ["use", "correction", "transfer"].includes(event.kind)
+      ? event.kind
+      : "use",
+    destination: ["trial", "activity", "waste", "merge"].includes(
+      event.destination,
+    )
+      ? event.destination
+      : "activity",
+    ref:
+      event.ref && typeof event.ref.label === "string"
+        ? event.ref
+        : { label: "未记录去向" },
+    recordedAt: event.recordedAt ?? new Date(0).toISOString(),
+    recordedBy: event.recordedBy ?? "未知",
+  };
+}
+
 export function normalizeWorkspaceState(
   state: WorkspaceState,
 ): WorkspaceState {
   return {
     ...state,
     accessions: state.accessions.map(normalizeAccession),
+    consumptionEvents: (
+      Array.isArray(state.consumptionEvents)
+        ? state.consumptionEvents
+        : []
+    ).flatMap((event) => {
+      const normalized = normalizeConsumptionEvent(event);
+      return normalized ? [normalized] : [];
+    }),
   };
 }
 
