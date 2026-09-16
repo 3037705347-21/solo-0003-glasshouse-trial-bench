@@ -59,6 +59,38 @@ export function workspaceReducer(
         clearanceSnapshots: [...state.clearanceSnapshots, action.snapshot],
         trials: action.trials,
       };
+    case "clearance-check/saved": {
+      const drafts = [...state.clearanceCheckDrafts];
+      const index = drafts.findIndex((draft) => draft.trialId === action.trialId);
+      const existing = index >= 0 ? drafts[index] : undefined;
+      const records = [
+        ...(existing?.records ?? []).filter(
+          (record) => record.key !== action.record.key,
+        ),
+        action.record,
+      ];
+      const nextDraft = { trialId: action.trialId, records };
+      if (index >= 0) {
+        drafts[index] = nextDraft;
+      } else {
+        drafts.push(nextDraft);
+      }
+      return { ...state, clearanceCheckDrafts: drafts };
+    }
+    case "clearance-check/cleared":
+      return {
+        ...state,
+        clearanceCheckDrafts: state.clearanceCheckDrafts.map((draft) =>
+          draft.trialId === action.trialId
+            ? {
+                ...draft,
+                records: draft.records.filter(
+                  (record) => record.key !== action.key,
+                ),
+              }
+            : draft,
+        ),
+      };
     default:
       return state;
   }

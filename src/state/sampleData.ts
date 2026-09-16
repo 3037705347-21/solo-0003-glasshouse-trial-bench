@@ -1,6 +1,7 @@
 import type {
   Accession,
   Bench,
+  ClearanceCheckDraft,
   ClearanceSnapshot,
   Flag,
   ObservationPass,
@@ -316,6 +317,8 @@ const flags: Flag[] = [
 
 const clearanceSnapshots: ClearanceSnapshot[] = [];
 
+const clearanceCheckDrafts: ClearanceCheckDraft[] = [];
+
 export function createSampleWorkspaceState(): WorkspaceState {
   return {
     trials,
@@ -324,5 +327,6 @@ export function createSampleWorkspaceState(): WorkspaceState {
     observationPasses,
     flags,
     clearanceSnapshots,
+    clearanceCheckDrafts,
   };
 }

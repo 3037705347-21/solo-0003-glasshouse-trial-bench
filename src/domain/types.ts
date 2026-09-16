@@ -103,6 +103,29 @@ export interface ClearanceBlocker {
   benchId?: string;
 }
 
+export type ClearanceCheckKey =
+  | "material-identity"
+  | "bench-placement"
+  | "observation-completeness"
+  | "label-handling";
+
+export type ClearanceCheckStatus = "confirmed" | "not-applicable" | "unconfirmed";
+
+export interface ClearanceCheckRecord {
+  key: ClearanceCheckKey;
+  status: ClearanceCheckStatus;
+  note: string;
+  confirmedBy: string;
+  confirmedAt: string;
+  contextSignature: string;
+  stale: boolean;
+}
+
+export interface ClearanceCheckDraft {
+  trialId: string;
+  records: ClearanceCheckRecord[];
+}
+
 export interface ClearanceSnapshot {
   id: string;
   trialId: string;
@@ -110,6 +133,7 @@ export interface ClearanceSnapshot {
   status: ClearanceStatus;
   metrics: ClearanceMetric[];
   blockers: ClearanceBlocker[];
+  checks: ClearanceCheckRecord[];
 }
 
 export interface WorkspaceState {
@@ -119,4 +143,5 @@ export interface WorkspaceState {
   observationPasses: ObservationPass[];
   flags: Flag[];
   clearanceSnapshots: ClearanceSnapshot[];
+  clearanceCheckDrafts: ClearanceCheckDraft[];
 }

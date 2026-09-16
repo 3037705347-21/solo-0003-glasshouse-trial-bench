@@ -1,23 +1,41 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Play, ShieldCheck } from "lucide-react";
 import { Button } from "../../components/Button";
 import { PageHeader } from "../../components/PageHeader";
+import { StatusBadge, statusTone } from "../../components/StatusBadge";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import {
   applyClearance,
   buildClearanceSnapshot,
+  summarizeChecks,
 } from "../../domain/clearance";
 import { transitionTrial } from "../../domain/trial";
-import { latestSnapshotForTrial } from "../../state/selectors";
+import { snapshotsForTrial } from "../../state/selectors";
 import { useWorkspace } from "../../state/store";
+import { ChecklistPanel } from "./ChecklistPanel";
 import { SnapshotCard } from "./SnapshotCard";
+
+function displayDateTime(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
 
 export function ClearancePage() {
   const { state, dispatch } = useWorkspace();
   const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const latest = latestSnapshotForTrial(state, trialId);
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(
+    null,
+  );
+  const snapshots = snapshotsForTrial(state, trialId);
   const trial = state.trials.find((item) => item.id === trialId);
+  const selectedSnapshot =
+    snapshots.find((snapshot) => snapshot.id === selectedSnapshotId) ??
+    snapshots[0];
+
+  useEffect(() => {
+    setSelectedSnapshotId(null);
+  }, [trialId]);
 
   const liveSnapshot = useMemo(
     () => buildClearanceSnapshot(state, trialId),
@@ -36,13 +54,17 @@ export function ClearancePage() {
     const snapshot = buildClearanceSnapshot(state, trialId);
     const trials = applyClearance(state, snapshot);
     dispatch({ type: "clearance/generated", snapshot, trials });
+    setSelectedSnapshotId(snapshot.id);
+    const unconfirmed = summarizeChecks(snapshot.checks).unconfirmed;
+    const checkNote =
+      unconfirmed > 0 ? `另有 ${unconfirmed} 项人工确认未完成，已记录在快照中。` : "";
     pushToast({
       tone: snapshot.status === "ready" ? "success" : "warning",
       title: snapshot.status === "ready" ? "试验已放行" : "放行被阻止",
       message:
         snapshot.status === "ready"
-          ? "试验状态已更新为已放行。"
-          : `仍有 ${snapshot.blockers.length} 个阻止项。`,
+          ? `试验状态已更新为已放行。${checkNote}`
+          : `仍有 ${snapshot.blockers.length} 个阻止项。${checkNote}`,
     });
   };
 
@@ -76,7 +98,7 @@ export function ClearancePage() {
       <PageHeader
         eyebrow="试验放行"
         title="放行检查"
-        description="检查跨模块约束，并生成一次不可变的放行快照。"
+        description="检查跨模块约束，完成人工确认清单，并生成一次不可变的放行快照。"
         actions={
           trial?.state === "draft" ? (
             <Button onClick={handleActivate}>
@@ -126,15 +148,51 @@ export function ClearancePage() {
         </div>
         <SnapshotCard snapshot={liveSnapshot} />
       </section>
-      {latest ? (
+      <ChecklistPanel
+        key={trialId}
+        trialId={trialId}
+        onToast={pushToast}
+      />
+      {selectedSnapshot ? (
         <section className="clearance-preview">
           <div className="panel-heading">
             <div>
               <span className="panel-title">已保存快照</span>
-              <span className="panel-subtitle">最近生成的放行快照</span>
+              <span className="panel-subtitle">
+                共 {snapshots.length} 份，确认结论已随快照固定，可回看历史版本
+              </span>
             </div>
           </div>
-          <SnapshotCard snapshot={latest} />
+          {snapshots.length > 1 ? (
+            <div className="snapshot-history" data-testid="snapshot-history">
+              {snapshots.map((snapshot) => {
+                const summary = summarizeChecks(snapshot.checks);
+                return (
+                  <button
+                    type="button"
+                    key={snapshot.id}
+                    className={`snapshot-history-row ${
+                      snapshot.id === selectedSnapshot.id
+                        ? "snapshot-history-row-active"
+                        : ""
+                    }`}
+                    onClick={() => setSelectedSnapshotId(snapshot.id)}
+                    data-testid={`snapshot-history-${snapshot.id}`}
+                  >
+                    <span>{displayDateTime(snapshot.generatedOn)}</span>
+                    <StatusBadge tone={statusTone(snapshot.status)}>
+                      {snapshot.status === "ready" ? "就绪" : "阻止"}
+                    </StatusBadge>
+                    <span>
+                      已确认 {summary.confirmed} · 不适用 {summary.notApplicable}{" "}
+                      · 未确认 {summary.unconfirmed}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+          <SnapshotCard snapshot={selectedSnapshot} />
         </section>
       ) : null}
       <ToastRegion

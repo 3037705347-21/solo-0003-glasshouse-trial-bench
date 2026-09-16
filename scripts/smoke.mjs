@@ -16,6 +16,7 @@ const scenarios = {
   "record-observation-pass": recordObservationPass,
   "advance-trial-clearance": advanceTrialClearance,
   "retire-accession-replacement": retireAccessionReplacement,
+  "confirm-clearance-checklist": confirmClearanceChecklist,
 };
 
 const scenarioPaths = {
@@ -24,6 +25,7 @@ const scenarioPaths = {
   "record-observation-pass": "/observations",
   "advance-trial-clearance": "/clearance",
   "retire-accession-replacement": "/roster",
+  "confirm-clearance-checklist": "/clearance",
 };
 
 async function waitForServer() {
@@ -92,6 +94,139 @@ async function advanceTrialClearance(page) {
     .getByTestId("clearance-snapshot")
     .getByText("阻止", { exact: true })
     .first()
+    .waitFor();
+}
+
+async function confirmClearanceChecklist(page) {
+  const checklist = page.getByTestId("clearance-checklist");
+  await checklist.waitFor();
+  await assertCount(
+    checklist.locator('[data-testid^="checklist-item-"]'),
+    4,
+    "checklist items",
+  );
+  await page
+    .getByTestId("checklist-summary")
+    .filter({ hasText: "未确认 4 项" })
+    .waitFor();
+
+  await page.getByTestId("checklist-confirmer").fill("K. Sato");
+  await page
+    .getByTestId("checklist-note-material-identity")
+    .fill("已核对穴盘标签与登记册。");
+  await page.getByTestId("checklist-confirm-material-identity").click();
+  const materialItem = page.getByTestId("checklist-item-material-identity");
+  await materialItem.getByText("已确认", { exact: true }).waitFor();
+
+  // 重复确认：更新备注后再次确认，仍只保留一条结论
+  await page
+    .getByTestId("checklist-note-material-identity")
+    .fill("复核无误，标签一致。");
+  await page.getByTestId("checklist-confirm-material-identity").click();
+  await materialItem
+    .getByText("复核无误，标签一致。", { exact: false })
+    .waitFor();
+  await assertCount(
+    materialItem.getByText("已确认", { exact: true }),
+    1,
+    "duplicate confirmation keeps single record",
+  );
+  await assertCount(
+    page.getByText("已核对穴盘标签与登记册。", { exact: false }),
+    0,
+    "superseded note removed",
+  );
+
+  await page.getByTestId("checklist-na-label-handling").click();
+  await page
+    .getByTestId("checklist-item-label-handling")
+    .locator(".status-badge")
+    .filter({ hasText: "不适用" })
+    .waitFor();
+
+  // 未确认项不影响自动阻止项，但必须在放行结果中说明
+  await page.getByTestId("generate-clearance").click();
+  await page.getByText("放行被阻止", { exact: true }).waitFor();
+  const savedSnapshot = page
+    .locator(".clearance-preview")
+    .nth(1)
+    .getByTestId("clearance-snapshot");
+  await savedSnapshot.getByText("人工确认清单", { exact: true }).waitFor();
+  const unconfirmedNote = savedSnapshot.getByTestId(
+    "snapshot-unconfirmed-note",
+  );
+  await unconfirmedNote.filter({ hasText: "台架位置" }).waitFor();
+  await unconfirmedNote.filter({ hasText: "观测完整性" }).waitFor();
+  await savedSnapshot
+    .getByTestId("snapshot-check-material-identity")
+    .getByText("已确认", { exact: true })
+    .waitFor();
+
+  // 刷新后确认结果仍然保留
+  await page.reload({ waitUntil: "networkidle" });
+  await page
+    .getByTestId("checklist-item-material-identity")
+    .getByText("已确认", { exact: true })
+    .waitFor();
+
+  // 确认后台架发生变化 → 清单提示已变化
+  await page.getByTestId("checklist-confirm-bench-placement").click();
+  await page
+    .getByTestId("checklist-item-bench-placement")
+    .getByText("已确认", { exact: true })
+    .waitFor();
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  await page
+    .getByTestId("assignment-accession-select")
+    .selectOption("acc-tom-03");
+  await page.getByTestId("assign-bench-bench-east-2").click();
+  await page.getByText("台架分配成功", { exact: true }).waitFor();
+  await page.goto(`${baseUrl}/#/clearance`, { waitUntil: "networkidle" });
+  const benchItem = page.getByTestId("checklist-item-bench-placement");
+  await benchItem.getByText("已变化", { exact: true }).waitFor();
+
+  // 重新确认后已变化标记消除
+  await page.getByTestId("checklist-confirm-bench-placement").click();
+  await benchItem.getByText("已确认", { exact: true }).waitFor();
+  await assertCount(
+    benchItem.getByText("已变化", { exact: true }),
+    0,
+    "stale badge cleared after re-confirmation",
+  );
+
+  // 同一试验第二次生成快照 → 历史列表保留两份
+  await page.getByTestId("generate-clearance").click();
+  await page.getByTestId("snapshot-history").waitFor();
+  await assertCount(
+    page.locator('[data-testid^="snapshot-history-"]'),
+    2,
+    "snapshot history rows",
+  );
+  const latestSaved = page
+    .locator(".clearance-preview")
+    .nth(1)
+    .getByTestId("clearance-snapshot");
+  await latestSaved
+    .getByTestId("snapshot-check-bench-placement")
+    .getByText("已确认", { exact: true })
+    .waitFor();
+
+  // 回看第一份快照：确认结论保持冻结，不受后续变化影响
+  await page.locator('[data-testid^="snapshot-history-"]').nth(1).click();
+  const firstSnapshot = page
+    .locator(".clearance-preview")
+    .nth(1)
+    .getByTestId("clearance-snapshot");
+  await firstSnapshot
+    .getByTestId("snapshot-check-bench-placement")
+    .getByText("未确认", { exact: true })
+    .waitFor();
+  await firstSnapshot
+    .getByText("复核无误，标签一致。", { exact: false })
+    .waitFor();
+  await firstSnapshot
+    .getByTestId("snapshot-unconfirmed-note")
+    .filter({ hasText: "台架位置" })
     .waitFor();
 }
 

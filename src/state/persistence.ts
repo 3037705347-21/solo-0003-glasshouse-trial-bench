@@ -1,4 +1,9 @@
-import type { Accession, WorkspaceState } from "../domain/types";
+import type {
+  Accession,
+  ClearanceCheckDraft,
+  ClearanceSnapshot,
+  WorkspaceState,
+} from "../domain/types";
 import { isWorkspaceState } from "./types";
 import { createSampleWorkspaceState } from "./sampleData";
 
@@ -16,12 +21,30 @@ function normalizeAccession(accession: Accession): Accession {
   };
 }
 
+function normalizeSnapshot(snapshot: ClearanceSnapshot): ClearanceSnapshot {
+  return {
+    ...snapshot,
+    checks: Array.isArray(snapshot.checks) ? snapshot.checks : [],
+  };
+}
+
+function normalizeCheckDraft(draft: ClearanceCheckDraft): ClearanceCheckDraft {
+  return {
+    ...draft,
+    records: Array.isArray(draft.records) ? draft.records : [],
+  };
+}
+
 export function normalizeWorkspaceState(
   state: WorkspaceState,
 ): WorkspaceState {
   return {
     ...state,
     accessions: state.accessions.map(normalizeAccession),
+    clearanceSnapshots: state.clearanceSnapshots.map(normalizeSnapshot),
+    clearanceCheckDrafts: Array.isArray(state.clearanceCheckDrafts)
+      ? state.clearanceCheckDrafts.map(normalizeCheckDraft)
+      : [],
   };
 }
 

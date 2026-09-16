@@ -1,6 +1,8 @@
 import type {
   Accession,
   Bench,
+  ClearanceCheckKey,
+  ClearanceCheckRecord,
   ClearanceSnapshot,
   Flag,
   ObservationPass,
@@ -24,6 +26,16 @@ export type WorkspaceAction =
       type: "clearance/generated";
       snapshot: ClearanceSnapshot;
       trials: Trial[];
+    }
+  | {
+      type: "clearance-check/saved";
+      trialId: string;
+      record: ClearanceCheckRecord;
+    }
+  | {
+      type: "clearance-check/cleared";
+      trialId: string;
+      key: ClearanceCheckKey;
     };
 
 export function isWorkspaceState(value: unknown): value is WorkspaceState {

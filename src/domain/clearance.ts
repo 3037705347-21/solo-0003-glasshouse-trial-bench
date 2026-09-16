@@ -1,5 +1,7 @@
 import type {
   ClearanceBlocker,
+  ClearanceCheckKey,
+  ClearanceCheckRecord,
   ClearanceMetric,
   ClearanceSnapshot,
   Trial,
@@ -7,6 +9,206 @@ import type {
 } from "./types";
 import { createId } from "./id";
 import { isAccessionRetired } from "./accession";
+import { fail, fieldError, ok, type Result } from "./result";
+
+export interface ClearanceCheckDefinition {
+  key: ClearanceCheckKey;
+  title: string;
+  description: string;
+}
+
+export const CLEARANCE_CHECK_DEFINITIONS: ClearanceCheckDefinition[] = [
+  {
+    key: "material-identity",
+    title: "材料身份",
+    description: "核对现场材料的编号、品种与登记信息一致，无混苗或错牌。",
+  },
+  {
+    key: "bench-placement",
+    title: "台架位置",
+    description: "确认材料实际摆放的台架与系统记录一致，无临时挪动。",
+  },
+  {
+    key: "observation-completeness",
+    title: "观测完整性",
+    description: "确认计划内的观测均已记录，缺失数据已说明原因。",
+  },
+  {
+    key: "label-handling",
+    title: "标签处理",
+    description: "确认旧标签已回收或更新，放行材料的新标签已就位。",
+  },
+];
+
+export function clearanceCheckDefinition(
+  key: ClearanceCheckKey,
+): ClearanceCheckDefinition {
+  return (
+    CLEARANCE_CHECK_DEFINITIONS.find((definition) => definition.key === key) ?? {
+      key,
+      title: key,
+      description: "",
+    }
+  );
+}
+
+export function checkContextSignature(
+  state: WorkspaceState,
+  trialId: string,
+  key: ClearanceCheckKey,
+): string {
+  const trialAccessions = state.accessions.filter(
+    (accession) => accession.trialId === trialId,
+  );
+  const accessionIdentity = trialAccessions
+    .map(
+      (accession) =>
+        `${accession.id}:${accession.accessionNo}:${accession.cultivar}:${accession.source}:${accession.lifecycleStatus}`,
+    )
+    .sort()
+    .join("|");
+  const accessionLabels = trialAccessions
+    .map((accession) => `${accession.id}:${accession.labels.join(",")}`)
+    .sort()
+    .join("|");
+  const trialAccessionIds = new Set(
+    trialAccessions.map((accession) => accession.id),
+  );
+  const benchPlacement = state.benches
+    .map(
+      (bench) =>
+        `${bench.id}:${bench.code}:${bench.status}:${bench.assignedIds
+          .filter((id) => trialAccessionIds.has(id))
+          .sort()
+          .join("+")}`,
+    )
+    .sort()
+    .join("|");
+  const observationTrail = [
+    ...state.observationPasses
+      .filter((pass) => pass.trialId === trialId)
+      .map((pass) => `${pass.id}:${pass.observedOn}:${pass.entries.length}`),
+    ...state.flags
+      .filter((flag) => flag.trialId === trialId)
+      .map((flag) => `${flag.id}:${flag.state}`),
+  ]
+    .sort()
+    .join("|");
+  switch (key) {
+    case "material-identity":
+      return accessionIdentity;
+    case "bench-placement":
+      return benchPlacement;
+    case "observation-completeness":
+      return observationTrail;
+    case "label-handling":
+      return accessionLabels;
+  }
+}
+
+export interface ClearanceCheckInput {
+  status: "confirmed" | "not-applicable";
+  note: string;
+  confirmedBy: string;
+}
+
+export function confirmClearanceCheck(
+  state: WorkspaceState,
+  trialId: string,
+  key: ClearanceCheckKey,
+  input: ClearanceCheckInput,
+): Result<ClearanceCheckRecord> {
+  if (!state.trials.some((trial) => trial.id === trialId)) {
+    return fail([fieldError("trialId", "unknown", "未找到对应试验")]);
+  }
+  const note = input.note.trim();
+  if (note.length > 200) {
+    return fail([
+      fieldError("note", "too_long", "备注不能超过 200 个字符"),
+    ]);
+  }
+  const confirmedBy = input.confirmedBy.trim();
+  if (confirmedBy.length > 40) {
+    return fail([
+      fieldError("confirmedBy", "too_long", "确认人姓名不能超过 40 个字符"),
+    ]);
+  }
+  return ok({
+    key,
+    status: input.status,
+    note,
+    confirmedBy,
+    confirmedAt: new Date().toISOString(),
+    contextSignature: checkContextSignature(state, trialId, key),
+    stale: false,
+  });
+}
+
+export function isCheckRecordStale(
+  state: WorkspaceState,
+  trialId: string,
+  record: ClearanceCheckRecord,
+): boolean {
+  return (
+    record.contextSignature !== checkContextSignature(state, trialId, record.key)
+  );
+}
+
+export function buildClearanceChecks(
+  state: WorkspaceState,
+  trialId: string,
+): ClearanceCheckRecord[] {
+  const draft = state.clearanceCheckDrafts.find(
+    (item) => item.trialId === trialId,
+  );
+  return CLEARANCE_CHECK_DEFINITIONS.map((definition) => {
+    const record = draft?.records.find(
+      (item) => item.key === definition.key,
+    );
+    if (!record) {
+      return {
+        key: definition.key,
+        status: "unconfirmed",
+        note: "",
+        confirmedBy: "",
+        confirmedAt: "",
+        contextSignature: "",
+        stale: false,
+      };
+    }
+    return { ...record, stale: isCheckRecordStale(state, trialId, record) };
+  });
+}
+
+export interface ClearanceCheckSummary {
+  confirmed: number;
+  notApplicable: number;
+  unconfirmed: number;
+}
+
+export function summarizeChecks(
+  checks: ClearanceCheckRecord[],
+): ClearanceCheckSummary {
+  return {
+    confirmed: checks.filter((check) => check.status === "confirmed").length,
+    notApplicable: checks.filter((check) => check.status === "not-applicable")
+      .length,
+    unconfirmed: checks.filter((check) => check.status === "unconfirmed")
+      .length,
+  };
+}
+
+export function describeCheckStatus(
+  status: ClearanceCheckRecord["status"],
+): string {
+  if (status === "confirmed") {
+    return "已确认";
+  }
+  if (status === "not-applicable") {
+    return "不适用";
+  }
+  return "未确认";
+}
 
 export function buildClearanceSnapshot(
   state: WorkspaceState,
@@ -107,6 +309,7 @@ export function buildClearanceSnapshot(
     status: blockers.length === 0 ? "ready" : "blocked",
     metrics,
     blockers,
+    checks: buildClearanceChecks(state, trialId),
   };
 }
 

@@ -1,6 +1,7 @@
 import type {
   Accession,
   Bench,
+  ClearanceCheckDraft,
   ClearanceSnapshot,
   Flag,
   ObservationPass,
@@ -102,6 +103,22 @@ export function latestSnapshotForTrial(
   return [...state.clearanceSnapshots]
     .filter((snapshot) => snapshot.trialId === trialId)
     .sort((left, right) => right.generatedOn.localeCompare(left.generatedOn))[0];
+}
+
+export function snapshotsForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): ClearanceSnapshot[] {
+  return [...state.clearanceSnapshots]
+    .filter((snapshot) => snapshot.trialId === trialId)
+    .sort((left, right) => right.generatedOn.localeCompare(left.generatedOn));
+}
+
+export function checkDraftForTrial(
+  state: WorkspaceState,
+  trialId: string,
+): ClearanceCheckDraft | undefined {
+  return state.clearanceCheckDrafts.find((draft) => draft.trialId === trialId);
 }
 
 export function benchUtilization(
