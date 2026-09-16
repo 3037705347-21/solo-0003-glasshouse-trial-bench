@@ -171,10 +171,25 @@ async function confirmClearanceChecklist(page) {
 
   // 确认后台架发生变化 → 清单提示已变化
   await page.getByTestId("checklist-confirm-bench-placement").click();
+  const benchItem = page.getByTestId("checklist-item-bench-placement");
+  await benchItem.getByText("已确认", { exact: true }).waitFor();
+
+  // 其他试验调整台架分配 → 不应影响当前试验的确认
+  await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
+  await page.getByTestId("layout-trial-select").selectOption("trial-ama-02");
   await page
-    .getByTestId("checklist-item-bench-placement")
-    .getByText("已确认", { exact: true })
-    .waitFor();
+    .getByRole("button", { name: "将 Chioggia 从台架 W-2 移出" })
+    .click();
+  await page.getByText("材料已移出", { exact: true }).waitFor();
+  await page.goto(`${baseUrl}/#/clearance`, { waitUntil: "networkidle" });
+  await assertCount(
+    benchItem.getByText("已变化", { exact: true }),
+    0,
+    "cross-trial bench change must not mark stale",
+  );
+  await benchItem.getByText("已确认", { exact: true }).waitFor();
+
+  // 当前试验自己的台架变化 → 清单提示已变化
   await page.goto(`${baseUrl}/#/layout`, { waitUntil: "networkidle" });
   await page
     .getByTestId("assignment-accession-select")
@@ -182,7 +197,6 @@ async function confirmClearanceChecklist(page) {
   await page.getByTestId("assign-bench-bench-east-2").click();
   await page.getByText("台架分配成功", { exact: true }).waitFor();
   await page.goto(`${baseUrl}/#/clearance`, { waitUntil: "networkidle" });
-  const benchItem = page.getByTestId("checklist-item-bench-placement");
   await benchItem.getByText("已变化", { exact: true }).waitFor();
 
   // 重新确认后已变化标记消除

@@ -75,6 +75,9 @@ export function checkContextSignature(
     trialAccessions.map((accession) => accession.id),
   );
   const benchPlacement = state.benches
+    .filter((bench) =>
+      bench.assignedIds.some((id) => trialAccessionIds.has(id)),
+    )
     .map(
       (bench) =>
         `${bench.id}:${bench.code}:${bench.status}:${bench.assignedIds
