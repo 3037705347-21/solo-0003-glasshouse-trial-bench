@@ -1411,3 +1411,159 @@ button {
     justify-content: flex-start;
   }
 }
+
+/* --- Configurable accession number rules --- */
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.number-mode-row {
+  display: flex;
+  gap: 8px;
+}
+
+.number-preview-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--surface-alt, #f6f8f4);
+}
+
+.number-preview-card strong {
+  font-size: 16px;
+  letter-spacing: 0.04em;
+}
+
+.number-preview-card small {
+  color: var(--text-muted);
+}
+
+.rules-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.rules-toolbar .muted-copy {
+  margin: 2px 0 0;
+}
+
+.rules-list {
+  display: grid;
+  gap: 10px;
+}
+
+.rule-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.rule-row-inactive {
+  opacity: 0.72;
+  background: var(--surface-alt, #f6f8f4);
+}
+
+.rule-row-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.rule-row-copy span {
+  font-size: 13px;
+}
+
+.rule-row-copy small {
+  color: var(--text-muted);
+}
+
+.import-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.import-controls {
+  display: grid;
+  gap: 14px;
+}
+
+.import-textarea {
+  min-height: 180px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.import-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.import-preview {
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.import-table td,
+.import-table th {
+  vertical-align: top;
+  font-size: 12px;
+}
+
+.import-row-error {
+  background: rgba(196, 68, 68, 0.06);
+}
+
+.import-manual-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.import-error-list {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--danger);
+  font-size: 12px;
+  display: grid;
+  gap: 2px;
+}
+
+.copy-preview {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+@media (max-width: 860px) {
+  .import-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .page-actions {
+    justify-content: flex-start;
+  }
+}

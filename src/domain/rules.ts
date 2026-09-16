@@ -1,5 +1,7 @@
 import type { Accession, Bench, PreferredLight } from "./types";
 
+export const MAX_ACCESSION_NO_LENGTH = 24;
+
 export const TRAY_CELL_OPTIONS = [32, 50, 72, 104, 128, 200, 288];
 
 export const LIGHT_PROFILES: PreferredLight[] = [

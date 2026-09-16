@@ -3,6 +3,7 @@ import type {
   Bench,
   ClearanceSnapshot,
   Flag,
+  NumberRule,
   ObservationPass,
   Trial,
   TrialState,
@@ -14,8 +15,13 @@ export type WorkspaceAction =
   | { type: "reset"; state: WorkspaceState }
   | { type: "trial/created"; trial: Trial }
   | { type: "trial/transitioned"; trialId: string; state: TrialState }
-  | { type: "accession/created"; accession: Accession }
+  | { type: "trial/copied"; trial: Trial; accessions: Accession[]; numberRules: NumberRule[] }
+  | { type: "accession/created"; accession: Accession; numberRules?: NumberRule[] }
   | { type: "accession/updated"; accession: Accession }
+  | { type: "accessions/imported"; accessions: Accession[]; numberRules: NumberRule[] }
+  | { type: "numberRule/created"; rule: NumberRule }
+  | { type: "numberRule/updated"; rule: NumberRule }
+  | { type: "numberRule/removed"; ruleId: string }
   | { type: "bench/assigned"; bench: Bench }
   | { type: "bench/released"; bench: Bench }
   | { type: "observation/recorded"; pass: ObservationPass; flags: Flag[] }
@@ -34,6 +40,8 @@ export function isWorkspaceState(value: unknown): value is WorkspaceState {
   return (
     Array.isArray(candidate.trials) &&
     Array.isArray(candidate.accessions) &&
+    // numberRules was added later; missing arrays are filled by normalization.
+    (!candidate.numberRules || Array.isArray(candidate.numberRules)) &&
     Array.isArray(candidate.benches) &&
     Array.isArray(candidate.observationPasses) &&
     Array.isArray(candidate.flags) &&

@@ -320,6 +320,7 @@ export function createSampleWorkspaceState(): WorkspaceState {
   return {
     trials,
     accessions,
+    numberRules: [],
     benches,
     observationPasses,
     flags,

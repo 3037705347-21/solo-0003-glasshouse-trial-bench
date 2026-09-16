@@ -1,5 +1,14 @@
 import { useMemo, useState } from "react";
-import { Ban, History, Plus, RotateCcw, Sprout } from "lucide-react";
+import {
+  Ban,
+  Copy,
+  History,
+  ListPlus,
+  Plus,
+  RotateCcw,
+  Settings2,
+  Sprout,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { DataTable, type DataColumn } from "../../components/DataTable";
@@ -12,8 +21,8 @@ import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import {
   accessionMatchesQuery,
   isAccessionRetired,
-  nextAccessionNumber,
 } from "../../domain/accession";
+import { accessionNumberRuleFor } from "../../domain/numbering";
 import type { Accession } from "../../domain/types";
 import {
   accessionStatus,
@@ -25,6 +34,9 @@ import {
   RestoreAccessionDialog,
   RetireAccessionDialog,
 } from "./AccessionLifecycleDialogs";
+import { CopyTrialDialog } from "./CopyTrialDialog";
+import { ImportAccessionsDialog } from "./ImportAccessionsDialog";
+import { NumberRulesDialog } from "./NumberRulesDialog";
 import { RosterForm } from "./RosterForm";
 
 type RosterSegment = "all" | "active" | "assigned" | "unassigned" | "retired";
@@ -39,6 +51,9 @@ export function RosterPage() {
   const [editingAccession, setEditingAccession] = useState<Accession | undefined>();
   const [retiringAccession, setRetiringAccession] = useState<Accession | undefined>();
   const [restoringAccession, setRestoringAccession] = useState<Accession | undefined>();
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
@@ -89,6 +104,23 @@ export function RosterPage() {
       key: "source",
       header: "来源",
       render: (accession) => accession.source,
+    },
+    {
+      key: "numberRule",
+      header: "编号来源",
+      render: (accession) => {
+        const rule = accessionNumberRuleFor(state, accession);
+        if (rule) {
+          return rule.status === "inactive" ? (
+            <span title="规则已停用，历史编号保留">
+              {rule.name} · 已停用
+            </span>
+          ) : (
+            rule.name
+          );
+        }
+        return <span className="muted-copy">手工编号</span>;
+      },
     },
     {
       key: "trial",
@@ -212,10 +244,36 @@ export function RosterPage() {
         title="材料登记"
         description="维护将进入观测和台架分配流程的植物品系。"
         actions={
-          <Button onClick={openCreate} data-testid="open-create-accession">
-            <Plus size={16} />
-            新建材料
-          </Button>
+          <div className="page-actions">
+            <Button
+              tone="secondary"
+              onClick={() => setRulesOpen(true)}
+              data-testid="open-number-rules"
+            >
+              <Settings2 size={16} />
+              编号规则
+            </Button>
+            <Button
+              tone="secondary"
+              onClick={() => setCopyOpen(true)}
+              data-testid="open-copy-trial"
+            >
+              <Copy size={16} />
+              复制试验
+            </Button>
+            <Button
+              tone="secondary"
+              onClick={() => setImportOpen(true)}
+              data-testid="open-import-accessions"
+            >
+              <ListPlus size={16} />
+              批量导入
+            </Button>
+            <Button onClick={openCreate} data-testid="open-create-accession">
+              <Plus size={16} />
+              新建材料
+            </Button>
+          </div>
         }
       />
       <section className="control-strip">
@@ -277,7 +335,6 @@ export function RosterPage() {
         {trialFilter ? (
           <RosterForm
             trialId={trialFilter}
-            nextAccessionNo={nextAccessionNumber(state)}
             accession={editingAccession}
             onCancel={() => setEditorOpen(false)}
             onSaved={() => {
@@ -297,6 +354,37 @@ export function RosterPage() {
           <p>请先创建试验，再添加材料。</p>
         )}
       </Dialog>
+      <NumberRulesDialog
+        open={rulesOpen}
+        trialId={trialFilter}
+        onClose={() => setRulesOpen(false)}
+      />
+      <ImportAccessionsDialog
+        open={importOpen}
+        trialId={trialFilter}
+        onClose={() => setImportOpen(false)}
+        onImported={(count) => {
+          setImportOpen(false);
+          pushToast({
+            tone: "success",
+            title: "批量导入完成",
+            message: `已导入 ${count} 条材料，编号计数器已推进，重复导入不会重号。`,
+          });
+        }}
+      />
+      <CopyTrialDialog
+        open={copyOpen}
+        sourceTrialId={trialFilter}
+        onClose={() => setCopyOpen(false)}
+        onCopied={(code, count) => {
+          setCopyOpen(false);
+          pushToast({
+            tone: "success",
+            title: `试验 ${code} 已创建`,
+            message: `${count} 个材料已按编号规则重新编号并复制到新试验。`,
+          });
+        }}
+      />
       {retiringAccession ? (
         <RetireAccessionDialog
           accession={retiringAccession}

@@ -4,10 +4,11 @@ import type {
   PreferredLight,
   WorkspaceState,
 } from "./types";
-import { createAccessionNumber, createId } from "./id";
+import { createId } from "./id";
 import {
   GROWTH_BOUNDS,
   BENCH_LIGHT_COMPATIBILITY,
+  MAX_ACCESSION_NO_LENGTH,
   normalizeLabels,
   parseDateOnly,
   todayDateOnly,
@@ -17,6 +18,7 @@ import { fail, fieldError, ok, type Result } from "./result";
 export interface AccessionDraft {
   trialId: string;
   accessionNo: string;
+  numberRuleId?: string;
   cultivar: string;
   source: string;
   propagatedOn: string;
@@ -47,32 +49,75 @@ export function validateAccessionDraft(
   draft: AccessionDraft,
   state: WorkspaceState,
   currentId?: string,
+  options: { accessionNoLocked?: boolean } = {},
 ): Result<AccessionDraft> {
   const errors: Array<ReturnType<typeof fieldError>> = [];
   if (!state.trials.some((trial) => trial.id === draft.trialId)) {
     errors.push(fieldError("trialId", "unknown", "请选择有效试验"));
   }
-  if (!/^ACC-\d{4,}$/.test(draft.accessionNo.trim())) {
+  const accessionNo = draft.accessionNo.trim();
+  if (options.accessionNoLocked && accessionNo !== draft.accessionNo) {
+    errors.push(
+      fieldError(
+        "accessionNo",
+        "immutable",
+        "已有材料编号不能修改；规则变更只影响新生成的编号",
+      ),
+    );
+  }
+  if (
+    !/^[A-Za-z0-9][A-Za-z0-9-]{1,}$/.test(accessionNo) ||
+    accessionNo.includes("--")
+  ) {
     errors.push(
       fieldError(
         "accessionNo",
         "invalid_format",
-        "请使用类似 ACC-0001 的材料编号",
+        "材料编号需为字母、数字和连字符，例如 ACC-0001 或 SOL-20260916-001",
       ),
     );
   }
-  const duplicate = state.accessions.find(
-    (item) =>
-      item.accessionNo === draft.accessionNo.trim() && item.id !== currentId,
-  );
+  if (accessionNo.length > MAX_ACCESSION_NO_LENGTH) {
+    errors.push(
+      fieldError(
+        "accessionNo",
+        "too_long",
+        `材料编号不能超过 ${MAX_ACCESSION_NO_LENGTH} 个字符`,
+      ),
+    );
+  }
+  const duplicate = state.accessions.find((item) => {
+    if (item.id === currentId) {
+      return false;
+    }
+    return item.accessionNo.trim().toLowerCase() === accessionNo.toLowerCase();
+  });
   if (duplicate) {
     errors.push(
       fieldError(
         "accessionNo",
         "duplicate",
-        "该材料编号已被使用",
+        `该材料编号已被 ${duplicate.cultivar} 使用`,
       ),
     );
+  }
+  if (draft.numberRuleId) {
+    const rule = state.numberRules.find(
+      (item) => item.id === draft.numberRuleId,
+    );
+    if (!rule) {
+      errors.push(
+        fieldError("numberRuleId", "unknown", "编号规则不存在，请重新生成或手工指定编号"),
+      );
+    } else if (rule.status === "inactive") {
+      errors.push(
+        fieldError(
+          "numberRuleId",
+          "rule_inactive",
+          "编号规则已停用，不能继续按它生成新编号，请选择其他规则或手工指定编号",
+        ),
+      );
+    }
   }
   if (draft.cultivar.trim().length < 2) {
     errors.push(fieldError("cultivar", "required", "请填写品种名称"));
@@ -143,6 +188,7 @@ export function createAccession(
     id: createId("acc"),
     trialId: value.trialId,
     accessionNo: value.accessionNo,
+    numberRuleId: value.numberRuleId,
     cultivar: value.cultivar,
     source: value.source,
     propagatedOn: value.propagatedOn,
@@ -161,7 +207,27 @@ export function updateAccession(
   draft: AccessionDraft,
   state: WorkspaceState,
 ): Result<Accession> {
-  const validated = validateAccessionDraft(draft, state, current.id);
+  if (draft.accessionNo.trim() !== current.accessionNo) {
+    return fail([
+      fieldError(
+        "accessionNo",
+        "immutable",
+        "已有材料编号不能修改；编号规则的调整只影响新生成的编号",
+      ),
+    ]);
+  }
+  if (draft.numberRuleId !== current.numberRuleId && draft.numberRuleId) {
+    return fail([
+      fieldError(
+        "numberRuleId",
+        "immutable",
+        "历史材料的编号来源不能被改写",
+      ),
+    ]);
+  }
+  const validated = validateAccessionDraft(draft, state, current.id, {
+    accessionNoLocked: true,
+  });
   if (!validated.ok) {
     return validated;
   }
@@ -169,7 +235,8 @@ export function updateAccession(
   return ok({
     ...current,
     trialId: value.trialId,
-    accessionNo: value.accessionNo,
+    accessionNo: current.accessionNo,
+    numberRuleId: current.numberRuleId,
     cultivar: value.cultivar,
     source: value.source,
     propagatedOn: value.propagatedOn,
@@ -183,6 +250,50 @@ export function updateAccession(
     retirementReason: current.retirementReason,
     replacementId: current.replacementId,
     retirementHistory: current.retirementHistory,
+  });
+}
+
+export function bumpRulesForAccessions(
+  state: WorkspaceState,
+  accessions: Accession[],
+): WorkspaceState["numberRules"] {
+  const maxSequenceByRule = new Map<string, number>();
+  for (const accession of accessions) {
+    if (!accession.numberRuleId) {
+      continue;
+    }
+    const rule = state.numberRules.find(
+      (item) => item.id === accession.numberRuleId,
+    );
+    if (!rule) {
+      continue;
+    }
+    const dateToken =
+      rule.datePart === "none"
+        ? ""
+        : accession.propagatedOn.replace(/-/g, "").slice(
+            0,
+            rule.datePart === "year" ? 4 : rule.datePart === "yearMonth" ? 6 : 8,
+          );
+    const prefixParts = [rule.prefix, dateToken].filter(Boolean).join("-");
+    const matcher = new RegExp(
+      `^${prefixParts.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-(\\d+)$`,
+    );
+    const match = matcher.exec(accession.accessionNo);
+    if (match) {
+      maxSequenceByRule.set(
+        rule.id,
+        Math.max(maxSequenceByRule.get(rule.id) ?? 0, Number(match[1])),
+      );
+    }
+  }
+  const timestamp = new Date().toISOString();
+  return state.numberRules.map((rule) => {
+    const max = maxSequenceByRule.get(rule.id);
+    if (max === undefined || max + 1 <= rule.nextSequence) {
+      return rule;
+    }
+    return { ...rule, nextSequence: max + 1, updatedAt: timestamp };
   });
 }
 
@@ -381,14 +492,6 @@ function normalizeTimestamp(value: string): string | undefined {
   }
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
-}
-
-export function nextAccessionNumber(state: WorkspaceState): string {
-  const largest = state.accessions.reduce((max, item) => {
-    const match = /^ACC-(\d+)$/.exec(item.accessionNo);
-    return match ? Math.max(max, Number(match[1])) : max;
-  }, 0);
-  return createAccessionNumber(largest + 1);
 }
 
 export function accessionMatchesQuery(

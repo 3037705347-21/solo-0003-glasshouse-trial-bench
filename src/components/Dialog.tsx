@@ -39,6 +39,7 @@ export function Dialog({
             size="sm"
             onClick={onClose}
             aria-label="关闭对话框"
+            data-testid="dialog-close"
           >
             <X size={18} />
           </Button>

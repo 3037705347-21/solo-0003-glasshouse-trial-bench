@@ -1,4 +1,8 @@
-import type { Accession, WorkspaceState } from "../domain/types";
+import type {
+  Accession,
+  NumberRule,
+  WorkspaceState,
+} from "../domain/types";
 import { isWorkspaceState } from "./types";
 import { createSampleWorkspaceState } from "./sampleData";
 
@@ -16,12 +20,32 @@ function normalizeAccession(accession: Accession): Accession {
   };
 }
 
+function normalizeNumberRule(rule: NumberRule): NumberRule {
+  return {
+    ...rule,
+    status: rule.status === "inactive" ? "inactive" : "active",
+    sequenceScope: rule.sequenceScope === "perDate" ? "perDate" : "global",
+    datePart: ["none", "year", "yearMonth", "yearMonthDay"].includes(
+      rule.datePart,
+    )
+      ? rule.datePart
+      : "none",
+    nextSequence:
+      Number.isInteger(rule.nextSequence) && rule.nextSequence > 0
+        ? rule.nextSequence
+        : 1,
+  };
+}
+
 export function normalizeWorkspaceState(
   state: WorkspaceState,
 ): WorkspaceState {
   return {
     ...state,
     accessions: state.accessions.map(normalizeAccession),
+    numberRules: Array.isArray(state.numberRules)
+      ? state.numberRules.map(normalizeNumberRule)
+      : [],
   };
 }
 

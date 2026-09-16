@@ -22,10 +22,31 @@ export interface AccessionRetirementRecord {
   restoredAt?: string;
 }
 
+export type NumberRuleStatus = "active" | "inactive";
+export type NumberRuleScopeType = "trial" | "cropFamily" | "source";
+export type NumberRuleDatePart = "none" | "year" | "yearMonth" | "yearMonthDay";
+export type NumberSequenceScope = "global" | "perDate";
+
+export interface NumberRule {
+  id: string;
+  name: string;
+  scopeType: NumberRuleScopeType;
+  scopeValue: string;
+  prefix: string;
+  datePart: NumberRuleDatePart;
+  sequencePadding: number;
+  sequenceScope: NumberSequenceScope;
+  nextSequence: number;
+  status: NumberRuleStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Accession {
   id: string;
   trialId: string;
   accessionNo: string;
+  numberRuleId?: string;
   cultivar: string;
   source: string;
   propagatedOn: string;
@@ -115,6 +136,7 @@ export interface ClearanceSnapshot {
 export interface WorkspaceState {
   trials: Trial[];
   accessions: Accession[];
+  numberRules: NumberRule[];
   benches: Bench[];
   observationPasses: ObservationPass[];
   flags: Flag[];

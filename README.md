@@ -2,6 +2,8 @@
 
 温室试验台是一个离线优先的 React 工作台，用于管理作物试验。它把材料登记、台架分配、生长观测和放行检查集中到一个本地浏览器工具中。材料支持停用、替代和恢复，停用后保留历史观测、标记、台架与放行引用，但不会继续出现在新分配或新观测的选择器中。
 
+材料编号由可配置的编号规则生成。负责人可以按试验、作物科属或来源设置前缀、日期段（无 / 年 / 年月 / 年月日）和序号方式（全局连续或按日期重新计数）。录入和批量导入时会先预览下一批编号并校验格式、长度和重复；试验复制时沿用同一规则并自动跳过规则已停用的材料。规则修改只影响新生成的编号，已有材料编号不可改写。
+
 ## 本地运行
 
 ```bash
@@ -25,6 +27,9 @@ npm run build
 
 ```bash
 node scripts/smoke.mjs curate-accession-roster
+node scripts/smoke.mjs configure-number-rules
+node scripts/smoke.mjs batch-import-accessions
+node scripts/smoke.mjs copy-trial-numbers
 node scripts/smoke.mjs assign-accession-bench
 node scripts/smoke.mjs record-observation-pass
 node scripts/smoke.mjs advance-trial-clearance
@@ -32,6 +37,12 @@ node scripts/smoke.mjs retire-accession-replacement
 ```
 
 每条命令都会启动并关闭一个本地 Vite 预览服务，端口为 `4177`。检查过程不调用外部服务，也不依赖在线数据库。
+
+无浏览器环境下可用 rolldown 执行领域层和渲染层的 Node 检查：
+
+```bash
+node_modules/.bin/rolldown scripts/verify-numbering.mts --platform node --format esm -o /tmp/verify-numbering.mjs && node /tmp/verify-numbering.mjs
+```
 
 ## 目录结构
 

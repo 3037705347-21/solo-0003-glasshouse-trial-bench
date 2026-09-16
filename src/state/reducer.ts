@@ -20,16 +20,49 @@ export function workspaceReducer(
             : trial,
         ),
       };
+    case "trial/copied":
+      return {
+        ...state,
+        trials: [...state.trials, action.trial],
+        accessions: [...state.accessions, ...action.accessions],
+        numberRules: action.numberRules,
+      };
     case "accession/created":
       return {
         ...state,
         accessions: [...state.accessions, action.accession],
+        numberRules: action.numberRules ?? state.numberRules,
       };
     case "accession/updated":
       return {
         ...state,
         accessions: state.accessions.map((accession) =>
           accession.id === action.accession.id ? action.accession : accession,
+        ),
+      };
+    case "accessions/imported":
+      return {
+        ...state,
+        accessions: [...state.accessions, ...action.accessions],
+        numberRules: action.numberRules,
+      };
+    case "numberRule/created":
+      return {
+        ...state,
+        numberRules: [...state.numberRules, action.rule],
+      };
+    case "numberRule/updated":
+      return {
+        ...state,
+        numberRules: state.numberRules.map((rule) =>
+          rule.id === action.rule.id ? action.rule : rule,
+        ),
+      };
+    case "numberRule/removed":
+      return {
+        ...state,
+        numberRules: state.numberRules.filter(
+          (rule) => rule.id !== action.ruleId,
         ),
       };
     case "bench/assigned":
