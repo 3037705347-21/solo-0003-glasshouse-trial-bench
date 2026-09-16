@@ -10,6 +10,7 @@ interface BenchCardProps {
   bench: Bench;
   accessions: Accession[];
   selectedAccession?: Accession;
+  highlighted?: boolean;
   onAssign: (accessionId: string, benchId: string) => void;
   onRelease: (accessionId: string, benchId: string) => void;
 }
@@ -18,6 +19,7 @@ export function BenchCard({
   bench,
   accessions,
   selectedAccession,
+  highlighted = false,
   onAssign,
   onRelease,
 }: BenchCardProps) {
@@ -29,11 +31,16 @@ export function BenchCard({
     selectedAccession && canAssignAccession(selectedAccession, bench),
   );
 
+  const cardClass = [
+    "bench-card",
+    compatible ? "bench-card-compatible" : "",
+    highlighted ? "bench-card-highlighted" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <article
-      className={`bench-card ${compatible ? "bench-card-compatible" : ""}`}
-      data-testid={`bench-card-${bench.id}`}
-    >
+    <article className={cardClass} data-testid={`bench-card-${bench.id}`}>
       <header className="bench-card-header">
         <div>
           <span className="bench-code">{bench.code}</span>

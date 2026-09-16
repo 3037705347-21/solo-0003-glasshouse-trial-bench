@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NotebookPen, Plus } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { Dialog } from "../../components/Dialog";
 import { PageHeader } from "../../components/PageHeader";
@@ -17,11 +18,38 @@ import { PassForm } from "./PassForm";
 
 export function ObservationPage() {
   const { state } = useWorkspace();
-  const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const trialFromUrl = searchParams.get("trial");
+  const [trialId, setTrialId] = useState(() =>
+    trialFromUrl && state.trials.some((trial) => trial.id === trialFromUrl)
+      ? trialFromUrl
+      : (state.trials[0]?.id ?? ""),
+  );
+  const [dialogOpen, setDialogOpen] = useState(
+    () => searchParams.get("new") === "1",
+  );
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const passes = passesForTrial(state, trialId);
   const flags = openFlagsForTrial(state, trialId);
+
+  // 今日工作台跳回时按 URL 预选试验，并在 ?new=1 时直接打开观测表单。
+  useEffect(() => {
+    const nextTrial = searchParams.get("trial");
+    if (nextTrial && state.trials.some((trial) => trial.id === nextTrial)) {
+      setTrialId(nextTrial);
+    }
+    if (searchParams.get("new") === "1") {
+      setDialogOpen(true);
+    }
+  }, [searchParams, state.trials]);
+
+  const handleTrialChange = (next: string) => {
+    setTrialId(next);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("trial", next);
+    nextParams.delete("new");
+    setSearchParams(nextParams, { replace: true });
+  };
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -55,7 +83,16 @@ export function ObservationPage() {
         title="观测记录"
         description="录入测量数据并呈现放行前需要处理的生长标记。"
         actions={
-          <Button onClick={() => setDialogOpen(true)} data-testid="open-observation-form">
+          <Button
+            onClick={() => {
+              const nextParams = new URLSearchParams(searchParams);
+              nextParams.set("trial", trialId);
+              nextParams.set("new", "1");
+              setSearchParams(nextParams, { replace: true });
+              setDialogOpen(true);
+            }}
+            data-testid="open-observation-form"
+          >
             <Plus size={16} />
             新建观测
           </Button>
@@ -65,7 +102,7 @@ export function ObservationPage() {
         <select
           className="compact-select"
           value={trialId}
-          onChange={(event) => setTrialId(event.target.value)}
+          onChange={(event) => handleTrialChange(event.target.value)}
           aria-label="选择试验"
           data-testid="observation-trial-select"
         >
@@ -120,24 +157,37 @@ export function ObservationPage() {
             </div>
           )}
         </section>
-        <FlagPanel flags={flags} />
+        <FlagPanel flags={flags} selectedFlagId={searchParams.get("flag") ?? undefined} />
       </div>
       <Dialog
         open={dialogOpen}
         title="记录观测"
-        onClose={() => setDialogOpen(false)}
+        onClose={() => {
+          setDialogOpen(false);
+          const nextParams = new URLSearchParams(searchParams);
+          nextParams.delete("new");
+          setSearchParams(nextParams, { replace: true });
+        }}
         wide
       >
         {trialId ? (
           <PassForm
             trialId={trialId}
-            onCancel={() => setDialogOpen(false)}
+            onCancel={() => {
+              setDialogOpen(false);
+              const nextParams = new URLSearchParams(searchParams);
+              nextParams.delete("new");
+              setSearchParams(nextParams, { replace: true });
+            }}
             onSaved={() => {
               setDialogOpen(false);
+              const nextParams = new URLSearchParams(searchParams);
+              nextParams.delete("new");
+              setSearchParams(nextParams, { replace: true });
               pushToast({
                 tone: "success",
                 title: "观测已记录",
-                message: "已根据测量数据生成生长标记。",
+                message: "已根据测量数据生成生长标记，今日工作台将即时刷新。",
               });
             }}
           />

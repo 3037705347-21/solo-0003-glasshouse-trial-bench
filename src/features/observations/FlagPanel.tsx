@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Flag, FlagOff } from "lucide-react";
 import { Button } from "../../components/Button";
 import { TextAreaField } from "../../components/fields";
@@ -9,13 +9,35 @@ import { useWorkspace } from "../../state/store";
 
 interface FlagPanelProps {
   flags: DomainFlag[];
+  /** 今日工作台深链 ?flag= 指定后，面板自动选中该标记。 */
+  selectedFlagId?: string;
 }
 
-export function FlagPanel({ flags }: FlagPanelProps) {
+export function FlagPanel({ flags, selectedFlagId }: FlagPanelProps) {
   const { dispatch } = useWorkspace();
-  const [selectedId, setSelectedId] = useState(() => flags[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState(
+    () => selectedFlagId ?? flags[0]?.id ?? "",
+  );
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (selectedFlagId && flags.some((flag) => flag.id === selectedFlagId)) {
+      setSelectedId(selectedFlagId);
+      setNote("");
+      setError(undefined);
+    }
+  }, [selectedFlagId, flags]);
+
+  // 当前选中项被解决或豁免后，自动落到列表中的第一条开放标记。
+  useEffect(() => {
+    if (!flags.some((flag) => flag.id === selectedId)) {
+      setSelectedId(flags[0]?.id ?? "");
+      setNote("");
+      setError(undefined);
+    }
+  }, [flags, selectedId]);
+
   const selected = flags.find((flag) => flag.id === selectedId) ?? flags[0];
 
   const applyTransition = (next: "resolved" | "waived") => {

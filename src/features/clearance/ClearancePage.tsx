@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { Play, ShieldCheck } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Pause, Play, ShieldCheck } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "../../components/Button";
 import { PageHeader } from "../../components/PageHeader";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
@@ -14,8 +15,30 @@ import { SnapshotCard } from "./SnapshotCard";
 
 export function ClearancePage() {
   const { state, dispatch } = useWorkspace();
-  const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const trialFromUrl = searchParams.get("trial");
+  const [trialId, setTrialId] = useState(() =>
+    trialFromUrl && state.trials.some((trial) => trial.id === trialFromUrl)
+      ? trialFromUrl
+      : (state.trials[0]?.id ?? ""),
+  );
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // 今日工作台“临近放行”跳回时预选对应试验。
+  useEffect(() => {
+    const nextTrial = searchParams.get("trial");
+    if (nextTrial && state.trials.some((trial) => trial.id === nextTrial)) {
+      setTrialId(nextTrial);
+    }
+  }, [searchParams, state.trials]);
+
+  const handleTrialChange = (next: string) => {
+    setTrialId(next);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("trial", next);
+    setSearchParams(nextParams, { replace: true });
+  };
+
   const latest = latestSnapshotForTrial(state, trialId);
   const trial = state.trials.find((item) => item.id === trialId);
 
@@ -66,8 +89,37 @@ export function ClearancePage() {
     });
     pushToast({
       tone: "success",
-        title: "试验已启动",
-        message: `${trial.code} 已进入进行中状态。`,
+      title: "试验已启动",
+      message: `${trial.code} 已进入进行中状态。`,
+    });
+  };
+
+  const handlePauseToggle = () => {
+    if (!trial) {
+      return;
+    }
+    const next = trial.state === "paused" ? "active" : "paused";
+    const result = transitionTrial(trial, next);
+    if (!result.ok) {
+      pushToast({
+        tone: "error",
+        title: next === "paused" ? "暂停失败" : "恢复失败",
+        message: result.errors[0]?.message,
+      });
+      return;
+    }
+    dispatch({
+      type: "trial/transitioned",
+      trialId: trial.id,
+      state: result.value.state,
+    });
+    pushToast({
+      tone: next === "paused" ? "info" : "success",
+      title: next === "paused" ? "试验已暂停" : "试验已恢复",
+      message:
+        next === "paused"
+          ? `${trial.code} 的今日工作台旧提醒会保留，但不再升级为逾期。`
+          : `${trial.code} 的提醒重新按截止状态汇总。`,
     });
   };
 
@@ -84,10 +136,31 @@ export function ClearancePage() {
               启动试验
             </Button>
           ) : (
-            <Button onClick={handleGenerate} data-testid="generate-clearance">
-              <ShieldCheck size={16} />
-              生成快照
-            </Button>
+            <>
+              {trial?.state === "active" || trial?.state === "paused" ? (
+                <Button
+                  tone="secondary"
+                  onClick={handlePauseToggle}
+                  data-testid="toggle-trial-pause"
+                >
+                  {trial.state === "paused" ? (
+                    <>
+                      <Play size={16} />
+                      恢复试验
+                    </>
+                  ) : (
+                    <>
+                      <Pause size={16} />
+                      暂停试验
+                    </>
+                  )}
+                </Button>
+              ) : null}
+              <Button onClick={handleGenerate} data-testid="generate-clearance">
+                <ShieldCheck size={16} />
+                生成快照
+              </Button>
+            </>
           )
         }
       />
@@ -95,7 +168,7 @@ export function ClearancePage() {
         <select
           className="compact-select"
           value={trialId}
-          onChange={(event) => setTrialId(event.target.value)}
+          onChange={(event) => handleTrialChange(event.target.value)}
           aria-label="选择试验"
           data-testid="clearance-trial-select"
         >

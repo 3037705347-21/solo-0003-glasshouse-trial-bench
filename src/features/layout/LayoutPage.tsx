@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Grid3X3 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { PageHeader } from "../../components/PageHeader";
 import { ToastRegion, type ToastMessage } from "../../components/Toast";
 import { assignAccession, releaseAccession } from "../../domain/bench";
@@ -10,9 +11,54 @@ import { BenchCard } from "./BenchCard";
 
 export function LayoutPage() {
   const { state, dispatch } = useWorkspace();
-  const [trialId, setTrialId] = useState(() => state.trials[0]?.id ?? "");
-  const [selectedAccessionId, setSelectedAccessionId] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const trialFromUrl = searchParams.get("trial");
+  const accessionFromUrl = searchParams.get("accession");
+  const benchFromUrl = searchParams.get("bench");
+  const [trialId, setTrialId] = useState(() =>
+    trialFromUrl && state.trials.some((trial) => trial.id === trialFromUrl)
+      ? trialFromUrl
+      : (state.trials[0]?.id ?? ""),
+  );
+  const [selectedAccessionId, setSelectedAccessionId] = useState(
+    () => accessionFromUrl ?? "",
+  );
+  const [highlightBenchId, setHighlightBenchId] = useState(
+    () => benchFromUrl ?? "",
+  );
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // 今日工作台跳回时预选试验/材料并高亮对应台架，处理完成后即可就地分配或移出。
+  useEffect(() => {
+    const nextTrial = searchParams.get("trial");
+    if (nextTrial && state.trials.some((trial) => trial.id === nextTrial)) {
+      setTrialId(nextTrial);
+    }
+    setSelectedAccessionId(searchParams.get("accession") ?? "");
+    setHighlightBenchId(searchParams.get("bench") ?? "");
+  }, [searchParams, state.trials]);
+
+  useEffect(() => {
+    if (!highlightBenchId) {
+      return;
+    }
+    const element = document.querySelector(
+      `[data-testid="bench-card-${highlightBenchId}"]`,
+    );
+    element?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [highlightBenchId]);
+
+  const updateTrial = (next: string) => {
+    setTrialId(next);
+    setSelectedAccessionId("");
+    const nextParams = new URLSearchParams();
+    nextParams.set("trial", next);
+    const bench = searchParams.get("bench");
+    if (bench) {
+      nextParams.set("bench", bench);
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
 
   const pushToast = (toast: Omit<ToastMessage, "id">) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -89,10 +135,7 @@ export function LayoutPage() {
         <select
           className="compact-select"
           value={trialId}
-          onChange={(event) => {
-            setTrialId(event.target.value);
-            setSelectedAccessionId("");
-          }}
+          onChange={(event) => updateTrial(event.target.value)}
           aria-label="选择试验"
           data-testid="layout-trial-select"
         >
@@ -123,6 +166,7 @@ export function LayoutPage() {
                 bench={bench}
                 accessions={accessions}
                 selectedAccession={selectedAccession}
+                highlighted={highlightBenchId === bench.id}
                 onAssign={handleAssign}
                 onRelease={handleRelease}
               />
